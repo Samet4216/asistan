@@ -1,0 +1,299 @@
+\begin{thebibliography}{10}\itemsep=-1pt
+
+\bibitem{bello2019attention}
+Irwan Bello, Barret Zoph, Ashish Vaswani, Jonathon Shlens, and Quoc~V Le.
+\newblock Attention augmented convolutional networks.
+\newblock {\em arXiv preprint arXiv:1904.09925}, 2019.
+
+\bibitem{cai2018proxylessnas}
+Han Cai, Ligeng Zhu, and Song Han.
+\newblock Proxylessnas: Direct neural architecture search on target task and
+  hardware.
+\newblock {\em arXiv preprint arXiv:1812.00332}, 2018.
+
+\bibitem{cao2019gcnet}
+Yue Cao, Jiarui Xu, Stephen Lin, Fangyun Wei, and Han Hu.
+\newblock Gcnet: Non-local networks meet squeeze-excitation networks and
+  beyond.
+\newblock In {\em Proceedings of the IEEE International Conference on Computer
+  Vision Workshops}, pages 0--0, 2019.
+
+\bibitem{chen2018searching}
+Liang-Chieh Chen, Maxwell Collins, Yukun Zhu, George Papandreou, Barret Zoph,
+  Florian Schroff, Hartwig Adam, and Jon Shlens.
+\newblock Searching for efficient multi-scale architectures for dense image
+  prediction.
+\newblock In {\em {NeurIPS}}, pages 8699--8710, 2018.
+
+\bibitem{chen2014semantic}
+Liang-Chieh Chen, George Papandreou, Iasonas Kokkinos, Kevin Murphy, and Alan~L
+  Yuille.
+\newblock Semantic image segmentation with deep convolutional nets and fully
+  connected crfs.
+\newblock In {\em {ICLR}}, 2015.
+
+\bibitem{chen2017rethinking}
+Liang-Chieh Chen, George Papandreou, Florian Schroff, and Hartwig Adam.
+\newblock Rethinking atrous convolution for semantic image segmentation.
+\newblock {\em arXiv preprint arXiv:1706.05587}, 2017.
+
+\bibitem{chen20182}
+Yunpeng Chen, Yannis Kalantidis, Jianshu Li, Shuicheng Yan, and Jiashi Feng.
+\newblock A\^{} 2-nets: Double attention networks.
+\newblock In {\em Advances in neural information processing systems}, pages
+  352--361, 2018.
+
+\bibitem{cordts2016cityscapes}
+Marius Cordts, Mohamed Omran, Sebastian Ramos, Timo Rehfeld, Markus Enzweiler,
+  Rodrigo Benenson, Uwe Franke, Stefan Roth, and Bernt Schiele.
+\newblock The cityscapes dataset for semantic urban scene understanding.
+\newblock In {\em {CVPR}}, 2016.
+
+\bibitem{everingham2015pascal}
+Mark Everingham, SM~Ali Eslami, Luc Van~Gool, Christopher~KI Williams, John
+  Winn, and Andrew Zisserman.
+\newblock The pascal visual object classes challenge: A retrospective.
+\newblock {\em {IJCV}}, 2015.
+
+\bibitem{fu2019dual}
+Jun Fu, Jing Liu, Haijie Tian, Yong Li, Yongjun Bao, Zhiwei Fang, and Hanqing
+  Lu.
+\newblock Dual attention network for scene segmentation.
+\newblock In {\em {CVPR}}, pages 3146--3154, 2019.
+
+\bibitem{gao2019global}
+Zilin Gao, Jiangtao Xie, Qilong Wang, and Peihua Li.
+\newblock Global second-order pooling convolutional networks.
+\newblock In {\em Proceedings of the IEEE Conference on Computer Vision and
+  Pattern Recognition}, pages 3024--3033, 2019.
+
+\bibitem{hariharan2011semantic}
+Bharath Hariharan, Pablo Arbel{\'a}ez, Lubomir Bourdev, Subhransu Maji, and
+  Jitendra Malik.
+\newblock Semantic contours from inverse detectors.
+\newblock In {\em {ICCV}}, 2011.
+
+\bibitem{He2016}
+Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+\newblock Deep residual learning for image recognition.
+\newblock In {\em {CVPR}}, 2016.
+
+\bibitem{hou2020strip}
+Qibin Hou, Li Zhang, Ming-Ming Cheng, and Jiashi Feng.
+\newblock Strip pooling: Rethinking spatial pooling for scene parsing.
+\newblock In {\em Proceedings of the IEEE/CVF Conference on Computer Vision and
+  Pattern Recognition}, pages 4003--4012, 2020.
+
+\bibitem{howard2019searching}
+Andrew Howard, Mark Sandler, Grace Chu, Liang-Chieh Chen, Bo Chen, Mingxing
+  Tan, Weijun Wang, Yukun Zhu, Ruoming Pang, Vijay Vasudevan, et~al.
+\newblock Searching for mobilenetv3.
+\newblock In {\em {ICCV}}, pages 1314--1324, 2019.
+
+\bibitem{howard2017mobilenets}
+Andrew~G Howard, Menglong Zhu, Bo Chen, Dmitry Kalenichenko, Weijun Wang,
+  Tobias Weyand, Marco Andreetto, and Hartwig Adam.
+\newblock Mobilenets: Efficient convolutional neural networks for mobile vision
+  applications.
+\newblock {\em arXiv preprint arXiv:1704.04861}, 2017.
+
+\bibitem{hu2018gather}
+Jie Hu, Li Shen, Samuel Albanie, Gang Sun, and Andrea Vedaldi.
+\newblock Gather-excite: Exploiting feature context in convolutional neural
+  networks.
+\newblock In {\em Advances in neural information processing systems}, pages
+  9401--9411, 2018.
+
+\bibitem{hu2018squeeze}
+Jie Hu, Li Shen, and Gang Sun.
+\newblock Squeeze-and-excitation networks.
+\newblock In {\em {CVPR}}, pages 7132--7141, 2018.
+
+\bibitem{huang2018ccnet}
+Zilong Huang, Xinggang Wang, Lichao Huang, Chang Huang, Yunchao Wei, and Wenyu
+  Liu.
+\newblock Ccnet: Criss-cross attention for semantic segmentation.
+\newblock {\em arXiv preprint arXiv:1811.11721}, 2018.
+
+\bibitem{li2019hbonet}
+Duo Li, Aojun Zhou, and Anbang Yao.
+\newblock Hbonet: Harmonious bottleneck on two orthogonal dimensions.
+\newblock In {\em Proceedings of the IEEE International Conference on Computer
+  Vision}, pages 3316--3325, 2019.
+
+\bibitem{lin2014microsoft}
+Tsung-Yi Lin, Michael Maire, Serge Belongie, James Hays, Pietro Perona, Deva
+  Ramanan, Piotr Doll{\'a}r, and C~Lawrence Zitnick.
+\newblock Microsoft coco: Common objects in context.
+\newblock In {\em {ECCV}}, 2014.
+
+\bibitem{linsley2018global}
+Drew Linsley, Dan Shiebler, Sven Eberhardt, and Thomas Serre.
+\newblock Learning what and where to attend.
+\newblock In {\em {ICLR}}, 2019.
+
+\bibitem{liu2018progressive}
+Chenxi Liu, Barret Zoph, Maxim Neumann, Jonathon Shlens, Wei Hua, Li-Jia Li, Li
+  Fei-Fei, Alan Yuille, Jonathan Huang, and Kevin Murphy.
+\newblock Progressive neural architecture search.
+\newblock In {\em Proceedings of the European Conference on Computer Vision
+  (ECCV)}, pages 19--34, 2018.
+
+\bibitem{liu2018darts}
+Hanxiao Liu, Karen Simonyan, and Yiming Yang.
+\newblock Darts: Differentiable architecture search.
+\newblock {\em arXiv preprint arXiv:1806.09055}, 2018.
+
+\bibitem{liu2020improving}
+Jiang-Jiang Liu, Qibin Hou, Ming-Ming Cheng, Changhu Wang, and Jiashi Feng.
+\newblock Improving convolutional networks with self-calibrated convolutions.
+\newblock In {\em Proceedings of the IEEE/CVF Conference on Computer Vision and
+  Pattern Recognition}, pages 10096--10105, 2020.
+
+\bibitem{liu2016ssd}
+Wei Liu, Dragomir Anguelov, Dumitru Erhan, Christian Szegedy, Scott Reed,
+  Cheng-Yang Fu, and Alexander~C Berg.
+\newblock Ssd: Single shot multibox detector.
+\newblock In {\em {ECCV}}, 2016.
+
+\bibitem{ma2018shufflenet}
+Ningning Ma, Xiangyu Zhang, Hai-Tao Zheng, and Jian Sun.
+\newblock Shufflenet v2: Practical guidelines for efficient cnn architecture
+  design.
+\newblock In {\em Proceedings of the European conference on computer vision
+  (ECCV)}, pages 116--131, 2018.
+
+\bibitem{misra2021rotate}
+Diganta Misra, Trikay Nalamada, Ajay~Uppili Arasanipalai, and Qibin Hou.
+\newblock Rotate to attend: Convolutional triplet attention module.
+\newblock In {\em Proceedings of the IEEE/CVF Winter Conference on Applications
+  of Computer Vision}, pages 3139--3148, 2021.
+
+\bibitem{mnih2014recurrent}
+Volodymyr Mnih, Nicolas Heess, Alex Graves, et~al.
+\newblock Recurrent models of visual attention.
+\newblock In {\em Advances in neural information processing systems}, pages
+  2204--2212, 2014.
+
+\bibitem{park2018bam}
+Jongchan Park, Sanghyun Woo, Joon-Young Lee, and In~So Kweon.
+\newblock Bam: Bottleneck attention module.
+\newblock {\em arXiv preprint arXiv:1807.06514}, 2018.
+
+\bibitem{paszke2019pytorch}
+Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer, James Bradbury, Gregory
+  Chanan, Trevor Killeen, Zeming Lin, Natalia Gimelshein, Luca Antiga, et~al.
+\newblock Pytorch: An imperative style, high-performance deep learning library.
+\newblock In {\em {NeurIPS}}, pages 8024--8035, 2019.
+
+\bibitem{real2019regularized}
+Esteban Real, Alok Aggarwal, Yanping Huang, and Quoc~V Le.
+\newblock Regularized evolution for image classifier architecture search.
+\newblock In {\em Proceedings of the aaai conference on artificial
+  intelligence}, volume~33, pages 4780--4789, 2019.
+
+\bibitem{russakovsky2015imagenet}
+Olga Russakovsky, Jia Deng, Hao Su, Jonathan Krause, Sanjeev Satheesh, Sean Ma,
+  Zhiheng Huang, Andrej Karpathy, Aditya Khosla, Michael Bernstein, et~al.
+\newblock Imagenet large scale visual recognition challenge.
+\newblock {\em {IJCV}}, 115(3):211--252, 2015.
+
+\bibitem{sandler2018mobilenetv2}
+Mark Sandler, Andrew Howard, Menglong Zhu, Andrey Zhmoginov, and Liang-Chieh
+  Chen.
+\newblock Mobilenetv2: Inverted residuals and linear bottlenecks.
+\newblock In {\em {CVPR}}, pages 4510--4520, 2018.
+
+\bibitem{selvaraju2017grad}
+Ramprasaath~R Selvaraju, Michael Cogswell, Abhishek Das, Ramakrishna Vedantam,
+  Devi Parikh, and Dhruv Batra.
+\newblock Grad-cam: Visual explanations from deep networks via gradient-based
+  localization.
+\newblock In {\em {ICCV}}, pages 618--626, 2017.
+
+\bibitem{simonyan2014very}
+Karen Simonyan and Andrew Zisserman.
+\newblock Very deep convolutional networks for large-scale image recognition.
+\newblock In {\em {ICLR}}, 2015.
+
+\bibitem{tan2019mnasnet}
+Mingxing Tan, Bo Chen, Ruoming Pang, Vijay Vasudevan, Mark Sandler, Andrew
+  Howard, and Quoc~V Le.
+\newblock Mnasnet: Platform-aware neural architecture search for mobile.
+\newblock In {\em Proceedings of the IEEE Conference on Computer Vision and
+  Pattern Recognition}, pages 2820--2828, 2019.
+
+\bibitem{tan2019efficientnet}
+Mingxing Tan and Quoc~V Le.
+\newblock Efficientnet: Rethinking model scaling for convolutional neural
+  networks.
+\newblock In {\em ICML}, 2019.
+
+\bibitem{tan2019mixconv}
+Mingxing Tan and Quoc~V Le.
+\newblock Mixconv: Mixed depthwise convolutional kernels.
+\newblock {\em CoRR, abs/1907.09595}, 2019.
+
+\bibitem{tsotsos2011computational}
+John~K Tsotsos.
+\newblock {\em A computational perspective on visual attention}.
+\newblock MIT Press, 2011.
+
+\bibitem{tsotsos1990analyzing}
+John~K Tsotsos et~al.
+\newblock Analyzing vision at the complexity level.
+\newblock {\em Behavioral and brain sciences}, 13(3):423--469, 1990.
+
+\bibitem{wang2020axial}
+Huiyu Wang, Yukun Zhu, Bradley Green, Hartwig Adam, Alan Yuille, and
+  Liang-Chieh Chen.
+\newblock Axial-deeplab: Stand-alone axial-attention for panoptic segmentation.
+\newblock {\em arXiv preprint arXiv:2003.07853}, 2020.
+
+\bibitem{wang2018non}
+Xiaolong Wang, Ross Girshick, Abhinav Gupta, and Kaiming He.
+\newblock Non-local neural networks.
+\newblock In {\em {CVPR}}, 2018.
+
+\bibitem{woo2018cbam}
+Sanghyun Woo, Jongchan Park, Joon-Young Lee, and In So~Kweon.
+\newblock Cbam: Convolutional block attention module.
+\newblock In {\em Proceedings of the European conference on computer vision
+  (ECCV)}, pages 3--19, 2018.
+
+\bibitem{wu2019fbnet}
+Bichen Wu, Xiaoliang Dai, Peizhao Zhang, Yanghan Wang, Fei Sun, Yiming Wu,
+  Yuandong Tian, Peter Vajda, Yangqing Jia, and Kurt Keutzer.
+\newblock Fbnet: Hardware-aware efficient convnet design via differentiable
+  neural architecture search.
+\newblock In {\em Proceedings of the IEEE Conference on Computer Vision and
+  Pattern Recognition}, pages 10734--10742, 2019.
+
+\bibitem{xie2017aggregated}
+Saining Xie, Ross Girshick, Piotr Doll{\'a}r, Zhuowen Tu, and Kaiming He.
+\newblock Aggregated residual transformations for deep neural networks.
+\newblock In {\em {CVPR}}, 2017.
+
+\bibitem{xu2015show}
+Kelvin Xu, Jimmy Ba, Ryan Kiros, Kyunghyun Cho, Aaron Courville, Ruslan
+  Salakhudinov, Rich Zemel, and Yoshua Bengio.
+\newblock Show, attend and tell: Neural image caption generation with visual
+  attention.
+\newblock In {\em ICML}, pages 2048--2057, 2015.
+
+\bibitem{zhao2016pyramid}
+Hengshuang Zhao, Jianping Shi, Xiaojuan Qi, Xiaogang Wang, and Jiaya Jia.
+\newblock Pyramid scene parsing network.
+\newblock In {\em {CVPR}}, 2017.
+
+\bibitem{daquan2020rethinking}
+Daquan Zhou, Qibin Hou, Yunpeng Chen, Jiashi Feng, and Shuicheng Yan.
+\newblock Rethinking bottleneck structure for efficient mobile network design.
+\newblock In {\em {ECCV}}, 2020.
+
+\bibitem{zoph2018learning}
+Barret Zoph, Vijay Vasudevan, Jonathon Shlens, and Quoc~V Le.
+\newblock Learning transferable architectures for scalable image recognition.
+\newblock In {\em {CVPR}}, pages 8697--8710, 2018.
+
+\end{thebibliography}

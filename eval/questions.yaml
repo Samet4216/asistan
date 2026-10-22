@@ -1,0 +1,91 @@
+- id: q01
+  type: conceptual
+  question: "How does Coordinate Attention differ from standard Squeeze-and-Excitation (SE) channel attention?"
+  expected_source: "2103.02907:Introduction"
+  key_points:
+    - "SE squeezes spatial information via 2D global average pooling losing positional detail"
+    - "Coordinate attention decomposes channel attention into two 1D feature encoding directions along horizontal and vertical axes"
+    - "Preserves precise spatial positional information"
+
+- id: q02
+  type: paper-detail
+  question: "What pooling operations are used in Coordinate Attention to factorize spatial coordinates?"
+  expected_source: "2103.02907:Coordinate Attention"
+  key_points:
+    - "Two 1D average pooling operations"
+    - "One along the horizontal coordinate (X-axis)"
+    - "One along the vertical coordinate (Y-axis)"
+    - "Produces direction-aware and position-sensitive feature maps"
+
+- id: q03
+  type: paper-detail
+  question: "Why does standard 2D global pooling struggle to preserve spatial location in vision backbones?"
+  expected_source: "2103.02907:Mobile Network Architectures"
+  key_points:
+    - "Averages all spatial coordinates into a single scalar per channel"
+    - "Destroys exact spatial coordinates essential for object detection and localization"
+
+- id: q04
+  type: telemetry
+  question: "What does it signify when train/box_loss steadily drops from epoch 10 to 20 while val/box_loss increases?"
+  expected_source: "AUTO-TELEMETRY"
+  key_points:
+    - "Overfitting signature"
+    - "Model memorizing training data while failing to generalize to validation distribution"
+    - "Requires regularization, data augmentation, or early stopping"
+
+- id: q05
+  type: telemetry
+  question: "If NaN is detected in loss starting at epoch 3, what are the primary root causes?"
+  expected_source: "AUTO-TELEMETRY"
+  key_points:
+    - "Exploding gradients"
+    - "Excessive learning rate (lr0)"
+    - "Numerical instability in loss calculation (e.g., log of zero or division by zero)"
+    - "Missing gradient clipping"
+
+- id: q06
+  type: my-error
+  question: "Why would placing dropout immediately before an attention projection layer disrupt attention weights?"
+  expected_source: "Vault/03_Experiment_Logs"
+  key_points:
+    - "Randomly zeros out key/query features before softmax projection"
+    - "Injects high variance into attention entropy"
+    - "Dropout should typically be applied after attention softmax or on final feed-forward output"
+
+- id: q07
+  type: conceptual
+  question: "What is the primary motivation for identity shortcut connections in residual networks?"
+  expected_source: "1512.03385:Introduction"
+  key_points:
+    - "Mitigates vanishing and exploding gradients in deep networks"
+    - "Allows gradients to propagate directly through identity mapping"
+    - "Simplifies optimization of residual function F(x) = H(x) - x"
+
+- id: q08
+  type: conceptual
+  question: "In Vision Transformers (ViT), how are 2D images converted into sequence inputs for standard transformer encoders?"
+  expected_source: "2010.11929:Method"
+  key_points:
+    - "Image is split into fixed-size non-overlapping 2D patches (e.g., 16x16)"
+    - "Patches are flattened and linearly projected into D-dimensional patch embeddings"
+    - "1D learnable positional embeddings and a [class] token are prepended"
+
+- id: q09
+  type: paper-detail
+  question: "What activation function is applied after the shared 1x1 convolution in the Coordinate Attention block?"
+  expected_source: "2103.02907:Coordinate Attention"
+  key_points:
+    - "Non-linear activation function"
+    - "Non-linear transform such as Hard-Swish or ReLU6"
+    - "Followed by split and sigmoid re-weighting"
+
+- id: q10
+  type: hypothesis
+  question: "Can we replace 2D convolutional backbones entirely with global multi-head self-attention on resource-constrained 6GB VRAM edge devices for 1280x1280 object detection?"
+  expected_source: "Limitations / Memory Analysis"
+  key_points:
+    - "Quadratic memory and compute complexity O(N^2) with respect to high token resolution"
+    - "1280x1280 image produces 6400 tokens at 16x16 patch size"
+    - "Exceeds 6GB VRAM during activation and attention map caching"
+    - "Local window attention (like Swin) or hybrid CNN-attention is required"

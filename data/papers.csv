@@ -1,0 +1,6 @@
+arxiv_id,title,year,notes,repo_url
+1706.03762,Attention Is All You Need,2017,Seminal Transformer architecture introducing multi-head self-attention,https://github.com/tensorflow/tensor2tensor
+1512.03385,Deep Residual Learning for Image Recognition,2015,ResNet architecture and identity shortcut connections,https://github.com/KaimingHe/deep-residual-networks
+2010.11929,An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale,2020,Vision Transformer (ViT) standard formulation,https://github.com/google-research/vision_transformer
+2103.02907,Coordinate Attention for Efficient Mobile Network Design,2021,Coordinate Attention mechanism embedding position into channel attention for vision,https://github.com/Andrew-Qibin/CoordAttention
+2103.14030,Swin Transformer: Hierarchical Vision Transformer using Shifted Windows,2021,Shifted window multi-scale self-attention for detection,https://github.com/microsoft/Swin-Transformer

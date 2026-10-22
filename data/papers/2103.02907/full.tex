@@ -1,0 +1,1374 @@
+\documentclass[final]{cvpr}
+
+%\usepackage{cvpr}
+\usepackage{times}
+\usepackage{epsfig}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{subfigure}
+\usepackage{color}
+\usepackage{multirow}
+\usepackage{diagbox}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{overpic}
+\usepackage[table]{xcolor}
+\makeindex
+
+% \graphicspath{{./figs/}}
+\DeclareGraphicsExtensions{.pdf,.jpg,.png}
+
+
+\newcommand{\Todo}[1]{{\textcolor{red}{#1}}}
+\def\ie{\emph{i.e.,~}}
+\def\eg{\emph{e.g.,~}}
+\def\etal{{\em et al.~}}
+
+\usepackage{pifont}
+\usepackage{overpic}
+\newcommand{\cmark}{\ding{51}}%
+\newcommand{\xmark}{\ding{55}}%
+
+\newcommand{\hou}[1]{{\textcolor{blue}{[QB: #1]}}}
+\newcommand{\JS}[1]{{\textcolor{red}{[JS: #1]}}}
+
+\newcommand{\algref}[1]{Alg.~\ref{#1}}
+\newcommand{\myPara}[1]{\vspace{.05in}\noindent\textbf{#1.}}
+\usepackage{url}
+
+
+% Include other packages here, before hyperref.
+
+% If you comment hyperref and then uncomment it, you should delete
+% egpaper.aux before re-running latex.  (Or just hit 'q' on the first latex
+% run, let it finish, and you should be clear).
+% \usepackage[pagebackref=false,breaklinks=true,letterpaper=true,colorlinks]{hyperref}
+\definecolor{mygreen}{RGB}{0,100,0}
+\definecolor{myred}{RGB}{150,0,0}
+% If you comment hyperref and then uncomment it, you should delete
+% egpaper.aux before re-running latex.  (Or just hit 'q' on the first latex
+% run, let it finish, and you should be clear).
+\usepackage{hyperref}
+\hypersetup{pagebackref=false,colorlinks=true,linkcolor=myred,citecolor=mygreen,bookmarks=false,urlcolor=black}
+
+%\cvprfinalcopy % *** Uncomment this line for the final submission
+
+\def\cvprPaperID{2807} % *** Enter the CVPR Paper ID here
+\def\confYear{CVPR 2021}
+%\def\httilde{\mbox{\tt\raisebox{-.5ex}{\symbol{126}}}}
+
+% Pages are numbered in submission  mode, and unnumbered in camera-ready
+%\ifcvprfinal\pagestyle{empty}\fi
+
+% Pages are numbered in submission mode, and unnumbered in camera-ready
+% \ifcvprfinal\pagestyle{empty}\fi
+%\setcounter{page}{4321}
+\begin{document}
+
+
+%%%%%%%%% TITLE
+\title{Coordinate Attention for Efficient Mobile Network Design}
+
+\author{Qibin Hou$^1$ \qquad Daquan Zhou$^1$ \qquad Jiashi Feng$^1$ \\
+  $^1$National University of Singapore \\
+  \small \url{{andrewhoux, zhoudaquan21}@gmail.com}
+}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+Recent studies on mobile network design have demonstrated the remarkable effectiveness of channel attention (\eg the Squeeze-and-Excitation attention) for lifting model performance, but they generally neglect the positional information, which is important for generating spatially selective attention maps.
+%
+In this paper, we propose a novel attention mechanism for mobile networks by embedding positional information into channel attention, which we call ``coordinate attention''.
+%quanhong: 注意，coordinate是个动词，我感觉应该是coordinated
+Unlike channel attention that transforms a feature tensor to a single feature vector via 2D global pooling, the coordinate attention factorizes channel attention into two 1D feature encoding processes that aggregate features along the two spatial directions, respectively.
+%
+In this way, long-range dependencies can be captured along one spatial direction and meanwhile precise positional information can be preserved along the other spatial direction.
+%
+The resulting feature maps are then encoded separately into a pair of direction-aware and position-sensitive attention maps that can be complementarily applied to the input feature map to augment the representations of the objects of interest.
+%
+Our coordinate attention is simple and can be flexibly plugged into classic mobile networks, such as MobileNetV2,
+MobileNeXt, and EfficientNet with nearly no computational overhead.
+%
+Extensive experiments demonstrate that our coordinate attention is not only beneficial to ImageNet classification but more interestingly, behaves better in down-stream tasks, such as object detection and semantic segmentation.
+%
+Code is available at \url{https://github.com/Andrew-Qibin/CoordAttention}.
+
+\end{abstract}
+
+\section{Introduction} \label{sec:introduction}
+
+% \textcolor{red}{[JS: attention method has been widely deployed for boosting the performance of modern deep neural network models. But its application for mobile networks (with limited model size) significantly lags behind its application for large networks. The main reason is the computation overhead brought by attention is not affordable for mobile networks. Therefore, though various attention methods have been proposed, SE is still the only choice for most cases. 
+% Then in second paragraph: explian the SE limitation. ]}
+
+
+% Attention mechanisms have been extensively studied~\cite{xu2015show,mnih2014recurrent} and widely applied in a variety of computer vision tasks~\cite{hu2018squeeze,woo2018cbam,cao2019gcnet,liu2020improving,fu2019dual,hou2020strip}, as they are capable of not only telling where to attend but also augmenting the representations of the objects of interest.
+% %
+% The intuition behind attention is to estimate the importance of different feature channels or spatial locations so that models are able to focus more on the target objects when extracting features while suppressing the irrelevant background.
+% %
+% A representative attention method is the Squeeze-and-Excitation (SE) block \cite{hu2018squeeze}, which effectively improves the model performance by computing channel attention but with negligible computation overhead.
+
+Attention mechanisms, used to tell a model ``what'' and ``where'' to attend, have been extensively studied~\cite{xu2015show,mnih2014recurrent} and widely deployed for boosting the performance of modern deep neural networks
+\cite{hu2018squeeze,woo2018cbam,cao2019gcnet,liu2020improving,fu2019dual,hou2020strip}.
+%
+% The intuition behind attention is to balance
+% the importance of different feature channels 
+% or spatial locations so that models with attention 
+% can learn `what' and `where' to attend along
+% both the channel and spatial dimensions.
+%
+% However, most recent attention mechanisms are designed for
+% large networks .
+However, their application for mobile networks (with limited model size) significantly lags behind that for large networks \cite{simonyan2014very,He2016,xie2017aggregated}.
+%
+This is mainly because 
+the computational overhead brought by most attention mechanisms is not affordable for mobile networks.
+% that require limited computational cost.
+
+%
+% This makes the development of attention mechanisms
+% for mobile networks greatly lag behind that for large
+% networks~\cite{li2019global,wang2018non,chen20182}. 
+
+% Different from heavy-weight networks~, mobile networks have limited model size, leading to limited expressive power of the learned features.
+
+
+%
+% A representative attention method is the Squeeze-and-Excitation (SE) block \cite{hu2018squeeze}, which effectively improves the model performance by computing channel attention but with negligible computation overhead.
+
+\begin{figure}[tp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/illu.png}
+  \caption{Performance of different attention methods on three classic vision tasks. 
+  The y-axis labels from left to right are top-1 accuracy, mean IoU, and AP, respectively.
+  Clearly, our approach not only achieves the best result in ImageNet classification \cite{russakovsky2015imagenet} against the SE block \cite{hu2018squeeze} and CBAM \cite{woo2018cbam} 
+  but performs even better in down-stream tasks, like semantic segmentation~\cite{everingham2015pascal} and COCO object detection~\cite{lin2014microsoft}.
+  Results are based on MobileNetV2 \cite{sandler2018mobilenetv2}.
+  }\label{fig:teasor}
+\end{figure}
+
+
+Considering the restricted computation capacity of mobile networks, to date, the most popular attention mechanism for mobile networks is still the Squeeze-and-Excitation (SE) attention~\cite{hu2018squeeze}.
+%
+It computes channel attention with the help of 2D global pooling and provides notable performance gains at considerably low computational cost.
+%
+However, the SE attention only considers encoding inter-channel information but neglects the importance of positional information, which is critical to capturing object structures in vision tasks~\cite{wang2020axial}.
+%
+Later works, such as BAM \cite{park2018bam} and CBAM \cite{woo2018cbam},
+attempt to exploit positional information by reducing the channel dimension of the input tensor and then computing spatial attention using convolutions as shown in Figure~\ref{fig:comp}(b).
+%
+However, convolutions can only capture local relations but fail in modeling long-range dependencies that are essential for vision tasks~\cite{zhao2016pyramid,hou2020strip}.
+
+
+
+In this paper, beyond the first works, 
+we propose a novel and efficient attention mechanism by embedding positional information into channel attention to enable mobile networks to attend over large regions while avoiding incurring significant computation overhead.
+%
+% Unlike channel attention~\cite{hu2018squeeze,woo2018cbam} that 
+To alleviate the positional information loss caused by the 2D global pooling, we factorize channel attention into two parallel 1D feature encoding processes to effectively integrate spatial coordinate information into the generated attention maps. 
+% , which is termed ``coordinate attention''.
+%
+Specifically, our method exploits two 1D global pooling operations to respectively aggregate the input features along the vertical and horizontal directions into two separate direction-aware feature maps.
+%
+These two feature maps with embedded direction-specific information are then separately encoded into two attention maps, each of which captures long-range dependencies of the input feature map along one spatial direction.
+%
+The positional information can thus be preserved in the generated attention maps.
+%
+% Specifically, we exploit two 1D global pooling operators to aggregate feature maps along the two spatial directions, respectively.
+% %
+% The aggregated feature maps are then separately encoded into a pair of attention maps that capture long-range dependencies along one spatial direction and precise positional information along the other one.
+%
+Both attention maps are then applied to the input feature map via multiplication to emphasize the representations of interest.
+%
+We name the proposed attention method as \emph{coordinate attention} as its operation distinguishes spatial direction (\ie coordinate) and generates coordinate-aware attention maps.
+%quanhong: 重复了，上面已经命名过了
+% Our method is inspired by a fundamental pre-algebra knowledge that
+% in a coordinate plane, it is easy to name a point (or location) by its paired
+% of the form of $(x, y)$, where the first number corresponds to the $x$-coordinate and
+% the second to the $y$-coordinate.
+%
+% Similarly, given a discrete 2D image, we can also easily
+% discover the locations of the corresponding object 
+% when a series of ordered pairs are provided.
+% %
+% This motivates us to regard the 2D attention capturing process
+% (which often takes advantage of the 2D global average pooling) 
+% as two separate target object locating steps, each of which
+% is responsible for capturing attentions along either 
+% the $x$-coordinate or the $y$-coordinate.
+%
+% The encoded horizontal and vertical context information is
+% finally separately applied to the input feature maps to calibrate the locations of attentive regions.
+%
+
+% \textcolor{red}{[JS: need to explain the coordinate attention in details. how it is used to augment the features and how it can be easily embedded into the mobile CNNs, before explaining it's advantage. ]}
+
+
+Our coordinate attention offers the following advantages.
+%
+First of all, it captures not only cross-channel but also direction-aware and position-sensitive information, which helps models to 
+more accurately locate and recognize the objects of interest.
+%
+Secondly, our method is flexible and light-weight, and can be easily plugged into classic building blocks of mobile networks, such as the inverted residual block proposed in MobileNetV2~\cite{sandler2018mobilenetv2} and the sandglass block proposed in MobileNeXt~\cite{daquan2020rethinking},
+to augment the features by emphasizing informative representations.
+%
+Thirdly, as a pretrained model, our coordinate attention can bring  significant performance gains to down-stream tasks with mobile networks, especially for those with dense predictions (\eg semantic segmentation),  which we will show in our experiment section.
+
+
+To demonstrate the advantages of the proposed approach over previous attention methods for mobile networks,
+we conduct extensive experiments in both ImageNet classification~\cite{russakovsky2015imagenet} and popular down-stream tasks, including object detection and semantic segmentation.
+%
+With a comparable amount of learnable parameters and computation, our network achieves 0.8\% performance gain in top-1 classification accuracy on ImageNet.
+%
+In object detection and semantic segmentation, we also observe significant improvements compared to models with other attention mechanisms as shown in Figure~\ref{fig:teasor}.
+%
+% For instance, when plugged into the MobileNetV2 network,
+% our approach improves the SE block by nearly 1.5\% mIoU
+% score in PASCAL VOC 2012 segmentation \cite{everingham2015pascal}
+% and 1.8\% on Cityscapes \cite{cordts2016cityscapes}.
+%
+We hope our simple and efficient design could facilitate the development of attention mechanisms for mobile networks in the future.
+
+% \textcolor{red}{[JS: summarize contributions?]}
+
+% To sum up, the contributions of this paper can be
+% summarized as follows:
+% \begin{itemize}
+%     \item 
+% \end{itemize}
+
+
+% To sum up, the contributions of this paper can be summarized
+% as follows:
+% \begin{itemize}
+%     \item We demonstrate that
+%     \item We present a 
+% \end{itemize}
+
+
+\section{Related Work} \label{sec:related_work}
+
+In this section, we give a brief literature review of this paper, including prior works on efficient network architecture design and attention or non-local models.
+
+
+%
+
+\begin{figure*}[tp]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/comp.pdf}
+  \caption{Schematic comparison of the proposed coordinate attention block (c) to the classic SE channel attention block \cite{hu2018squeeze} (a) and CBAM \cite{woo2018cbam} (b). Here, ``GAP''
+  and ``GMP'' refer to the global average pooling and global max pooling, respectively. `X Avg Pool'
+  and 'Y Avg Pool' refer to 1D horizontal global pooling
+  and 1D vertical global pooling, respectively.
+  }\label{fig:comp}
+\end{figure*}
+
+\subsection{Mobile Network Architectures}
+
+% Great progress has been made in recent years in the field of efficient network architecture design \cite{howard2017mobilenets,sandler2018mobilenetv2,ma2018shufflenet,daquan2020rethinking,howard2019searching,tan2019efficientnet}.
+% %
+% Unlike most previous large networks~\cite{krizhevsky2012imagenet,simonyan2014very,szegedy2015going,He2016,he2016identity}that require tens of millions of learnable parameters, mobile networks have far less parameters but achieve great performance as well.
+%
+Recent state-of-the-art mobile networks are mostly based on the depthwise separable convolutions~\cite{howard2017mobilenets} and  the inverted residual block~\cite{sandler2018mobilenetv2}.
+%
+% Based on the depthwise separable convolution, proposes a new building block, named, which has been widely adopted in modern mobile network architectures.
+%
+HBONet~\cite{li2019hbonet} introduces down-sampling operations inside each inverted residual block for modeling the representative spatial information.
+%
+ShuffleNetV2~\cite{ma2018shufflenet} uses a channel split module
+and a channel shuffle module before and after the inverted residual block.
+%
+Later, MobileNetV3~\cite{howard2019searching} combines with neural architecture search algorithms~\cite{zoph2018learning} to search for optimal activation functions and the expansion ratio of inverted residual blocks at different depths.
+%
+Moreover, MixNet~\cite{tan2019mixconv}, EfficientNet~\cite{tan2019efficientnet} and ProxylessNAS \cite{cai2018proxylessnas} also adopt different searching strategies to search for either the optimal kernel sizes  of the depthwise separable convolutions or scalars to control the network weight in terms of expansion ratio, input resolution, network depth and width.
+%
+More recently, Zhou \etal~\cite{daquan2020rethinking} rethought the way of exploiting depthwise separable convolutions and proposed MobileNeXt that adopts a classic bottleneck structure for mobile networks.
+
+\subsection{Attention Mechanisms}
+
+Attention mechanisms \cite{tsotsos1990analyzing,tsotsos2011computational} have been proven helpful in a variety of computer vision tasks, such as image classification~\cite{hu2018squeeze,hu2018gather,woo2018cbam,bello2019attention} and image segmentation~\cite{hou2020strip,huang2018ccnet,fu2019dual}.
+%
+One of the successful examples is SENet~\cite{hu2018squeeze}, which simply squeezes each 2D feature map to efficiently build inter-dependencies
+among channels.
+%
+CBAM~\cite{woo2018cbam} further advances this idea by introducing spatial information encoding via
+convolutions with large-size kernels.
+%
+Later works, like GENet~\cite{hu2018gather}, GALA~\cite{linsley2018global}, AA~\cite{bello2019attention}, and TA~\cite{misra2021rotate}, extend this idea by adopting different spatial attention mechanisms or designing advanced attention blocks.
+
+
+Non-local/self-attention networks are recently very popular due to their capability of building spatial or channel-wise attention.
+%
+Typical examples include  NLNet~\cite{wang2018non}, GCNet~\cite{cao2019gcnet}, $A^2$Net~\cite{chen20182}, SCNet~\cite{liu2020improving}, GSoP-Net~\cite{gao2019global}, or CCNet~\cite{huang2018ccnet}, all of which exploit non-local mechanisms to capture different types of spatial information.
+%
+However, because of the large amount of computation inside the self-attention modules, they are often adopted in large models~\cite{He2016,xie2017aggregated} but not suitable for mobile networks.
+
+
+Different from these approaches that
+leverage expensive and heavy non-local or self-attention blocks, our approach considers a more efficient way of capturing positional information and channel-wise relationships to augment the feature representations for mobile networks.
+%
+By factorizing the 2D global pooling operations into two one-dimensional encoding processes, our approach performs much better than other attention methods
+with the lightweight property (\eg SENet~\cite{hu2018squeeze}, CBAM~\cite{woo2018cbam}, and TA~\cite{misra2021rotate}).
+
+
+\section{Coordinate Attention} \label{sec:method}
+
+
+A \emph{coordinate attention} block can be viewed  as a computational unit that aims to enhance the expressive power of the learned features for mobile networks.
+%
+It can take any intermediate feature tensor
+$\mathbf{X} = [\mathbf{x}_1, \mathbf{x}_2, \ldots, \mathbf{x}_{C}] \in \mathbb{R}^{C \times H \times W}$ as input
+and outputs a transformed tensor with augmented representations
+$\mathbf{Y} = [\mathbf{y}_1, \mathbf{y}_2, \ldots, \mathbf{y}_{C}]$ of the same size to $\mathbf{X}$.
+%
+% Instead of simply modeling the channel dependencies
+% as in the Squeeze-and-Excitation (SE) block,
+% we propose to embed positional information into channel attention
+% to encourage mobile networks to attend over large regions.
+%
+To provide a clear description of the proposed coordinate attention, we first revisit the SE attention, which is widely used in mobile networks.
+% As our approach is an advanced version of 
+% In the following of this section, before introducing
+% the proposed coordinate attention block, 
+% 
+
+\subsection{Revisit Squeeze-and-Excitation Attention}
+
+As demonstrated in \cite{hu2018squeeze}, the standard convolution itself is difficult to model the channel relationships.
+%
+Explicitly building channel inter-dependencies can increase the model sensitivity to the informative channels that contribute more to the final classification decision.
+%
+Moreover, using global average pooling can also assist the model in capturing global information, which is a lack for convolutions.
+
+
+Structurally, the SE block can be decomposed into two steps:
+squeeze and excitation, which are designed for global information embedding and adaptive recalibration of channel relationships, respectively.
+%
+Given the input $\mathbf{X}$, the squeeze step for the $c$-th channel can be formulated as follows:
+\begin{equation} \label{eqn:gap}
+    z_c = \frac{1}{H \times W} \sum_{i=1}^{H}\sum_{j=1}^{W} x_c(i, j),
+\end{equation}
+where $z_c$ is the output associated with the $c$-th channel.
+%
+The input $\mathbf{X}$ is directly from a convolutional layer with a fixed kernel size and hence can be viewed as a collection of local descriptors.
+%
+The squeeze operation makes collecting global information possible.
+
+
+The second step, excitation, aims to fully capture channel-wise dependencies, which can be formulated as 
+\begin{equation}
+    \hat{\mathbf{X}} = \mathbf{X} \cdot \sigma(\hat{\mathbf{z}}),
+\end{equation}
+where $\cdot$ refers to channel-wise multiplication, $\sigma$ is the sigmoid function, and $\hat{\mathbf{z}}$ is the result generated by a transformation function, which is formulated as follows:
+\begin{equation}
+    \hat{\mathbf{z}} = T_2(\text{ReLU}(T_1(\mathbf{z}))).
+\end{equation}
+Here, $T_1$ and $T_2$ are two linear transformations that can be learned to capture the importance of each channel.
+
+
+The SE block has been widely used in recent mobile networks \cite{hu2018squeeze,chen2018searching,tan2019efficientnet}
+and proven to be a key component for
+achieving state-of-the-art performance.
+%
+However, it only considers reweighing the importance of each channel by modeling channel relationships but neglects positional information, which as we will prove experimentally in Section~\ref{sec:experiments} to be important for generating spatially selective attention maps.
+%
+In the following, we introduce a novel attention block, which takes into account both inter-channel
+relationships and positional information.
+
+\subsection{Coordinate Attention Blocks}
+
+% Regarding the application circumstance in mobile devices, 
+% the proposed coordinate attention block must have
+% considerably low computational cost as the SE block.
+%
+
+%
+Our coordinate attention encodes both channel relationships and long-range dependencies with precise positional information in two steps:
+coordinate information embedding and coordinate attention generation.
+%
+The diagram of the proposed coordinate attention block can be found in the right part of Figure~\ref{fig:comp}.
+%
+In the following, we will describe it in detail.
+
+\subsubsection{Coordinate Information Embedding}
+
+% In order to encourage attention blocks to learn
+% spatially selective attention maps, we present
+% ``coordinate information embedding'' in this subsection.
+
+The global pooling is often used in channel attention to encode spatial information globally, but it squeezes global spatial information into a channel descriptor and hence is difficult to preserve positional information, which is essential for capturing spatial structures in vision tasks.
+%
+To encourage attention blocks to capture long-range interactions spatially with precise positional information,
+we factorize the global pooling as formulated in Eqn.~(\ref{eqn:gap})
+into a pair of 1D feature encoding operations. 
+%
+Specifically, given the input $\mathbf{X}$, we use two spatial extents of pooling kernels $(H, 1)$ or $(1, W)$ to encode each channel along the horizontal coordinate and the vertical coordinate, respectively.
+%
+Thus, the output of the $c$-th channel at height $h$ can be formulated as
+\begin{equation} \label{eqn:pool_h}
+z_{c}^h(h) = \frac{1}{W} \sum_{0 \le i < W}x_c(h, i).
+\end{equation}
+Similarly, the output of the $c$-th channel at width $w$ can be written as
+\begin{equation} \label{eqn:pool_v}
+z_{c}^w(w) = \frac{1}{H} \sum_{0 \le j < H}x_c(j, w).
+\end{equation}
+
+
+The above two transformations aggregate features along the two spatial directions respectively, yielding a pair of direction-aware feature maps.
+%
+This is rather different from the squeeze operation (Eqn.~(\ref{eqn:gap})) in channel attention methods
+that produce a single feature vector.
+%
+These two transformations also allow our attention block to capture long-range dependencies along one spatial direction and preserve precise positional information along the other spatial direction, which helps the networks more accurately locate the objects of interest.
+% The outputs of Eqn.~\ref{eqn:pool_h} and Eqn.~\ref{eqn:pool_v}
+% can be interpreted as a pair of collections of global descriptors
+% preserving expressive positional information which helps models
+% focus more on informative regions.
+%
+% Such spatial information can help us to more accurately locate
+% the attentive regions and further improve the recognition capability
+% compared to the simple global pooling used in the SE block.
+%
+% We will give more analysis and visual illustrations 
+% in our experiment section.
+
+\subsubsection{Coordinate Attention Generation}
+
+As described above, Eqn.~(\ref{eqn:pool_h}) and Eqn.~(\ref{eqn:pool_v}) enable a global receptive field and encode precise positional information.
+%
+To take advantage of the resulting expressive representations, we present the second transformation, termed 
+coordinate attention generation.
+%
+Our design refers to the following three criteria.
+%
+First of all, the new transformation should be as simple and cheap
+as possible regarding the applications in mobile environments.
+%
+Second, it can make full use of the captured positional information so that the regions of interest can be accurately highlighted.
+%
+Last but not the least, it should also be able to effectively capture inter-channel relationships, which has been demonstrated essential in existing studies \cite{hu2018squeeze,woo2018cbam}.
+%
+% \textcolor{red}{Taking into account the above criteria, we present a cheap and flexible convolutional coordinate attention generation
+% transformation.}
+%quanhong: 重复了，已经提出过了，修改一下这里
+
+
+
+Specifically, given the aggregated feature maps produced by Eqn.~\ref{eqn:pool_h} and Eqn.~\ref{eqn:pool_v},
+we first concatenate them and then send them to a shared $1\times1$ convolutional transformation function $F_1$,
+yielding
+\begin{equation} \label{eqn:transformation_1}
+\mathbf{f} = \delta(F_1([\mathbf{z}^h, \mathbf{z}^w])),
+\end{equation}
+where $[\cdot,\cdot]$ denotes the concatenation operation along the spatial dimension, $\delta$ is a non-linear activation function and $\mathbf{f}\in \mathbb{R}^{C/r \times (H + W)}$ is the intermediate feature map that encodes spatial information in both the horizontal direction and the vertical direction.
+%
+Here, $r$ is the reduction ratio for controlling the block size as in the SE block.
+%
+We then split $\mathbf{f}$ along the spatial dimension into two separate tensors $\mathbf{f}^h\in \mathbb{R}^{C/r \times H}$ and $\mathbf{f}^w\in \mathbb{R}^{C/r \times W}$.
+% of the same spatial size to $\mathbf{z}^h$ and $\mathbf{z}^w$,
+% respectively.
+%
+Another two $1\times1$ convolutional transformations $F_h$ and $F_w$ are utilized to separately transform
+$\mathbf{f}^h$ and $\mathbf{f}^w$ to tensors with the same channel number to the input $\mathbf{X}$, yielding
+\begin{align} \label{eqn:transformation_2}
+\mathbf{g}^h &= \sigma(F_h(\mathbf{f}^h)), \\
+\mathbf{g}^w &= \sigma(F_w(\mathbf{f}^w)).
+\end{align}
+Recall that $\sigma$ is the sigmoid function.
+%
+To reduce the overhead model complexity, we often reduce the channel number of $\mathbf{f}$ with an appropriate reduction ratio $r$ (\eg 32).
+%
+We will discuss the impact of different reduction ratios on the performance in our experiment section.
+%
+The outputs $\mathbf{g}^h$ and $\mathbf{g}^w$ are then
+expanded and used as attention weights, respectively.
+%
+Finally, the output of our coordinate attention block $\mathbf{Y}$ can be written as
+\begin{equation} \label{eqn:attention}
+y_c(i, j) = x_c(i, j) \times g_c^h(i) \times g_c^w(j).
+\end{equation}
+
+\myPara{Discussion} Unlike channel attention that only focuses on reweighing the importance of different channels, 
+our coordinate attention block also considers encoding the spatial information.
+%
+As described above, the attention along both the horizontal and vertical directions is simultaneously applied to the input tensor.
+%
+Each element in the two attention maps reflects whether the object of interest exists in the corresponding row and column.
+%
+This encoding process allows our coordinate attention to more accurately locate the exact position of the object of interest and hence helps the whole model to recognize better.
+%
+We will demonstrate this exhaustively in our experiment section.
+% ImageNet \cite{russakovsky2015imagenet} classification
+% and also show its advantages in down-stream tasks,
+% including object detection and semantic segmentation. 
+
+\begin{figure}[tp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/exemplars.pdf}
+  \caption{Network implementation for different network architectures. (a) Inverted residual block proposed in MobileNetV2 \cite{sandler2018mobilenetv2};
+  (b) Sandglass bottleneck block proposed in MobileNeXt \cite{daquan2020rethinking}.
+  }\label{fig:exemplars}
+\end{figure}
+
+\subsection{Implementation}
+
+As the goal of this paper is to investigate a better way to augment the convolutional features for mobile networks, here we take two classic light-weight architectures with different types of residual blocks (\ie MobileNetV2 \cite{sandler2018mobilenetv2} and 
+MobileNeXt \cite{daquan2020rethinking}) as examples to demonstrate the advantages of the proposed coordinate attention block over other famous light-weight attention blocks.
+%
+Figure~\ref{fig:exemplars} shows how we plug attention blocks into the inverted residual block in MobileNetV2 and the sandglass block in MobileNeXt.
+
+% \myPara{Parameters}
+
+\section{Experiments} \label{sec:experiments}
+%quanhong: 请写完实验后检查这段是否与内容相符。
+In this section, we first describe our experiment settings and then conduct a series of ablation experiments to demonstrate the contribution of each component in the proposed coordinate attention to the performance.
+%
+Next, we compare our approach with some attention based methods.
+%
+Finally, we report the results of the proposed approach compared to other attention based methods on object detection and semantic segmentation.
+%-------quanhong： till here，contact me if you finish
+\subsection{Experiment Setup}
+
+We use the PyTorch toolbox \cite{paszke2019pytorch}
+to implement all our experiments.
+%
+During training, we use the standard SGD optimizer
+with decay and momentum of 0.9 to train all the models.
+%
+The weight decay is set to $4\times 10^{-5}$ always.
+%
+The cosine learning schedule with an initial learning rate of 0.05 is adopted.
+%
+We use four NVIDIA GPUs for training and the batch size is set to 256.
+%
+Without extra declaration, we take MobileNetV2 as our baseline and train all the models for 200 epochs.
+%
+For data augmentation, we use the same methods as
+in MobileNetV2.
+%
+We report results on the ImageNet dataset \cite{russakovsky2015imagenet} 
+in classification.
+
+% We use distributed training with three epochs of warmup.
+
+\begin{table}[t]
+    \centering
+    \small
+    \setlength\tabcolsep{1mm}
+    \renewcommand{\arraystretch}{1.1}
+    \caption{Result comparisons under different experiment settings of the
+    proposed coordinate attention. Here, $r$ is the reduction ratio
+    and the baseline result is based on the MobileNetV2 model.
+    As can be seen, the model with either the horizontal (X) attention or the vertical (Y) attention added
+    achieves the same performance as the one with SE attention. However, when taking both horizontal and vertical
+    attentions into account (coordinate attention), our approach yields
+    the best result. The latency is tested on a Google Pixel 4 device.}
+    \begin{tabular}{lccccccc} \midrule[1pt]
+    Settings & Param. & M-Adds & $r$ & Latency & Top-1 (\%)  \\ \midrule[1pt]
+    Baseline  &   3.5M      &  300M   & - & 14-16ms &  72.3     \\
+    + SE &   3.89M      &  300M & 24  & 16-18ms & $73.5_{+1.2}$     \\
+    + X Attention &   3.89M &   300M & 24 & 16-18ms & $73.5_{+1.2}$  \\
+    + Y Attention &   3.89M &   300M & 24 & 16-18ms & $73.5_{+1.2}$ \\
+    + Coord. Attention &   3.95M & 310M & 32 & 17-19ms & $\mathbf{74.3_{+2.0}}$ \\ \bottomrule[1pt]
+    \end{tabular}
+    \label{tab:comp_set}
+\end{table}
+
+\subsection{Ablation Studies}
+
+\myPara{Importance of coordinate attention}
+%
+To demonstrate the performance of the proposed coordinate
+attention, we perform a series of ablation experiments,
+the corresponding results of which are all listed 
+in Table~\ref{tab:comp_set}.
+%
+We remove either the horizontal attention
+or the vertical attention from the coordinate attention
+to see the importance of encoding coordinate information.
+%
+As shown in Table~\ref{tab:comp_set}, the model with attention
+along either direction has comparable performance to
+the one with the SE attention.
+%
+However, when both the horizontal attention
+and the vertical attention are incorporated,
+we obtain the best result as highlighted in
+Table~\ref{tab:comp_set}.
+%
+These experiments reflect that with comparable
+learnable parameters and computational cost,
+coordinate information embedding is more helpful
+for image classification.
+
+\begin{table}[t]
+    \centering
+    \small
+    \setlength\tabcolsep{1mm}
+    \renewcommand{\arraystretch}{1.1}
+    \caption{Comparisons of different attention methods under different weight multipliers when taking MobileNetV2 as the baseline. }
+    \begin{tabular}{lccccccc} \midrule[1pt]
+    Settings & Param. (M) & M-Adds (M) & Top-1 Acc (\%)  \\ \midrule[1pt]
+    MobileNetV2-1.0  &   3.5      &  300    &  72.3     \\
+    + SE &   3.89      &  300    &  $73.5_{+1.2}$     \\
+    + CBAM &   3.89      &  300    &  $73.6_{+1.3}$     \\
+    + CA &   3.95 &   310 & $\mathbf{74.3_{+2.0}}$ \\ \midrule[1pt]
+    MobileNetV2-0.75  &   2.5      &  200    &  69.9     \\
+    + SE &   2.86      &  210    &  $71.5_{+1.6}$     \\
+    + CBAM &   2.86      &  210    &  $71.5_{+1.6}$     \\
+    + CA &   2.89 &   210 & $\mathbf{72.1_{+2.2}}$ \\ \midrule[1pt]
+    MobileNetV2-0.5  &   2.0      &  100    &  65.4     \\
+    + SE &   2.1      &  100    &  $66.4_{+1.0}$     \\
+    + CBAM &   2.1      &  100    &  $66.4_{+1.0}$     \\
+    + CA &   2.1 &   100 & $\mathbf{67.0_{+1.6}}$ \\ \bottomrule[1pt]
+    \end{tabular}
+    
+    \label{tab:mbv2_weight_mult}
+\end{table}
+
+\myPara{Different weight multipliers}
+%
+Here, we take two classic mobile networks (including
+MobileNetV2 \cite{sandler2018mobilenetv2} with inverted
+residual blocks and
+MobileNeXt \cite{daquan2020rethinking} with sandglass bottleneck block) as baselines
+to see the performance of the proposed approach
+compared to the SE attention \cite{hu2018squeeze} and
+CBAM \cite{woo2018cbam} under different weight
+multipliers.
+%
+In this experiment, we adopt three typical
+weight multipliers, including $\{1.0, 0.75, 0.5\}$.
+%
+As shown in Table~\ref{tab:mbv2_weight_mult},
+when taking the MobileNetV2 network as baseline,
+models with CBAM have similar results to those 
+with the SE attention.
+%
+However, models with the proposed coordinate attention
+yield the best results under each setting.
+%
+Similar phenomenon can also be observed when the
+MobileNeXt network is used as listed
+in Table~\ref{tab:mnext_weight_mult}.
+%
+This indicates that no matter which of the sandglass
+bottleneck block or the inverted residual block 
+is considered and no matter which weight multiplier
+is selected, our coordinate attention performs
+the best because of the advanced way to encode positional
+and inter-channel information simultaneously.
+
+\begin{table}[t]
+    \centering
+    \small
+    \setlength\tabcolsep{1mm}
+    \renewcommand{\arraystretch}{1.1}
+    \caption{Comparisons of different attention methods under different weight multipliers when taking MobileNeXt \cite{daquan2020rethinking} as the baseline.}
+    \begin{tabular}{lccccccc} \midrule[1pt]
+    Settings & Param. (M) & M-Adds (M) & Top-1 Acc (\%)  \\ \midrule[1pt]
+    MobileNeXt  &   3.5      &  300    &  74.0     \\
+    + SE &   3.89      &  300    &  $74.7_{+0.7}$     \\
+    + CA &   4.09 &   330 & $\mathbf{75.2_{+1.2}}$ \\ \midrule[1pt]
+    MobileNeXt-0.75  &   2.5      &  210    &  72.0     \\
+    + SE &   2.9      &  210    &  $72.6_{+0.6}$     \\
+    + CA &   3.0 &   220 & $\mathbf{73.2_{+1.2}}$ \\ \midrule[1pt]
+    MobileNeXt-0.5  &   2.1      &  110    &  67.7     \\
+    + SE &   2.4      &  110    &  $68.7_{+1.0}$     \\
+    + CA &   2.4 &   110 & $\mathbf{69.4_{+1.7}}$ \\ \bottomrule[1pt]
+    \end{tabular}
+    
+    \label{tab:mnext_weight_mult}
+\end{table}
+
+\myPara{The impact of reduction ratio $r$}
+To investigate the impact of different reduction ratios of
+attention blocks on the model performance, we attempt to 
+decrease the size of the reduction ratio and see the performance
+change.
+%
+As shown in Table~\ref{tab:reduction_ratio}, when we reduce
+$r$ to half of the original size, the model size increases
+but better performance can be yielded.
+%
+This demonstrates that adding more parameters by reducing the
+reduction ratio matters for improving the model performance.
+%
+More importantly, our coordinate attention still performs better
+than the SE attention and CBAM in this experiment, reflecting the
+robustness of the proposed coordinate attention to the reduction ratio.
+
+
+\begin{table}[t]
+    \centering
+    \small
+    \setlength\tabcolsep{2.5mm}
+    \renewcommand{\arraystretch}{1.1}
+    \caption{Comparisons of models equipped with different
+    attention blocks under different reduction ratios $r$. 
+    The baseline result is based on the MobileNetV2 model.
+    Obviously, when the reduction ratio decreases, 
+    our approach still yields the best results.}
+    \begin{tabular}{lcccc} \midrule[1pt]
+    Settings & Param. & M-Adds & $r$ & Top-1 Acc (\%)  \\ \midrule[1pt]
+    Baseline  &   3.5M      &  300M   & - &  72.3     \\
+    + SE &   3.89M      &  300M & 24  &  $73.5_{+1.2}$     \\
+    + CBAM &   3.89M      &  300M & 24  & $73.6_{+1.3}$     \\
+    + CA (Ours) &   3.95M & 310M & 32 & $\mathbf{74.3_{+2.0}}$ \\ \midrule[1pt]
+    + SE &   4.28M      &  300M & 12  &  $74.1_{+1.8}$     \\
+    + CBAM &   4.28M      &  300M & 12  & $74.1_{+1.8}$     \\
+    + CA (Ours) &   4.37M & 310M & 16 & $\mathbf{74.7_{+2.4}}$ \\
+    \bottomrule[1pt]
+    \end{tabular}
+    \label{tab:reduction_ratio}
+\end{table}
+
+% \begin{table}[ht]
+%     \centering
+%     \small
+%     \setlength\tabcolsep{1mm}
+%     \renewcommand{\arraystretch}{1.1}
+%     \begin{tabular}{lccccccc} \midrule[1pt]
+%     Settings & Param. (M) & M-Adds (M) & Top-1 Acc (\%)  \\ \midrule[1pt]
+%     MobileNetV2 ($320 \times 320$)  &   3.5      &  300    &  72.3     \\
+%     + SE &   3.89      &  300    &  73.5     \\
+%     + CA &   3.95 &   310 & 74.3 \\ \midrule[1pt]
+%     MobileNetV2 ($224 \times 224$)  &   3.5      &  300    &  72.3     \\
+%     + SE &   3.89      &  300    &  73.5     \\
+%     + CA &   3.95 &   310 & 74.3 \\ \midrule[1pt]
+%     MobileNetV2 ($192 \times 192$)  &   3.5      &  300    &  72.3     \\
+%     + SE &   3.89      &  300    &  73.5     \\
+%     + CA &   3.95 &   310 & 74.3 \\ \midrule[1pt]
+%     MobileNetV2 ($160 \times 160$)  &   3.5      &  300    &  72.3     \\
+%     + SE &   3.89      &  300    &  73.5     \\
+%     + CA &   3.95 &   310 & 74.3 \\\bottomrule[1pt]
+%     \end{tabular}
+%     \caption{Comparisons of different approaches under different input resolutions.}
+%     \label{tab:input_resolution}
+% \end{table}
+
+\newcommand{\addFig}[1]{\includegraphics[width=0.185\linewidth]{figures/gradcam/#1}}
+\newcommand{\addFigs}[3]{\addFig{ILSVRC2012_val_#1_#2_#3.JPEG}}
+\newcommand{\addFigsX}[3]{\addFig{#1-#2-layer4-resnext50-#1-#3.png}}
+\newcommand{\addFigsS}[3]{\addFig{#1-#2-layer4-seresnet50-#1-#3.png}}
+\newcommand{\addFigsP}[3]{\addFig{#1-#2-layer4-resnet50sp-#1-#3.png}}
+% \begin{figure}
+%   \centering
+%   \footnotesize
+%   \setlength\tabcolsep{0.3mm}
+%   \renewcommand\arraystretch{1.0}
+%   % n02871525-00021555-layer4-resnet50-n02871525-bookshop
+%   % n03814639-00002650-layer4-resnet50-n03814639-neck_brace
+%   % n03837869-00009364-layer4-resnet50sp-n03837869-obelisk
+%   % n04254680-00019408-layer4-resnet50sp-soccer_ball
+%   % n03874293-00021470-layer4-resnet50sp-n03874293-paddlewheel
+%   % n04355933-00044566-layer4-resnet50-n04355933-sunglass
+%   \begin{tabular}{cccccccccccccc}
+%     \rotatebox{90}{MobileNetV2} & 
+%     % \addFigs{n04141076-00036922}{sax} & 
+%     \addFigs{00001137}{Ibizan_hound}{mobilenetv2} & 
+%     %\addFigs{n04404412-00013324}{television} & 
+%     \addFigs{00004942}{totem_pole}{mobilenetv2} & 
+%     \addFigs{00005264}{chainlink_fence}{mobilenetv2} & 
+%     \addFigs{00022030}{honeycomb}{mobilenetv2} &
+%     % \addFigs{n04409515-00010954}{tennis_ball} & 
+%     \addFigs{00022519}{accordion}{mobilenetv2} \\
+%     \rotatebox{90}{~~~~~w/ SE} & 
+%     % \addFigs{n04141076-00036922}{sax} & 
+%     \addFigs{00001137}{Ibizan_hound}{se_mbv2} & 
+%     %\addFigs{n04404412-00013324}{television} & 
+%     \addFigs{00004942}{totem_pole}{se_mbv2} & 
+%     \addFigs{00005264}{chainlink_fence}{se_mbv2} & 
+%     \addFigs{00022030}{honeycomb}{se_mbv2} &
+%     % \addFigs{n04409515-00010954}{tennis_ball} & 
+%     \addFigs{00022519}{accordion}{se_mbv2} \\
+%     \rotatebox{90}{~~w/ CBAM} & 
+%     % \addFigs{n04141076-00036922}{sax} & 
+%     \addFigs{00001137}{Ibizan_hound}{cbam} & 
+%     %\addFigs{n04404412-00013324}{television} & 
+%     \addFigs{00004942}{totem_pole}{cbam} & 
+%     \addFigs{00005264}{chainlink_fence}{cbam} & 
+%     \addFigs{00022030}{honeycomb}{cbam} &
+%     % \addFigs{n04409515-00010954}{tennis_ball} & 
+%     \addFigs{00022519}{accordion}{cbam} \\
+%     \rotatebox{90}{~~~~~w/ CA} & 
+%     % \addFigs{n04141076-00036922}{sax} & 
+%     \addFigs{00001137}{Ibizan_hound}{canet} & 
+%     %\addFigs{n04404412-00013324}{television} & 
+%     \addFigs{00004942}{totem_pole}{canet} & 
+%     \addFigs{00005264}{chainlink_fence}{canet} & 
+%     \addFigs{00022030}{honeycomb}{canet} &
+%     % \addFigs{n04409515-00010954}{tennis_ball} & 
+%     \addFigs{00022519}{accordion}{canet} \\
+%     & Ibizan hound & Totem pole & Chain fence & Honeycomb & Accordion \\
+%   \end{tabular}
+%   \vspace{3pt}
+%   \caption{Visualization of attention maps produced by different attention methods. We use the Grad-CAM \cite{selvaraju2017grad} visualization tool. 
+%   It is obvious that models with our coordinate attention
+%   (CA) can more precisely locate the objects of interest
+%   than models with other attention methods.
+% %   This heavily relies on
+% %   our self-calibration operation which benefits adaptively 
+% %   capturing rich context information. We use 50-layer settings
+% %   for all networks.
+%   }
+%   \label{fig:cam_comps}
+%   %\vspace{-10pt}
+% \end{figure}
+
+
+\renewcommand{\addFig}[1]{\includegraphics[width=0.185\linewidth]{figures/vis_comp/#1}}
+\renewcommand{\addFigs}[3]{\addFig{ILSVRC2012_val_#1_#2_#3.JPEG}}
+\begin{figure}
+  \centering
+  \footnotesize
+  \setlength\tabcolsep{0.3mm}
+  \renewcommand\arraystretch{1.0}
+  % n02871525-00021555-layer4-resnet50-n02871525-bookshop
+  % n03814639-00002650-layer4-resnet50-n03814639-neck_brace
+  % n03837869-00009364-layer4-resnet50sp-n03837869-obelisk
+  % n04254680-00019408-layer4-resnet50sp-soccer_ball
+  % n03874293-00021470-layer4-resnet50sp-n03874293-paddlewheel
+  % n04355933-00044566-layer4-resnet50-n04355933-sunglass
+  \begin{tabular}{cccccc}
+     
+    % & \multicolumn{5}{l}{MobileNetV2 + SE} \\
+    \rotatebox{90}{~~~Bef. SE} & 
+    % \addFigs{n04141076-00036922}{sax} & 
+    \addFigs{00004716}{leaf_beetle}{se_mbv2_5} & 
+    %\addFigs{n04404412-00013324}{television} & 
+    \addFigs{00007128}{flamingo}{se_mbv2_5} & 
+    \addFigs{00013135}{screen}{se_mbv2_5} & 
+    \addFigs{00018397}{beer_glass}{se_mbv2_5} &
+    % \addFigs{n04409515-00010954}{tennis_ball} & 
+    \addFigs{00035591}{American_black_bear}{se_mbv2_5} \\
+    \rotatebox{90}{~~~~Aft. SE} &
+    \addFigs{00004716}{leaf_beetle}{se_mbv2_6} & 
+    %\addFigs{n04404412-00013324}{television} & 
+    \addFigs{00007128}{flamingo}{se_mbv2_6} & 
+    \addFigs{00013135}{screen}{se_mbv2_6} & 
+    \addFigs{00018397}{beer_glass}{se_mbv2_6} &
+    % \addFigs{n04409515-00010954}{tennis_ball} & 
+    \addFigs{00035591}{American_black_bear}{se_mbv2_6} \\
+    
+    % & \multicolumn{5}{l}{MobileNetV2 + CBAM} \\
+    \rotatebox{90}{~Bef. CBAM} & 
+    % \addFigs{n04141076-00036922}{sax} & 
+    \addFigs{00004716}{leaf_beetle}{cbam_5} & 
+    %\addFigs{n04404412-00013324}{television} & 
+    \addFigs{00007128}{flamingo}{cbam_5} & 
+    \addFigs{00013135}{screen}{cbam_5} & 
+    \addFigs{00018397}{beer_glass}{cbam_5} &
+    % \addFigs{n04409515-00010954}{tennis_ball} & 
+    \addFigs{00035591}{American_black_bear}{cbam_5} \\
+    \rotatebox{90}{~Aft. CBAM} &
+    \addFigs{00004716}{leaf_beetle}{cbam_6} & 
+    %\addFigs{n04404412-00013324}{television} & 
+    \addFigs{00007128}{flamingo}{cbam_6} & 
+    \addFigs{00013135}{screen}{cbam_6} & 
+    \addFigs{00018397}{beer_glass}{cbam_6} &
+    % \addFigs{n04409515-00010954}{tennis_ball} & 
+    \addFigs{00035591}{American_black_bear}{cbam_6} \\
+    
+    % & \multicolumn{5}{l}{MobileNetV2 + CA} \\
+    \rotatebox{90}{~~~~Bef. CA} & 
+    % \addFigs{n04141076-00036922}{sax} & 
+    \addFigs{00004716}{leaf_beetle}{canet_5} & 
+    %\addFigs{n04404412-00013324}{television} & 
+    \addFigs{00007128}{flamingo}{canet_5} & 
+    \addFigs{00013135}{screen}{canet_5} & 
+    \addFigs{00018397}{beer_glass}{canet_5} &
+    % \addFigs{n04409515-00010954}{tennis_ball} & 
+    \addFigs{00035591}{American_black_bear}{canet_5} \\
+    \rotatebox{90}{~~~~Aft. CA} &
+    \addFigs{00004716}{leaf_beetle}{canet_6} & 
+    %\addFigs{n04404412-00013324}{television} & 
+    \addFigs{00007128}{flamingo}{canet_6} & 
+    \addFigs{00013135}{screen}{canet_6} & 
+    \addFigs{00018397}{beer_glass}{canet_6} &
+    % \addFigs{n04409515-00010954}{tennis_ball} & 
+    \addFigs{00035591}{American_black_bear}{canet_6} \\
+    
+    & Leaf beetle & Flamingo & Screen & Beer glass & Black bear \\
+  \end{tabular}
+  \vspace{3pt}
+  \caption{Visualization of feature maps 
+  produced by models with different attention
+  methods in the last building block.
+  We use Grad-CAM \cite{selvaraju2017grad}
+  as our visualization tool.
+  Both feature maps before and after each
+  attention block are visualized.
+  It is obvious that our coordinate attention (CA)
+  can more precisely locate the objects of
+  interest than other attention methods.}
+  \label{fig:vis_comps}
+  %\vspace{-10pt}
+\end{figure}
+
+
+
+\subsection{Comparison with Other Methods}
+
+\myPara{Attention for Mobile Networks}
+We compare our coordinate attention
+with other light-weight attention methods
+for mobile networks, including
+the widely adopted SE attention \cite{hu2018squeeze} and CBAM \cite{woo2018cbam}
+in Table~\ref{tab:mbv2_weight_mult}.
+%
+As can be seen, adding the SE attention has
+already raised the classification performance
+by more than 1\%.
+%
+For CBAM, it seems that its spatial attention module
+shown in Figure~\ref{fig:comp}(b)
+does not contribute in mobile networks compared to 
+the SE attention.
+%
+However, when the proposed coordinate
+attention is considered, we achieve the best results.
+%
+We also visualize the feature maps produced
+by models with different attention methods
+in Figure~\ref{fig:vis_comps}.
+%
+Obviously, our coordinate attention can
+help better in locating the objects of interest
+than the SE attention and CBAM.
+
+We argue that the advantages of the proposed
+positional information encoding manner
+over CBAM are two-fold.
+%
+First, the spatial attention module in CBAM
+squeezes the channel dimension to 1, leading
+to information loss.
+%
+However, our coordinate attention uses
+an appropriate reduction ratio to 
+reduce the channel dimension in the bottleneck,
+avoiding too much information loss.
+%
+Second, CBAM utilizes a convolutional layer
+with kernel size $7\times7$ to
+encode local spatial information while our
+coordinate attention encodes global information
+by using two complementary 1D global pooling
+operations.
+%
+This enables our coordinate attention to capture
+long-range dependencies among spatial locations
+that are essential for vision tasks.
+%
+% We will further show the advantages of our
+% coordinate attention in the applications.
+
+\myPara{Stronger Baseline}
+To further demonstrate the advantages of the proposed coordinate
+attention over the SE attention in more powerful mobile networks,
+we take EfficientNet-b0 \cite{tan2019efficientnet} 
+as our baseline here.
+%
+EfficientNet is based on architecture search algorithms.
+and contains SE attention.
+%
+To investigate the performance of the proposed coordinate attention
+on EfficientNet, we simply replace the SE attention
+with our proposed coordinate attention.
+%
+For other settings, we follow the original paper.
+%
+The results have been listed in Table~\ref{tab:efficientnet}.
+%
+Compared to the original EfficientNet-b0 with SE attention included and other methods that have comparable parameters and computations to EfficientNet-b0,
+our network with coordinate attention achieves the best result.
+%
+This demonstrates that the proposed coordinate attention
+can still performance well in powerful mobile networks.
+
+
+\begin{table}[t]
+    \centering
+    \small
+    \setlength\tabcolsep{1mm}
+    \renewcommand{\arraystretch}{1.1}
+    \caption{Experimental results when taking the powerful
+    EfficientNet-b0 \cite{tan2019efficientnet} as baseline.
+    We also compare with other methods that
+    have comparable parameters and computations
+    to EfficientNet-b0.}
+    \begin{tabular}{lcccc} \midrule[1pt]
+    Settings & Param. & M-Adds & Top-1 Acc (\%)  \\ \midrule[1pt]
+    PNAS \cite{liu2018progressive} & 5.1M & 588M & 72.7 \\
+    DARTS \cite{liu2018darts} & 4.7M & 574M & 73.3 \\
+    ProxylessNAS-M \cite{cai2018proxylessnas} & 4.1M & 330M & 74.4 \\
+    AmoebaNet-A \cite{real2019regularized} & 5.1M & 555M & 74.5 \\
+    FBNet-C \cite{wu2019fbnet}  & 5.5M & 375M & 74.9 \\
+    MobileNeXt \cite{daquan2020rethinking} & 6.1M & 590M & 76.1 \\
+    MNasNet-A3 \cite{tan2019mnasnet} & 5.2M & 403M & 76.7 \\ \midrule[1pt]
+    EfficientNet-b0 (w/ SE) \cite{tan2019efficientnet} & 5.3M & 390M & 76.3     \\
+    EfficientNet-b0 (w/ CA) &  5.4M & 400M & \textbf{76.9} \\
+    \bottomrule[1pt]
+    \end{tabular}
+    \label{tab:efficientnet}
+\end{table}
+
+\subsection{Applications}
+
+In this subsection, we conduct experiments
+on both the object detection task and
+the semantic segmentation task to explore the transferable capability of the proposed 
+coordinate attention against other attention methods.
+
+\begin{table*}[t]
+    \centering
+    \small
+    \setlength\tabcolsep{2.5mm}
+    \renewcommand{\arraystretch}{1.2}
+    \caption{Object detection results on the COCO validation set. 
+    In all experiments here, we use the SSDLite320 detector. As can be seen, the backbone
+    model with our coordinate attention 
+    achieves the best results in terms of all kinds of measuring metrics.
+    Note that all the results are based on
+    single-model test.
+    Besides hand-designed mobile networks, we
+    also show results produced by architecture search-based methods (\ie MobileNetV3 \cite{howard2019searching} and MnasNet-A1 \cite{tan2019mnasnet}).}
+    \begin{tabular}{ccccccccccc} \toprule[1pt] %\toprule[1pt]%\whline{1pt}%\cline{1-2}
+        No. & Method & Backbone & Param. (M) & M-Adds (B) & AP & AP$_{50}$ & AP$_{75}$ & AP$_{S}$ & AP$_{M}$ & AP$_{L}$ \\ \midrule[1pt]
+        1 & SSDLite320  & MobileNetV1 \cite{howard2017mobilenets} & 5.1 & 1.3 & 22.2 & - & - & - & - & - \\
+        2 & SSDLite320  & MobileNetV2 \cite{sandler2018mobilenetv2} & 4.3 & 0.8 & 22.3 & 37.4 & 22.7 & 2.8 & 21.2 & 42.8 \\
+        3 & SSDLite320  & MobileNetV3 \cite{howard2019searching} & 5.0 & 0.62 & 22.0 & - & - & - & - & - \\
+        4 & SSDLite320 & MnasNet-A1 \cite{tan2019mnasnet} & 4.9 & 0.8 & 23.0 & - & - &  3.8 & 21.7 &  42.0 \\
+        5 & SSDLite320  & MobileNeXt \cite{daquan2020rethinking} & 4.4 & 0.8 & 23.3 & 38.9 & 23.7 & 2.8 & 22.7 & 45.0 \\ \midrule[1pt]
+        6 & SSDLite320  & MobileNetV2 + SE & 4.7 & 0.8 & 23.7 & 40.0 & 24.3 & 2.2 & 25.4 & 44.7 \\ 
+        7 & SSDLite320  & MobileNetV2 + CBAM & 4.7 & 0.8 & 23.0 & 38.6 & 23.3 & 2.7 & 22.2 & 44.5 \\ 
+        8 & SSDLite320  & MobileNetV2 + CA & 4.8 & 0.8 & \textbf{24.5} & 40.7 & 25.4 & 2.3 & 26.2 & 45.9 \\ 
+        % \midrule[1pt]
+        % 8 & SSDLite320  & MobileNeXt + SE & 4.3 & 0.8 & - & 40.0 & 24.3 & 2.2 & 25.4 & 44.7 \\ 
+        % 9 & SSDLite320  & MobileNeXt + CA & 4.3 & 0.8 & - & 40.7 & 25.4 & 2.3 & 26.2 & 45.9 \\
+        \bottomrule[1.0pt]
+        \end{tabular}
+        \label{tab:coco_detection}
+\end{table*}
+
+\begin{table}[t]
+    \centering
+    \small
+    \setlength\tabcolsep{1.2mm}
+    \renewcommand{\arraystretch}{1.1}
+    \caption{Object detection results on the Pascal VOC 2007 test set. 
+    We can observe that when the same SSDLite320 detector is adopted, MobileNetV2 network
+    with our coordinate attention added
+    achieves better results in terms of mAP.}
+    \begin{tabular}{ccccccccc} \toprule[1pt] %\toprule[1pt]%\whline{1pt}%\cline{1-2}
+        Backbone &  Param. (M) & M-Adds (B) & mAP (\%) \\ \midrule[1pt]
+        MobileNetV2 \cite{sandler2018mobilenetv2}  & 4.3 & 0.8  & 71.7 \\
+        MobileNetV2 + SE  & 4.7 & 0.8  & 71.7 \\
+        MobileNetV2 + CBAM  & 4.7 & 0.8  & 71.7 \\
+        MobileNetV2 + CA  & 4.8 & 0.8  & \textbf{73.1} \\
+        \bottomrule[1.0pt]
+        \end{tabular}
+        \label{tab:voc_detection}
+\end{table}
+
+\subsubsection{Object Detection}
+
+% To explore the transferable capability of the proposed approach against MobileNetV2,
+% in this subsection, we apply our classification model to the object detection task as pretrained models.
+% %
+% We use both the proposed network and MobileNetv2 as feature extractors and report results on 
+% both the COCO \cite{lin2014microsoft} the Pascal VOC 2007 test set \cite{everingham2015pascal}
+% following \cite{liu2016ssd} using SSDLite \cite{sandler2018mobilenetv2,liu2016ssd}.
+
+\myPara{Implementation Details}
+Our code is based on PyTorch and SSDLite \cite{sandler2018mobilenetv2,liu2016ssd}.
+% and ssdlite-pytorch \cite{hou2020ssdite-pytorch}.
+%
+Following \cite{sandler2018mobilenetv2}, we
+connect the first and second layers of SSDLite 
+to the last pointwise convolutions with output stride of 16 and 32, respectively
+and add the rest SSDLite layers on top of the 
+last convolutional layer.
+%
+When training on COCO, we set the batch size to 256 and use the synchronized batch normalization.
+%
+The cosine learning schedule is used with an initial learning rate of 0.01.
+%
+We train the models for totally 1,600,000 iterations.
+%
+When training on Pascal VOC, the batch size is
+set to 24 and all the models
+are trained for 240,000 iterations.
+%
+The weight decay is set to 0.9.
+%
+The initial learning rate is 0.001, 
+which is then divided by 10 at 160,000 and again at 200,000 iterations.
+%
+For other settings, readers can refer to
+\cite{sandler2018mobilenetv2,liu2016ssd}.
+
+\myPara{Results on COCO}
+In this experiment, we follow most previous work
+and report results in terms of AP, AP$_{50}$, AP$_{75}$,
+AP$_{S}$, AP$_{M}$, and AP$_{L}$, respectively.
+%
+In Table~\ref{tab:coco_detection}, we show the results 
+produced by different network settings 
+on the COCO 2017 validation set.
+%
+It is obvious that adding coordinate attention
+into MobileNetV2 substantially improve the detection 
+results (24.5 v.s. 22.3) with only 0.5M parameters
+overhead and nearly the same computational cost.
+%
+Compared to other light-weight attention methods,
+such as the SE attention and CBAM, 
+our version of SSDLite320 achieves the best results 
+in all metrics with nearly the same number of
+parameters and computations.
+
+Moreover, we also show results produced by
+previous state-of-the-art models based on SSDLite320 as listed in
+Table~\ref{tab:coco_detection}.
+%
+Note that some methods (\eg MobileNetV3 \cite{howard2019searching} and MnasNet-A1 \cite{tan2019mnasnet})
+are based on neural architecture search methods
+but our model does not.
+%
+Obviously, our detection model achieves the best
+results in terms of AP compared to other approaches with close parameters and computations.
+%
+% We also want to stress here that MobileNetV2, MobileNetV3
+% and MnasNet-A1 are all based on the inverted residual block.
+% %
+% Therefore, this series of experiments demonstrate that
+% our sandglass block performs better than the inverted 
+% residual block in not only image classification but also
+% object detection.
+% %
+% We argue that this is mostly because of the high-dimensional
+% information delivered from bottom layers to deep layers.
+
+\myPara{Results on Pascal VOC}
+In Table~\ref{tab:voc_detection}, we show the 
+detection results on Pascal VOC 2007 test set
+when different attention methods are adopted.
+%
+We observe that the SE attention and CBAM
+cannot improve the baseline results.
+%
+However, adding the proposed coordinate
+attention can largely raise the mean AP
+from 71.7 to 73.1.
+%
+Both detection experiments on COCO and
+Pascal VOC datasets demonstrate that 
+classification models with the proposed 
+coordinate attention have better
+transferable capability compared to 
+those with other attention methods.
+
+\begin{table}[t]
+    \centering
+    %\footnotesize
+    \small
+    \setlength\tabcolsep{1.8mm}
+    \renewcommand{\arraystretch}{1.1}
+     \caption{Semantic segmentation results on the Pascal VOC 2012 validation set.
+     All the results are based on single-model test and no post-processing tools are used. We can see that the models equipped with
+     all attention methods improve
+     the segmentation results.
+     However, when the proposed coordinate
+     attention is used, we achieve the best
+     result, which is much better than
+     models with other attention methods.
+     `Stride' here denotes the output stride
+     of the segmentation network.}
+    \begin{tabular}{lccc} \toprule[1pt] %\toprule[1pt]%\whline{1pt}%\cline{1-2}
+        Backbone & Param. (M) & Stride & mIoU (\%)  \\ \midrule[1pt]
+        MobileNetV2 \cite{sandler2018mobilenetv2} & 4.5 & 16 & 70.84 \\
+        % MobileNeXt & 4.5 & 16 & 72.63 \\ 
+        MobileNetV2 + SE & 4.9 & 16 & 71.69 \\
+        MobileNetV2 + CBAM & 4.9 & 16 & 71.28 \\
+        MobileNetV2 + CA (ours) & 5.0 & 16 & \textbf{73.32} \\\midrule[1pt]
+        MobileNetV2 \cite{sandler2018mobilenetv2} & 4.5 & 8 & 71.82 \\
+        % MobileNeXt & 4.5 & 8 & 73.68 \\ 
+        MobileNetV2 + SE & 4.9 & 8 & 72.52 \\
+        MobileNetV2 + CBAM & 4.9 & 8 & 71.67 \\
+        MobileNetV2 + CA (ours) & 5.0 & 8 & \textbf{73.96} \\
+        \bottomrule[1pt]
+        \end{tabular}
+        \label{tab:seg_voc}
+\end{table} 
+
+\begin{table}[t]
+    \centering
+    %\footnotesize
+    \small
+    \setlength\tabcolsep{1.1mm}
+    \renewcommand{\arraystretch}{1.1}
+     \caption{Semantic segmentation results on the Cityscapes \cite{cordts2016cityscapes} validation set. 
+     We report results on single-model test and
+     full image size (\ie $1024 \times 2048$)
+     is used for testing.
+     We do not use any post-processing tools.}
+    \begin{tabular}{lccc} \toprule[1pt] %\toprule[1pt]%\whline{1pt}%\cline{1-2}
+        Backbone & Param. (M) & Output Stride & mIoU (\%)  \\ \midrule[1pt]
+        MobileNetV2 & 4.5  & 8  & 71.4 \\
+        MobileNetV2 + SE & 4.9  & 8  & 72.2 \\
+        MobileNetV2 + CBAM & 4.9  & 8  & 71.4 \\
+        MobileNetV2 + CA  & 5.0  & 8  & \textbf{74.0}  \\ 
+        \bottomrule[1pt]
+        \end{tabular}
+        \label{tab:seg_city}
+\end{table} 
+
+\subsubsection{Semantic Segmentation}
+
+We also conduct experiments on semantic segmentation.
+%
+Following MobileNetV2 \cite{sandler2018mobilenetv2},
+we utilize the classic DeepLabV3 \cite{chen2017rethinking} 
+as an example and compare the proposed approach with
+other models to demonstrate the transferable capability of
+the proposed coordinate attention in semantic segmentation.
+%
+Specifically, we discard the last linear operator and
+connect the ASPP to the last convolutional operator.
+%
+We replace the standard $3\times3$ convolutional
+operators with the depthwise separable convolutions
+in the ASPP to reduce the model size considering mobile applications.
+%
+The output channels for each branch in ASPP are set to
+256 and other components in the ASPP are kept unchanged
+(including the $1\times1$ convolution branch and 
+the image-level feature encoding branch).
+%
+We report results on two widely used semantic segmentation
+benchmarks, including Pascal VOC 2012 \cite{everingham2015pascal}
+and Cityscapes \cite{cordts2016cityscapes}.
+%
+For experiment settings, we strictly follow the DeeplabV3 
+paper except for the weight decay that is set to 4e-5.
+%
+When the output stride is set to 16, the dilation rates
+in the ASPP are \{6, 12, 18\} while \{12, 24, 36\}
+when the output stride is set to 8.
+
+\myPara{Results on Pascal VOC 2012}
+%
+The Pascal VOC 2012 segmentation benchmark has 
+totally 21 classes including one background class.
+%
+As suggested by the original paper, we use the split 
+with 1,464 images for training and the split with
+1,449 images for validation.
+%
+Also, as done in most previous work
+\cite{chen2017rethinking,chen2014semantic}, 
+we augment the training set by adding extra images
+from \cite{hariharan2011semantic},
+resulting in totally 10,582 images for training.
+
+We show the segmentation results when taking different models
+as backbones in Table~\ref{tab:seg_voc}.
+%
+We report results under two different output strides, 
+\ie 16 and 8.
+%
+Note that all the results reported here are not based on
+COCO pretraining.
+%
+According to Table~\ref{tab:seg_voc}, models equipped with
+our coordinate attention performs much better than the vanilla
+MobileNetV2 and other attention methods.                 
+%
+
+\myPara{Results on Cityscapes} 
+Cityscapes \cite{cordts2016cityscapes} is one of 
+the most popular urban street scene segmentation
+datasets, containing totally 19
+different categories.
+%
+Following the official suggestion, we use
+the split with 2,975 images for training and 500 images for validation. 
+%
+Only the fine-annotated images are used 
+for training.
+%
+In training, we randomly crop the original
+images to $768 \times 768$.
+%
+During testing, all images are kept 
+the original size ($1024\times2048$).
+%
+% For experiment settings, readers can refer to
+% \cite{chen2017rethinking} for more details.
+
+In Table~\ref{tab:seg_city}, we show the segmentation
+results produced by models with different 
+attention methods on the Cityscapes dataset.
+%
+Compared to the vanilla MobileNetV2 and
+other attention methods, our coordinate attention can improve the segmentation results
+by a large margin with comparable number of learnable parameters.
+
+\myPara{Discussion}
+We observe that our coordinate attention
+yields larger improvement on semantic
+segmentation than ImageNet classification 
+and object detection.
+%
+We argue that this is because our coordinate
+attention is able to capture long-range
+dependencies with precise postional information,
+which is more beneficial to vision tasks with
+dense predictions, such as semantic segmentation.
+
+\section{Conclusions}
+
+In this paper, we present a novel light-weight
+attention mechanism for mobile networks, named
+coordinate attention.
+%
+Our coordinate attention inherits the
+advantage of channel attention methods
+(\eg the Squeeze-and-Excitation attention)
+that model inter-channel relationships
+and meanwhile captures long-range dependencies
+with precise positional information.
+%
+Experiments in ImageNet classification, object
+detection and semantic segmentation demonstrate
+the effectiveness of our coordination
+attention.
+% strip pooling.
+% %
+% Its long but narrow pooling window allows the model to collect rich global contextual information that is essential for scene parsing networks.
+% %
+% Based on both strip and spatial pooling operations, 
+% %quanhong: 我不太明白你是怎么理解regarding的，感觉没法解释这个句子。你看这么写可以吗
+% we design a novel strip pooling module to increase the receptive fields
+% of the backbone network and present a mixed pooling module based on 
+% the classic residual block with bottleneck structure.
+% %
+% Experiments on several widely-used datasets demonstrate the effectiveness
+% of the proposed approach.
+
+
+\myPara{Acknowledgement}
+This research was partially supported by AISG-100E-2019-035, MOE2017-T2-2-151, NUS\_ECRA\_FY17\_P08 and CRP20-2017-0006.
+
+
+%-------------------------------------------------------------------
+{\small
+\bibliographystyle{ieee_fullname}
+\bibliography{egbib}
+}
+
+\end{document}
