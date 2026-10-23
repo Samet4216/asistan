@@ -21,7 +21,8 @@ class LLMClient:
         messages: List[Dict[str, str]],
         schema: Optional[Dict[str, Any]] = None,
         max_tokens: int = 800,
-        temperature: float = None
+        temperature: float = None,
+        **kwargs
     ) -> str:
         """
         Calls Ollama /api/chat with strict options.
@@ -109,9 +110,15 @@ class LLMClient:
 client = LLMClient()
 
 
-def generate(messages: List[Dict[str, str]], schema: Optional[Dict[str, Any]] = None, max_tokens: int = 800) -> str:
+def generate(
+    messages: List[Dict[str, str]],
+    schema: Optional[Dict[str, Any]] = None,
+    max_tokens: int = 800,
+    temperature: Optional[float] = None,
+    **kwargs
+) -> str:
     """Convenience functional interface."""
-    return client.generate(messages=messages, schema=schema, max_tokens=max_tokens)
+    return client.generate(messages=messages, schema=schema, max_tokens=max_tokens, temperature=temperature, **kwargs)
 
 
 def stream_generate(messages: List[Dict[str, str]], max_tokens: int = 1500, temperature: float = None):
