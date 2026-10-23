@@ -371,22 +371,23 @@ def normalize_latex(text: str) -> str:
 
 
 def is_casual_or_personal(text: str) -> bool:
-    """Detects whether prompt is a greeting, casual chat, or personal profile declaration."""
+    """Detects whether prompt is a greeting, casual chat, idea sharing, or personal profile declaration."""
     p = text.strip().lower()
-    greetings = [
-        "naber", "nasılsın", "whats up", "what's up", "selam", "merhaba",
-        "günaydın", "iyi akşamlar", "iyi günler", "kolay gelsin", "hey",
-        "kimsin", "sen kimsin", "kimsin sen", "neler yapabilirsin", "ne yapabilirsin",
-        "ne işe yararsın", "beni tanıyor musun", "adın ne", "naber?", "nasılsın?",
-        "ne haber", "ne yapıyorsun", "merhabalar", "selamlar", "selamün aleyküm"
+    conversational_starters = [
+        "kanka", "kankam", "hocam", "dostum", "reis", "selam", "merhaba",
+        "naber", "nasılsın", "hey", "günaydın", "iyi akşamlar", "iyi günler",
+        "kolay gelsin", "merhabalar", "selamlar", "selamün aleyküm", "bak şimdi"
     ]
     personal_cues = [
         "benim adım", "adım ", "aklında tut", "hafızana kaydet",
-        "beni hatırla", "projem", "çalışmaya başladım", "çalışıyorum"
+        "beni hatırla", "projem", "çalışmaya başladım", "çalışıyorum",
+        "düşünüyorum", "planlıyorum", "yapmak istiyorum", "öğrenciyim", "okuyorum",
+        "fikrim var", "bir model eğiteceğim", "model eğitmeyi", "başlayacağım",
+        "yapacağım", "benim hakkımda", "beni tanıyor musun", "kimsin"
     ]
-    if any(p.startswith(g) or p == g for g in greetings):
+    if any(p.startswith(g) or g in p.split()[:3] for g in conversational_starters):
         return True
-    if any(cue in p for cue in personal_cues) and len(p.split()) < 30:
+    if any(cue in p for cue in personal_cues) and len(p.split()) < 35:
         return True
     return False
 
@@ -803,16 +804,13 @@ with tab_chat:
                 if len(sub_qs) > 1 and has_sufficient_evidence:
                     st.info("🔀 **Ayrıştırılan Alt-Sorgular:**\n" + "\n".join([f"- `{sq}`" for sq in sub_qs]))
 
-                # Honest Abstention: If no evidence in local papers/notes, abstain politely and state 'Bilmiyorum'
+                # If no direct academic paper matches, answer naturally from broad expert AI & engineering intelligence
                 if not has_sufficient_evidence:
-                    abstain_msg = (
-                        "### ⚠️ Yerel Hafızada / Makalelerde Bulunamadı\n\n"
-                        f"Sorduğunuz soru (*\"{clean_q}\"*) ile ilgili yerel kütüphanemdeki akademik makalelerde ve notlarda herhangi bir bilgi veya kanıt bulunamadı.\n\n"
-                        "Yanıltıcı ve uydurma (halüsinasyon) bilgi vermemek prensibim olduğu için **bu sorunun cevabını bilmiyorum**.\n\n"
-                        "💡 *Eğer bu bir Derin Öğrenme / AI konusu ise, sol menüdeki **'📥 Hafızaya Yeni Makale Ekle'** kutusundan ilgili makalenin arXiv ID'sini girerek hafızama ekleyebilirsiniz.*"
-                    )
-                    st.markdown(abstain_msg)
-                    st.session_state.messages.append({"role": "assistant", "content": abstain_msg})
+                    expert_msgs = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
+                    stream = llm.stream_generate(expert_msgs, max_tokens=1600, temperature=0.6)
+                    full_response = st.write_stream(stream)
+                    clean_full = normalize_latex(full_response)
+                    st.session_state.messages.append({"role": "assistant", "content": clean_full})
                     st.rerun()
 
                 # Display source citations box if available

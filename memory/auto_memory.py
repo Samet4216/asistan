@@ -23,11 +23,12 @@ ABOUT_FILE = config.VAULT_DIR / "00_Profile" / "About_Me.md"
 STYLE_FILE = config.VAULT_DIR / "00_Profile" / "Style.md"
 
 FIRST_PERSON_CUES = [
-    "ben ", "benim ", "benim adım", "adım ", "okuyorum", "öğrenciyim", "öğrenciyim",
+    "ben ", "benim ", "benim adım", "adım ", "okuyorum", "öğrenciyim",
     "mühendisim", "mühendisiyim", "çalışıyorum", "üzerinde çalışıyorum", "yapıyorum",
     "projem", "tezim", "bitirme projem", "kullanıyorum", "biliyorum", "ilgiliyim",
     "öğrenmek istiyorum", "aklında tut", "hafızana kaydet", "beni hatırla",
-    "bana ... anlat", "kod ağırlıklı", "pratik anlat", "formül istemiyorum",
+    "düşünüyorum", "planlıyorum", "yapmak istiyorum", "yapacağım", "fikrim var",
+    "hedefim", "bana ... anlat", "kod ağırlıklı", "pratik anlat", "formül istemiyorum",
     "i am", "my name", "my project", "i'm working on", "i study", "remember that"
 ]
 
