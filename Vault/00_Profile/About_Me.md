@@ -20,7 +20,7 @@ tags:
 ### 🚀 Aktif Projeler & İlgi Alanları
   - Hafif dikkat mekanizmaları ve model optimizasyonu (YOLO, Coordinate Attention)
   - Yerel, gizlilik odaklı derin öğrenme asistanı
-  - trained my own ANN model
+  - yapay sinir ağı projem
 
 ### 🎯 Tercih Edilen Öğrenme & Anlatım Tarzı
   - Standart akademik ve pratik derin öğrenme yaklaşımı
