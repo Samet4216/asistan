@@ -147,3 +147,30 @@ def build_answer_prompt(
 
     messages.append({"role": "user", "content": user_message})
     return messages
+
+
+def build_casual_response_prompt(query: str, history: list = None) -> list:
+    """Builds a warm, personalized conversational prompt for greetings, casual chat, and personal updates."""
+    from memory.user_profile import profile_manager
+    about_me = profile_manager.get_about_me()
+
+    sys_casual = f"""You are the user's personal AI Deep Learning Research Partner, Lab Co-Pilot, and close peer.
+You know the user well from their research profile:
+{about_me}
+
+GUIDELINES FOR CASUAL & PERSONAL CONVERSATION:
+1. Warm & Personable: Speak naturally, warmly, and intelligently like a brilliant lab peer and partner.
+2. Context-Aware: Acknowledge who the user is, their projects (e.g. YOLO, Transformers, thermal vision), and hardware (RTX 4050 TUF laptop).
+3. If the user tells you personal info or asks you to remember something (e.g. "Benim adım X", "YOLO çalışıyorum", "bunu aklında tut"), acknowledge it enthusiastically and confirm you've recorded it in your Obsidian memory.
+4. Language Matching: Reply in the same language the user addressed you with (Turkish for Turkish, English for English).
+5. Conversational Style: Do NOT output formal lecture headers (### 1. Intuition...) or raw JSON. Just converse naturally like a close AI partner."""
+
+    messages = [{"role": "system", "content": sys_casual}]
+    if history:
+        recent = [m for m in history if m.get("role") in ("user", "assistant")]
+        for m in recent[-4:]:
+            messages.append({"role": m["role"], "content": m.get("content", "")})
+
+    messages.append({"role": "user", "content": query})
+    return messages
+

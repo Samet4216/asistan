@@ -1,9 +1,13 @@
 """
-Local Deep Learning Lab Assistant — Modern Web Chat Interface (Streamlit).
-Provides a ChatGPT/Open-WebUI-grade browser interface with KaTeX math rendering,
-real-time streaming generation, multi-turn conversational context, Obsidian Vault integration,
-Two-Stage Chain-of-Thought deep reasoning, interactive ChatGPT-style text quoting/reply,
-and live RTX 4050 & CPU hardware telemetry.
+Local Deep Learning Lab Assistant — Cyber-Lab AI Research Studio (Streamlit).
+Provides a high-end, futuristic dark glassmorphism research laboratory interface:
+- Inter & Fira Code typography with KaTeX crisp mathematical rendering
+- Real-time streaming generation, multi-turn conversational context, Obsidian Vault integration
+- Two-Stage Chain-of-Thought deep reasoning with live animated pulse
+- Interactive text selection & quotation popover
+- Sub-Query Decomposition & HyDE retrieval controls
+- Live NVIDIA RTX 4050 GPU VRAM & thermal gauges
+- Quick-action research prompt cards
 """
 
 import sys
@@ -24,10 +28,16 @@ import llm
 import budget
 from retrieval.search import searcher
 from retrieval.git_context import get_git_diff
-from answer.prompts import build_answer_prompt, build_thought_plan_prompt
+from answer.prompts import (
+    build_answer_prompt,
+    build_thought_plan_prompt,
+    build_casual_response_prompt
+)
 from answer.challenge import challenger
 from memory.approval import approval_manager
 from memory.errors import error_manager
+from memory.user_profile import profile_manager
+from ingest.single_ingest import ingest_arxiv_paper
 import lang_guard
 
 
@@ -39,47 +49,175 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom Styling for ChatGPT/Ollama-like Typography
+# Custom High-End Cyber-Lab CSS & Typography
 st.markdown("""
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
 <style>
-    /* Dark comfortable font & line height */
-    .main {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        font-size: 16px;
-        line-height: 1.7;
+    /* Global Base Canvas */
+    .stApp {
+        background: radial-gradient(circle at 10% 10%, #0d1527 0%, #060911 100%) !important;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        color: #e2e8f0 !important;
     }
+
+    /* Sidebar Glassmorphism */
+    section[data-testid="stSidebar"] {
+        background: rgba(10, 15, 29, 0.88) !important;
+        backdrop-filter: blur(28px) !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4) !important;
+    }
+
+    /* Sleek Custom Scrollbars */
+    ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: rgba(56, 189, 248, 0.28);
+        border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: rgba(56, 189, 248, 0.6);
+    }
+
+    /* Typography & Line Spacing */
+    p, li, span {
+        line-height: 1.72 !important;
+    }
+
+    /* Modern Chat Bubble Styling */
     .stChatMessage {
-        border-radius: 12px;
-        padding: 18px 24px;
-        margin-bottom: 16px;
+        border-radius: 14px !important;
+        padding: 20px 24px !important;
+        margin-bottom: 20px !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-    p {
-        margin-bottom: 1.1rem !important;
+
+    /* Assistant Message Glass Card */
+    .stChatMessage:has([data-testid="chatAvatarIcon-assistant"]) {
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.75) 0%, rgba(20, 30, 55, 0.45) 100%) !important;
+        border: 1px solid rgba(56, 189, 248, 0.25) !important;
+        border-left: 4px solid #38bdf8 !important;
+        box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
     }
-    /* Formula block styling */
+
+    /* User Message Gradient Card */
+    .stChatMessage:has([data-testid="chatAvatarIcon-user"]) {
+        background: linear-gradient(135deg, rgba(30, 27, 75, 0.55) 0%, rgba(15, 23, 42, 0.65) 100%) !important;
+        border: 1px solid rgba(129, 140, 248, 0.3) !important;
+        border-left: 4px solid #818cf8 !important;
+        box-shadow: 0 6px 24px -2px rgba(0, 0, 0, 0.4) !important;
+    }
+
+    /* KaTeX Mathematical Formula Styling */
     .katex-display {
-        margin: 1.2em 0 !important;
-        padding: 0.9em 1.2em;
-        background: rgba(255, 255, 255, 0.04);
-        border-radius: 8px;
+        margin: 1.3em 0 !important;
+        padding: 1.1em 1.4em !important;
+        background: rgba(3, 7, 18, 0.65) !important;
+        border: 1px solid rgba(56, 189, 248, 0.25) !important;
+        border-radius: 10px !important;
+        box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5) !important;
         overflow-x: auto;
     }
-    .stMetric {
-        background-color: rgba(255, 255, 255, 0.03);
-        padding: 8px 12px;
-        border-radius: 8px;
+
+    /* Code Blocks */
+    pre, code {
+        font-family: 'Fira Code', 'JetBrains Mono', monospace !important;
     }
+    pre {
+        background: #040711 !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 10px !important;
+        padding: 14px 18px !important;
+    }
+
+    /* Metric Cards */
+    div[data-testid="stMetric"] {
+        background: linear-gradient(180deg, rgba(22, 31, 53, 0.5) 0%, rgba(10, 15, 29, 0.7) 100%) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 10px !important;
+        padding: 12px 14px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: 1.35rem !important;
+        font-weight: 700 !important;
+        color: #38bdf8 !important;
+    }
+
     /* Sleek Blockquote Styling for Quoted Replies */
     blockquote {
         border-left: 3px solid #38bdf8 !important;
-        background: rgba(56, 189, 248, 0.06);
-        padding: 8px 16px !important;
+        background: rgba(56, 189, 248, 0.07) !important;
+        padding: 10px 18px !important;
         border-radius: 6px;
-        margin: 8px 0 14px 0 !important;
-        color: #94a3b8 !important;
+        margin: 10px 0 16px 0 !important;
+        color: #cbd5e1 !important;
         font-style: italic;
     }
-    /* Hide Streamlit exception debug buttons */
+
+    /* Status Widgets / Extended Thinking */
+    div[data-testid="stStatusWidget"] {
+        background: rgba(13, 19, 35, 0.8) !important;
+        border: 1px solid rgba(168, 85, 247, 0.35) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 20px rgba(168, 85, 247, 0.1) !important;
+    }
+
+    /* Live Header Status Pill */
+    .status-badge-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 22px;
+    }
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 6px 14px;
+        border-radius: 999px;
+        font-size: 13px;
+        color: #94a3b8;
+    }
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        background-color: #10b981;
+        border-radius: 50%;
+        box-shadow: 0 0 10px #10b981;
+        animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Quick Action Cards */
+    .quick-card {
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.6) 0%, rgba(30, 41, 59, 0.35) 100%);
+        border: 1px solid rgba(56, 189, 248, 0.2);
+        border-radius: 12px;
+        padding: 14px 18px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .quick-card:hover {
+        border-color: #38bdf8;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(56, 189, 248, 0.15);
+    }
+
+    /* Hide Streamlit Debug / Ask ChatGPT buttons */
     [data-testid="stExceptionActionButtons"],
     .stException > div:last-child {
         display: none !important;
@@ -98,24 +236,30 @@ function setupQuoteButton() {
 
     const btn = parentDoc.createElement("div");
     btn.id = "agy-quote-btn";
-    btn.innerHTML = "💬 <b>Alıntı Yap (Reply)</b>";
+    btn.innerHTML = `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        Alıntı Yap
+    `;
     btn.style.position = "fixed";
     btn.style.display = "none";
-    btn.style.zIndex = "9999999";
-    btn.style.backgroundColor = "#0f172a";
+    btn.style.zIndex = "999999";
+    btn.style.background = "#0f172a";
     btn.style.color = "#38bdf8";
     btn.style.border = "1px solid #38bdf8";
     btn.style.borderRadius = "20px";
     btn.style.padding = "6px 14px";
     btn.style.fontSize = "13px";
+    btn.style.fontWeight = "600";
+    btn.style.fontFamily = "-apple-system, sans-serif";
     btn.style.cursor = "pointer";
-    btn.style.boxShadow = "0 8px 24px rgba(0,0,0,0.6)";
-    btn.style.transition = "transform 0.1s ease, background 0.2s ease";
-    btn.style.userSelect = "none";
+    btn.style.boxShadow = "0 6px 20px rgba(0,0,0,0.6)";
+    btn.style.transition = "transform 0.12s ease, background 0.12s ease";
 
     btn.onmouseenter = () => {
         btn.style.backgroundColor = "#1e293b";
-        btn.style.transform = "scale(1.05)";
+        btn.style.transform = "scale(1.06)";
     };
     btn.onmouseleave = () => {
         btn.style.backgroundColor = "#0f172a";
@@ -178,12 +322,10 @@ function setupQuoteButton() {
         }
 
         btn.style.display = "none";
-        parentDoc.getSelection().removeAllRanges();
     });
 }
 
-setupQuoteButton();
-setInterval(setupQuoteButton, 1000);
+setTimeout(setupQuoteButton, 500);
 </script>
 """, height=0)
 
@@ -199,23 +341,17 @@ def normalize_latex(text: str) -> str:
     if not text:
         return ""
 
-    # Split text into code blocks and normal prose so code is 100% protected
     parts = re.split(r'(```[\s\S]*?```)', text)
     processed = []
 
     for part in parts:
-        # If this is a fenced code block, keep it completely untouched!
         if part.startswith("```"):
             processed.append(part)
             continue
 
-        # 1. Standard display math: \[ ... \] -> $$ ... $$
         p = re.sub(r'\\\[([\s\S]*?)\\\]', r'$$\n\1\n$$', part)
-
-        # 2. Standard inline math: \( ... \) -> $ ... $
         p = re.sub(r'\\\(([\s\S]*?)\\\)', r'$\1$', p)
 
-        # 3. Standalone bracket lines [ ... ] that contain math indicators
         def _bracket_repl(m):
             inner = m.group(1).strip()
             indicators = ["=", "\\text", "\\frac", "\\times", "^", "_", "\\cdot", "\\left", "\\sum", "softmax", "ReLU"]
@@ -224,12 +360,29 @@ def normalize_latex(text: str) -> str:
             return m.group(0)
 
         p = re.sub(r'(?m)^\s*\[\s*([^\n\]]+)\s*\]\s*$', _bracket_repl, p)
-
-        # 4. Clean excessive $$$ to $$
         p = re.sub(r'\${3,}', '$$', p)
         processed.append(p)
 
     return "".join(processed)
+
+
+def is_casual_or_personal(text: str) -> bool:
+    """Detects whether prompt is a greeting, casual chat, or personal profile declaration."""
+    p = text.strip().lower()
+    greetings = [
+        "naber", "nasılsın", "whats up", "what's up", "selam", "merhaba",
+        "günaydın", "iyi akşamlar", "hey", "kimsin", "neler yapabilirsin",
+        "beni tanıyor musun", "adın ne", "naber?", "nasılsın?", "ne haber", "ne yapıyorsun"
+    ]
+    personal_cues = [
+        "benim adım", "adım ", "aklında tut", "hafızana kaydet",
+        "beni hatırla", "projem", "çalışmaya başladım", "çalışıyorum"
+    ]
+    if any(p.startswith(g) or p == g for g in greetings):
+        return True
+    if any(cue in p for cue in personal_cues) and len(p.split()) < 30:
+        return True
+    return False
 
 
 def contextualize_query(current_query: str, history: list) -> str:
@@ -302,15 +455,15 @@ def get_gpu_status():
 
 # --- SIDEBAR CONTROLS ---
 with st.sidebar:
-    st.title("🔬 Donanım & Bellek")
+    st.markdown("### 🔬 Laboratuvar Donanımı")
     
-    # GPU Monitor
+    # GPU Monitor Card
     gpu = get_gpu_status()
     if gpu.get("available"):
-        st.markdown("**NVIDIA RTX 4050 Laptop (GPU)**")
+        st.caption(f"⚡ **{gpu['name']}**")
         col1, col2 = st.columns(2)
-        col1.metric("GPU Sıcaklık", f"{gpu['temp']} °C")
-        col2.metric("GPU Yükü", f"{gpu['util']} %")
+        col1.metric("GPU Isı", f"{gpu['temp']} °C")
+        col2.metric("GPU Yük", f"{gpu['util']} %")
         vram_pct = int((gpu['used'] / gpu['total']) * 100)
         st.progress(vram_pct, text=f"VRAM: {gpu['used']} / {gpu['total']} MiB")
     else:
@@ -319,38 +472,37 @@ with st.sidebar:
     # CPU & RAM Monitor
     cpu_percent = psutil.cpu_percent(interval=None)
     ram = psutil.virtual_memory()
-    st.markdown("**İşlemci (CPU) & Sistem Belleği**")
+    st.caption("💻 **İşlemci & Sistem Belleği**")
     ccol1, ccol2 = st.columns(2)
-    ccol1.metric("CPU Yükü", f"{cpu_percent} %")
+    ccol1.metric("CPU", f"{cpu_percent} %")
     ccol2.metric("RAM", f"{ram.percent} %")
     st.progress(ram.percent / 100.0, text=f"RAM: {ram.used // (1024**2)} / {ram.total // (1024**2)} MiB")
 
-    st.caption("ℹ️ *Laptop fanları hem CPU hem de GPU ısısına göre hızlanır. Gösterilen sıcaklık NVIDIA GPU çipinin sıcaklığıdır.*")
-
     # Unload & Clear Buttons
+    st.write("")
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
-        if st.button("❄️ Boşalt", help="Modeli VRAM'den siler, GPU'yu soğutur."):
+        if st.button("❄️ VRAM'i Boşalt", help="Model ağırlıklarını VRAM'den siler, GPU'yu soğutur."):
             llm.unload()
             st.success("VRAM boşaltıldı.")
             st.rerun()
     with col_btn2:
-        if st.button("🗑️ Temizle", help="Sohbet geçmişini sıfırlar ve yeni bir seans açar."):
+        if st.button("🗑️ Sohbeti Sıfırla", help="Sohbet geçmişini sıfırlar ve yeni bir seans açar."):
             st.session_state.messages = [
                 {
                     "role": "assistant",
-                    "content": "Merhaba! Ben yerel Derin Öğrenme Laboratuvar Asistanınızım. İndekslenmiş makalelerimiz hakkında teknik sorular sorabilir, fareyle herhangi bir cümleyi veya formülü seçip '💬 Alıntı Yap' diyerek doğrudan o kısım hakkında soru sorabilirsiniz."
+                    "content": "Merhaba! Ben yerel Derin Öğrenme Araştırma Partnerinizim. İndekslenmiş 11 makalemiz ve 91 sinaptik kavram notumuz hakkında teknik sorular sorabilir, fareyle herhangi bir satırı seçip '💬 Alıntı Yap' diyerek soru sorabilirsiniz."
                 }
             ]
             st.rerun()
 
     st.divider()
 
-    st.subheader("⚙️ Yanıt Derinliği & Mod")
+    st.markdown("### ⚙️ Akıl Yürütme Modu")
     mode = st.radio(
-        "Mod Seçimi:",
+        "Yanıt Derinliği:",
         [
-            "🎓 Derin Akıl Yürütme & Ders Kitabı (Two-Stage CoT)",
+            "🎓 İki Aşamalı Derin Akıl Yürütme (Two-Stage CoT)",
             "⚡ Hızlı Akademik Soru-Cevap",
             "🎯 Devil's Advocate (/challenge)"
         ],
@@ -359,15 +511,37 @@ with st.sidebar:
 
     st.divider()
 
-    st.subheader("🔍 Arama Motoru Ayarları")
+    st.markdown("### 🔍 Arama Motoru Ayarları")
     use_decomp = st.checkbox("🔀 Alt-Sorgu Ayrıştırma (Decomposition)", value=True, help="Karmaşık veya karşılaştırmalı soruları otomatik 2-3 bağımsız sorguya bölerek arar.")
     use_hyde = st.checkbox("💡 HyDE (Hipotetik Belge Vektörü)", value=False, help="Soyut sorular için önce akademik bir varsayımsal yanıt üretip onun vektörüyle arar.")
 
     st.divider()
 
+    # On-demand arXiv Paper Ingestion Section
+    st.markdown("### 📥 Hafızaya Yeni Makale Ekle")
+    with st.form("form_add_paper"):
+        new_arxiv_id = st.text_input("arXiv Kodu:", placeholder="örn: 2103.02907 veya 1706.03762")
+        submit_paper = st.form_submit_button("📥 İndir & İndeksle")
+        if submit_paper and new_arxiv_id.strip():
+            with st.spinner(f"[{new_arxiv_id.strip()}] arXiv'den indiriliyor, parçalanıyor ve ChromaDB'ye ekleniyor..."):
+                res_ing = ingest_arxiv_paper(new_arxiv_id.strip())
+                if res_ing.get("success"):
+                    st.success(f"✅ '{res_ing.get('title')}' ({res_ing.get('chunks_count')} parça) başarıyla hafızaya eklendi!")
+                    st.rerun()
+                else:
+                    st.error(f"❌ Hata: {res_ing.get('error', 'Makale indirilemedi.')}")
+
+    st.divider()
+
+    # Researcher Profile / About Me Panel
+    with st.expander("👤 Araştırmacı Profili (Benim Hakkımda)", expanded=False):
+        current_about = profile_manager.get_about_me()
+        st.caption("Asistan sizi bu bilgilerle tanır. Sohbette adınızı veya projenizi belirttiğinizde burası otomatik güncellenir.")
+        st.text_area("Obsidian Kayıtlı Profil:", value=current_about, height=130, disabled=True)
+
     # Obsidian Pending Drafts
     drafts = approval_manager.list_drafts()
-    st.subheader(f"📝 Obsidian Taslakları ({len(drafts)})")
+    st.markdown(f"### 📝 Obsidian Taslakları ({len(drafts)})")
     if drafts:
         for d in drafts[:5]:
             with st.expander(f"{d['title'][:25]}"):
@@ -382,26 +556,61 @@ with st.sidebar:
 
 
 # --- MAIN CHAT AREA ---
-st.title("Local Deep Learning Lab Assistant")
-st.caption("Donanım: RTX 4050 6GB | Motor: Ollama qwen2.5:7b | Vektör Veritabanı: ChromaDB | Bellek: Obsidian Vault")
+
+# Top Hero Status Bar
+gpu_temp_str = f"{gpu['temp']}°C" if gpu.get("available") else "Normal"
+st.markdown(f"""
+<div style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:14px; margin-bottom:18px;">
+    <div>
+        <h1 style="margin:0; font-size:1.85rem; font-weight:700; background: linear-gradient(90deg, #38bdf8 0%, #818cf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+            Local Deep Learning Lab Assistant
+        </h1>
+        <p style="margin:4px 0 0 0; font-size:0.88rem; color:#94a3b8;">
+            Çevrimdışı Akademik Araştırma, Tensör Laboratuvarı & İkinci Beyin
+        </p>
+    </div>
+    <div class="status-badge-container" style="margin:0;">
+        <div class="status-pill"><span class="status-dot"></span> Ollama CUDA</div>
+        <div class="status-pill">⚡ RTX 4050 ({gpu_temp_str})</div>
+        <div class="status-pill">📚 606 RAG Parçası</div>
+        <div class="status-pill">🧠 91 Sinaps</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # Initialize session messages
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
             "role": "assistant",
-            "content": "Merhaba! Ben yerel Derin Öğrenme Laboratuvar Asistanınızım. İndekslenmiş makalelerimiz hakkında teknik sorular sorabilir, fareyle herhangi bir cümleyi veya formülü seçip '💬 Alıntı Yap' diyerek doğrudan o kısım hakkında soru sorabilirsiniz."
+            "content": "Merhaba! Ben yerel Derin Öğrenme Araştırma Partnerinizim. İndekslenmiş 11 makalemiz ve 91 sinaptik kavram notumuz hakkında teknik sorular sorabilir, fareyle herhangi bir satırı seçip '💬 Alıntı Yap' diyerek soru sorabilirsiniz."
         }
     ]
+
+# One-Click Quick Action Cards (Shown at start or above input)
+if len(st.session_state.messages) <= 1:
+    st.markdown("##### 🚀 Hızlı Başlangıç Araştırma Başlıkları")
+    q_col1, q_col2 = st.columns(2)
+    with q_col1:
+        if st.button("⚖️ PPO vs DPO: Ödül Modelleme Farkları", use_container_width=True):
+            st.session_state.pending_prompt = "Compare PPO clipped surrogate objective with DPO policy optimization in terms of reward modeling and memory."
+        if st.button("⚡ FlashAttention: SRAM Tiling & IO-Awareness", use_container_width=True):
+            st.session_state.pending_prompt = "How does FlashAttention avoid materializing the NxN attention matrix in HBM using SRAM tiling?"
+    with q_col2:
+        if st.button("🔍 Self-RAG: Reflection Token Mekanizması", use_container_width=True):
+            st.session_state.pending_prompt = "Explain Self-RAG reflection tokens ([Retrieve], [IsRel], [IsSup]) and how they prevent hallucination."
+        if st.button("📐 Coordinate Attention: 1D Uzamsal Pooling", use_container_width=True):
+            st.session_state.pending_prompt = "Coordinate Attention yatay ve dikey 1D pooling ile konumsal bilgiyi nasıl korur? Formüllerini ve tensör boyutlarını açıkla."
+    st.write("")
 
 # Render chat history with normalized LaTeX and Obsidian Save buttons
 for i, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):
         st.markdown(normalize_latex(msg["content"]))
         
-        # If assistant message (and not the initial welcome message), provide Save & Quote buttons
+        # If assistant message (and not the initial welcome message), provide Save button
         if msg["role"] == "assistant" and i > 0:
-            btn_col1, btn_col2, _ = st.columns([1, 1, 3])
+            btn_col1, _ = st.columns([1, 4])
             with btn_col1:
                 if st.button("💾 Obsidian'a Kaydet", key=f"save_draft_{i}", help="Bu cevabı Obsidian Vault/Drafts/ klasörüne taslak olarak kaydeder."):
                     user_q = "Theory_Note"
@@ -420,8 +629,17 @@ for i, msg in enumerate(st.session_state.messages):
                     st.toast(f"✅ '{safe_title}' Obsidian Vault/Drafts/ klasörüne kaydedildi!", icon="📝")
                     st.rerun()
 
-# User input box
-if prompt := st.chat_input("Bir soru sorun veya yukarıdan bir satırı seçip '💬 Alıntı Yap' ile soru yöneltin..."):
+# User input handling (or pending quick prompt)
+input_prompt = st.chat_input("Bir soru sorun, selam verin veya yukarıdan bir satırı seçip '💬 Alıntı Yap' ile sorun...")
+
+prompt = None
+if input_prompt:
+    prompt = input_prompt
+elif "pending_prompt" in st.session_state and st.session_state.pending_prompt:
+    prompt = st.session_state.pending_prompt
+    st.session_state.pending_prompt = None
+
+if prompt:
     # Render user query
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -429,8 +647,23 @@ if prompt := st.chat_input("Bir soru sorun veya yukarıdan bir satırı seçip '
 
     # Generate Response
     with st.chat_message("assistant"):
-        # Check Mode
-        if "Devil's Advocate" in mode or prompt.startswith("/challenge"):
+        # 1. Check if Casual Chat or Personal Profile Statement
+        if is_casual_or_personal(prompt):
+            lower_p = prompt.lower()
+            # If user mentioned personal info, save it to About_Me.md
+            if any(c in lower_p for c in ["benim adım", "adım ", "aklında tut", "hafızana kaydet", "projem", "üzerinde çalışıyorum", "çalışmaya başladım"]):
+                profile_manager.append_about_me(prompt.strip())
+                st.toast("👤 Kişisel notunuz Obsidian About_Me.md dosyasına kaydedildi!", icon="📝")
+
+            # Stream warm casual response
+            casual_msgs = build_casual_response_prompt(prompt, history=st.session_state.messages[:-1])
+            stream = llm.stream_generate(casual_msgs, max_tokens=600)
+            full_response = st.write_stream(stream)
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
+            st.rerun()
+
+        # 2. Check Devil's Advocate Mode
+        elif "Devil's Advocate" in mode or prompt.startswith("/challenge"):
             with st.spinner("Hipotez literatürle ve RTX 4050 donanım sınırlarıyla test ediliyor..."):
                 clean_q = prompt.replace("/challenge", "").strip()
                 res = challenger.challenge_hypothesis(clean_q)
@@ -450,6 +683,7 @@ if prompt := st.chat_input("Bir soru sorun veya yukarıdan bir satırı seçip '
                 st.markdown(clean_output)
                 st.session_state.messages.append({"role": "assistant", "content": clean_output})
 
+        # 3. Technical Deep Learning Question
         else:
             is_deep_cot = "Two-Stage CoT" in mode or prompt.startswith("/explain")
             clean_q = prompt.replace("/explain", "").strip()
@@ -482,6 +716,22 @@ if prompt := st.chat_input("Bir soru sorun veya yukarıdan bir satırı seçip '
             if len(sub_qs) > 1:
                 st.info("🔀 **Ayrıştırılan Alt-Sorgular:**\n" + "\n".join([f"- `{sq}`" for sq in sub_qs]))
 
+            # Honest Abstention: If no evidence in local papers/notes, abstain politely and offer to ingest!
+            if not has_sufficient_evidence and not retrieved_context:
+                abstain_msg = (
+                    "### ⚠️ Yerel Hafızada Yeterli Kaynak Bulunamadı\n\n"
+                    f"Bu konu (*\"{clean_q}\"*) şu an yerel hafızamdaki makalelerde "
+                    "(Transformer, ResNet, ViT, Swin, Coordinate Attention, PPO, DPO vb.) doğrudan yer almıyor.\n\n"
+                    "Uydurma ve yanıltıcı bilgi vermemek için **bu konuyu henüz tam olarak bilmiyorum**.\n\n"
+                    "💡 **Hafızama Nasıl Ekleyebilirsin?**\n"
+                    "Sol menüdeki **'📥 Hafızaya Yeni Makale Ekle'** kutusundan bu konunun arXiv kodunu "
+                    "girip *'İndir & İndeksle'* dersen, makaleyi anında indirip parçalayarak hafızama eklerim "
+                    "ve ardından bu soruya derinlemesine ders kitabı kalitesinde cevap verebilirim!"
+                )
+                st.markdown(abstain_msg)
+                st.session_state.messages.append({"role": "assistant", "content": abstain_msg})
+                st.rerun()
+
             # Display source citations box if available
             sources = search_res.get("results", [])
             if sources:
@@ -501,7 +751,6 @@ if prompt := st.chat_input("Bir soru sorun veya yukarıdan bir satırı seçip '
                 t_start = time.time()
                 with st.status("💭 Derin Düşünme & Analiz (Model kendi kendine muhakeme yapıyor...)", expanded=True) as status_cot:
                     cot_prompt_msgs = build_thought_plan_prompt(clean_q, safe_packed.get("paper_chunks", ""))
-                    # Stream the actual thought monologue live into the container
                     thought_stream = llm.stream_generate(cot_prompt_msgs, max_tokens=650, temperature=0.2)
                     thought_plan = st.write_stream(thought_stream)
                     elapsed_sec = max(1, int(time.time() - t_start))
@@ -519,7 +768,6 @@ if prompt := st.chat_input("Bir soru sorun veya yukarıdan bir satırı seçip '
                 history=st.session_state.messages[:-1]
             )
 
-            # Max tokens: 2500 for deep CoT mode, 1000 for quick mode
             target_max_tokens = config.TOKEN_BUDGET.get("max_answer", 2500) if is_deep_cot else 1000
 
             stream = llm.stream_generate(

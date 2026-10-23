@@ -18,11 +18,37 @@ from vault import vault
 
 STYLE_FILE = config.VAULT_DIR / "00_Profile" / "Style.md"
 KNOWLEDGE_FILE = config.VAULT_DIR / "00_Profile" / "Knowledge_State.md"
+ABOUT_FILE = config.VAULT_DIR / "00_Profile" / "About_Me.md"
 
 
 class ProfileManager:
     def __init__(self):
         vault.ensure_layout()
+
+    def get_about_me(self) -> str:
+        """Reads personal researcher profile from Vault/00_Profile/About_Me.md."""
+        if ABOUT_FILE.exists():
+            try:
+                content = ABOUT_FILE.read_text(encoding="utf-8")
+                if content.startswith("---"):
+                    parts = content.split("---", 2)
+                    if len(parts) >= 3:
+                        return parts[2].strip()
+                return content.strip()
+            except Exception:
+                pass
+        return "Araştırmacı Profili: Derin Öğrenme ve Bilgisayarlı Görü çalışıyor."
+
+    def append_about_me(self, fact: str):
+        """Appends a new personal fact or project note to About_Me.md."""
+        current = self.get_about_me()
+        new_content = current.strip() + f"\n- {fact}\n"
+        frontmatter = {
+            "type": "profile",
+            "tags": ["profile", "about-me"]
+        }
+        vault.write_note("00_Profile", "About_Me.md", frontmatter, new_content)
+        vault.git_commit(f"profile: added personal fact '{fact[:30]}'")
 
     def get_style(self) -> str:
         """Reads style instructions from Vault/00_Profile/Style.md."""
