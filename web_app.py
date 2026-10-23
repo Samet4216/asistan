@@ -35,6 +35,7 @@ from answer.prompts import (
     build_general_expert_prompt
 )
 from answer.challenge import challenger
+from answer.verify import audit_markdown_response
 from memory.approval import approval_manager
 from memory.errors import error_manager
 from memory.user_profile import profile_manager
@@ -374,20 +375,25 @@ def is_casual_or_personal(text: str) -> bool:
     """Detects whether prompt is a greeting, casual chat, idea sharing, or personal profile declaration."""
     p = text.strip().lower()
     conversational_starters = [
+        "whats up", "what's up", "sup", "hello", "hi", "hey", "how are you",
+        "how's it going", "good morning", "good evening", "who are you",
         "kanka", "kankam", "hocam", "dostum", "reis", "selam", "merhaba",
-        "naber", "nasılsın", "hey", "günaydın", "iyi akşamlar", "iyi günler",
-        "kolay gelsin", "merhabalar", "selamlar", "selamün aleyküm", "bak şimdi"
+        "naber", "nasılsın", "günaydın", "iyi akşamlar", "iyi günler",
+        "kolay gelsin", "merhabalar", "selamlar", "selamün aleyküm", "bak şimdi",
+        "sen kimsin", "kimsin sen", "beni tanıyor musun", "adın ne", "ne yapıyorsun",
+        "ne haber", "ne var ne yok"
     ]
     personal_cues = [
         "benim adım", "adım ", "aklında tut", "hafızana kaydet",
         "beni hatırla", "projem", "çalışmaya başladım", "çalışıyorum",
         "düşünüyorum", "planlıyorum", "yapmak istiyorum", "öğrenciyim", "okuyorum",
         "fikrim var", "bir model eğiteceğim", "model eğitmeyi", "başlayacağım",
-        "yapacağım", "benim hakkımda", "beni tanıyor musun", "kimsin"
+        "yapacağım", "benim hakkımda", "hakkımda ne biliyorsun", "beni tanıyor musun",
+        "geçmişim", "okulum", "bölümüm", "tezim", "ben ", "benim "
     ]
-    if any(p.startswith(g) or g in p.split()[:3] for g in conversational_starters):
+    if any(p == g or p.startswith(g) or g in p.split()[:3] for g in conversational_starters):
         return True
-    if any(cue in p for cue in personal_cues) and len(p.split()) < 35:
+    if any(cue in p for cue in personal_cues) and len(p.split()) < 40:
         return True
     return False
 
@@ -764,10 +770,12 @@ with tab_chat:
             elif "Mekatronik & Robotik Mentoru" in mode:
                 with st.spinner("🤖 Mekatronik ve Yapay Zeka mühendislik perspektifiyle analiz ediliyor..."):
                     clean_q = prompt.replace("/mentor", "").strip()
+                    disclaimer = "> ⚠️ **Genel Mühendislik Bilgisi:** Bu mod yerel makale kütüphanesinden kanıt aramadan genel mühendislik bilgisiyle yanıt üretir.\n\n"
+                    st.markdown(disclaimer)
                     mentor_msgs = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
                     stream = llm.stream_generate(mentor_msgs, max_tokens=1600)
                     full_response = st.write_stream(stream)
-                    clean_full = normalize_latex(full_response)
+                    clean_full = disclaimer + normalize_latex(full_response)
                     st.session_state.messages.append({"role": "assistant", "content": clean_full})
                     st.rerun()
 
@@ -799,12 +807,16 @@ with tab_chat:
                     safe_packed = packed_report["packed"]
                     status.update(label="Literatür tarandı.", state="complete")
 
-                # Display decomposed sub-queries if any were generated for technical questions
+                # Display decomposed sub-queries or translated English search query
                 sub_qs = search_res.get("sub_queries", [])
+                en_sq = search_res.get("search_query", "")
                 if len(sub_qs) > 1 and has_sufficient_evidence:
-                    st.info("🔀 **Ayrıştırılan Alt-Sorgular:**\n" + "\n".join([f"- `{sq}`" for sq in sub_qs]))
+                    st.info("🔀 **Ayrıştırılan Alt-Sorgular (EN):**\n" + "\n".join([f"- `{sq}`" for sq in sub_qs]))
+                elif en_sq and en_sq != augmented_search_query and has_sufficient_evidence:
+                    st.caption(f"🌐 **Arama Sorgusu (TR → EN):** `{en_sq}`")
 
-                # If no direct academic paper matches, answer naturally from broad expert AI & engineering intelligence
+                # If no direct academic paper matches with high confidence,
+                # answer naturally and conversationally using broad expert AI & engineering intelligence:
                 if not has_sufficient_evidence:
                     expert_msgs = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
                     stream = llm.stream_generate(expert_msgs, max_tokens=1600, temperature=0.6)
@@ -813,17 +825,18 @@ with tab_chat:
                     st.session_state.messages.append({"role": "assistant", "content": clean_full})
                     st.rerun()
 
-                # Display source citations box if available
+                # Display numbered source citations box [S1]..[S5] if available
                 sources = search_res.get("results", [])
                 if sources:
-                    with st.expander(f"📚 Referans Alınan Makale Parçaları ({len(sources)} Bölüm)"):
-                        for s in sources:
+                    with st.expander(f"📚 Referans Alınan Makale Parçaları ({len(sources)} Bölüm — [S1]..[S{len(sources)}])"):
+                        for idx, s in enumerate(sources):
+                            tag = s.get("source_tag", f"S{idx+1}")
                             meta = s.get("metadata", {})
                             title = meta.get("title", "Akademik Makale")
                             section = meta.get("section_name", "")
                             score = s.get("rerank_score", 0.0)
                             sec_info = f" • Bölüm: *{section}*" if section else ""
-                            st.markdown(f"- 📄 **{title}**{sec_info} (`{s.get('id')}`) — *Alaka Skoru: `{score:.2f}`*")
+                            st.markdown(f"- **`[{tag}]`** 📄 **{title}**{sec_info} (`{s.get('id')}`) — *Alaka Skoru: `{score:.2f}`*")
 
                 thought_plan = ""
                 # Step 2: Extended Thinking Mode - Model Thinks Deeply in Public
@@ -857,6 +870,27 @@ with tab_chat:
                 )
                 full_response = st.write_stream(stream)
                 clean_full = normalize_latex(full_response)
+
+                # Step 4: Deterministic Citation & Verbatim Quote Audit
+                audit = audit_markdown_response(clean_full, retrieved_context)
+                cited_str = ", ".join([f"`[{t}]`" for t in audit["cited_tags"]]) if audit["cited_tags"] else "Belirtilmedi"
+                if audit["total_quotes"] > 0:
+                    q_badge = f"✅ **{audit['verified_count']}/{audit['total_quotes']} Doğrudan Alıntı Kaynak Metinde Doğrulandı** (`%{int(audit['verified_ratio']*100)}`)"
+                else:
+                    q_badge = "ℹ️ Doğrudan tırnak içi alıntı kullanılmadı (Parafraz / Formül anlatımı)"
+
+                footer_parts = [
+                    f"\n\n---\n🔎 **Kaynak & Alıntı Denetimi:** Atıf Yapılan Kaynaklar: {cited_str} | {q_badge}"
+                ]
+                for q_item in audit["quotes"]:
+                    mark = "✅" if q_item["verified"] else "⚠️ *(Kaynak metinde tam eşleşmedi)*"
+                    snippet = q_item["text"][:140] + ("..." if len(q_item["text"]) > 140 else "")
+                    footer_parts.append(f"- {mark} *\"{snippet}\"*")
+
+                verification_footer = "\n".join(footer_parts)
+                st.markdown(verification_footer)
+                clean_full = clean_full + verification_footer
+
                 st.session_state.messages.append({"role": "assistant", "content": clean_full})
                 st.rerun()
 
