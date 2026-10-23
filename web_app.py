@@ -38,6 +38,7 @@ from answer.challenge import challenger
 from memory.approval import approval_manager
 from memory.errors import error_manager
 from memory.user_profile import profile_manager
+from memory.auto_memory import auto_memory
 from ingest.single_ingest import ingest_arxiv_paper
 import lang_guard
 
@@ -547,8 +548,8 @@ with st.sidebar:
     # Researcher Profile / About Me Panel
     with st.expander("👤 Araştırmacı Profili (Benim Hakkımda)", expanded=False):
         current_about = profile_manager.get_about_me()
-        st.caption("Asistan sizi bu bilgilerle tanır. Sohbette adınızı veya projenizi belirttiğinizde burası otomatik güncellenir.")
-        st.text_area("Obsidian Kayıtlı Profil:", value=current_about, height=130, disabled=True)
+        st.caption("Asistan sizi bu bilgilerle tanır. Sohbette kendinizi, projelerinizi veya tercihlerinizi anlattıkça burası otomatik güncellenir.")
+        st.markdown(current_about)
 
     # Obsidian Pending Drafts
     drafts = approval_manager.list_drafts()
@@ -651,6 +652,15 @@ elif "pending_prompt" in st.session_state and st.session_state.pending_prompt:
     st.session_state.pending_prompt = None
 
 if prompt:
+    # Autonomous Memory Extraction: check if user shares personal facts, projects, or preferences
+    if auto_memory.has_personal_cues(prompt):
+        try:
+            update_summary = auto_memory.extract_and_update(prompt)
+            if update_summary:
+                st.toast(f"🧠 Obsidian Hafızası Güncellendi: {update_summary}", icon="📝")
+        except Exception:
+            pass
+
     # Render user query
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -660,12 +670,6 @@ if prompt:
     with st.chat_message("assistant"):
         # 1. Check if Casual Chat or Personal Profile Statement
         if is_casual_or_personal(prompt):
-            lower_p = prompt.lower()
-            # If user mentioned personal info, save it to About_Me.md
-            if any(c in lower_p for c in ["benim adım", "adım ", "aklında tut", "hafızana kaydet", "projem", "üzerinde çalışıyorum", "çalışmaya başladım"]):
-                profile_manager.append_about_me(prompt.strip())
-                st.toast("👤 Kişisel notunuz Obsidian About_Me.md dosyasına kaydedildi!", icon="📝")
-
             # Stream warm casual response
             casual_msgs = build_casual_response_prompt(prompt, history=st.session_state.messages[:-1])
             stream = llm.stream_generate(casual_msgs, max_tokens=600)
@@ -727,14 +731,16 @@ if prompt:
             if len(sub_qs) > 1 and has_sufficient_evidence:
                 st.info("🔀 **Ayrıştırılan Alt-Sorgular:**\n" + "\n".join([f"- `{sq}`" for sq in sub_qs]))
 
-            # Fallback for General Engineering, Career, Robotics, or Out-of-Corpus Questions:
-            # If the query does not match any indexed deep learning papers, do NOT force irrelevant
-            # papers or rigid lecture templates. Answer directly and practically using broad engineering intelligence!
+            # Honest Abstention: If no evidence in local papers/notes, abstain politely and state 'Bilmiyorum'
             if not has_sufficient_evidence:
-                expert_msgs = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
-                stream = llm.stream_generate(expert_msgs, max_tokens=1600)
-                full_response = st.write_stream(stream)
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                abstain_msg = (
+                    "### ⚠️ Yerel Hafızada / Makalelerde Bulunamadı\n\n"
+                    f"Sorduğunuz soru (*\"{clean_q}\"*) ile ilgili yerel kütüphanemdeki akademik makalelerde ve notlarda herhangi bir bilgi veya kanıt bulunamadı.\n\n"
+                    "Yanıltıcı ve uydurma (halüsinasyon) bilgi vermemek prensibim olduğu için **bu sorunun cevabını bilmiyorum**.\n\n"
+                    "💡 *Eğer bu bir Derin Öğrenme / AI konusu ise, sol menüdeki **'📥 Hafızaya Yeni Makale Ekle'** kutusundan ilgili makalenin arXiv ID'sini girerek hafızama ekleyebilirsiniz.*"
+                )
+                st.markdown(abstain_msg)
+                st.session_state.messages.append({"role": "assistant", "content": abstain_msg})
                 st.rerun()
 
             # Display source citations box if available

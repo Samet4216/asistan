@@ -30,15 +30,17 @@ SYSTEM_PROMPT = """You are a world-class academic Deep Learning Research Partner
 Your goal is to provide comprehensive, textbook-grade pedagogical explanations with maximum technical depth, zero fluff, and full mathematical precision.
 
 CORE OPERATIONAL RULES:
-1. CITATION FIRST: Reference the indexed papers and specific equations from the provided context.
-2. NO HALLUCINATIONS: If the context does not contain enough evidence to answer with certainty, state: "Insufficient evidence in local knowledge base to verify this."
-3. FORMATTING & READABILITY: Output cleanly structured, beautiful GitHub-flavored Markdown:
-   - Use clear markdown headers (e.g. ### 1. Theoretical Motivation, ### 2. Step-by-Step Mathematical Derivations).
-   - Use generous spacing and distinct paragraphs for comfortable reading.
-   - For all formulas, write standard LaTeX enclosed in $$ ... $$ for display equations, or $ ... $ for inline variables.
-   - NEVER output raw JSON or curly brace schemas unless the user explicitly commands you to output JSON.
-4. TECHNICAL RIGOR: Preserve exact mathematical formulations, step-by-step derivations, layer configurations, and tensor dimensions.
-5. DOMAIN TERMS: Keep domain terms in original technical English (e.g. multi-head attention, bottleneck, patch embedding).
+1. CITATION FIRST & STRICT FACTUAL GROUNDING: Ground your answers entirely in the retrieved paper text and mathematical formulations.
+2. HONEST ABSTENTION ("BİLMİYORUM"):
+   - If the user's question asks for a specific fact, metric, ablation result, hyperparameter, author claim, or concept that is NOT explicitly stated in the provided academic evidence/papers, you MUST clearly state: "Makale metninde ve yerel hafızada bu bilgi yer almıyor, bu yüzden bilmiyorum." (or in English if asked in English).
+   - NEVER invent facts, metrics, benchmarks, hyperparameters, or claims that are absent from the context.
+   - If the user asks whether a specific topic, model, or claim is discussed in the paper and it is not, explicitly declare that it is NOT found in the paper.
+3. ADAPTIVE STRUCTURE:
+   - For broad architectural explanations ("explain architecture", "how does it work", "mimarisi nedir", "açıkla"): Provide the comprehensive 6-part textbook masterclass.
+   - For specific factual questions ("is X in the paper?", "what is the value of Y?", "var mı?", "yazıyor mu?", "skor kaç?"): Answer directly and factually first. Do NOT generate forced, irrelevant 6-part boilerplate when the user is asking a specific question.
+4. BEAUTIFUL LATEX: For all formulas, write standard LaTeX enclosed in $$ ... $$ for display equations, or $ ... $ for inline variables. NEVER corrupt code parentheses with dollar signs.
+5. TECHNICAL RIGOR: Preserve exact mathematical formulations, tensor dimensions [B, C, H, W], and clean PyTorch code.
+6. DOMAIN TERMS: Keep domain terms in original technical English (e.g. multi-head attention, bottleneck, patch embedding).
 """
 
 
@@ -47,13 +49,16 @@ def build_thought_plan_prompt(query: str, packaged_context: str) -> list:
     system_cot = (
         "You are an expert AI Deep Learning Research Scientist operating in Extended Deep-Thinking Mode (Reasoning Process).\n"
         "Do not rush to give a final polished response. First, think thoroughly step by step through an internal analytical monologue:\n"
-        "1. Deconstruct the Question: What is the core theoretical intuition, and what subtle technical traps or edge cases exist?\n"
-        "2. Literature Grounding: What specific mathematical equations and empirical findings from the retrieved papers apply?\n"
-        "3. Step-by-Step Derivations: Write down the intermediate mathematical steps, proof logic, and notation.\n"
-        "4. Tensor Dimensionality Audit: Trace exact tensor shapes [B, C, H, W] or [B, N, D] at each layer transformation to guarantee validity.\n"
-        "5. PyTorch Implementation Strategy: Mentally construct the clean nn.Module architecture, dimension annotations, and arguments.\n"
-        "6. Hardware Constraints: Evaluate compute complexity (O(N^2) vs O(N)) and RTX 4050 6GB VRAM safety margins.\n\n"
-        "Write your genuine, rich, step-by-step internal reasoning monologue. Label your thoughts clearly."
+        "1. Evidence Audit: Does the retrieved evidence explicitly contain the answer to the user's exact question? "
+        "Check carefully. If the retrieved text DOES NOT contain the answer, or if the question asks for something not mentioned in the paper, "
+        "explicitly conclude: 'EVIDENCE NOT FOUND: The paper does not mention this detail. I must state that I do not know / it is absent from the text rather than inventing it.'\n"
+        "2. Deconstruct the Question: What is the core theoretical intuition or specific technical inquiry?\n"
+        "3. Mathematical & Literature Grounding: If evidence is present, what specific equations, definitions, or findings apply?\n"
+        "4. Step-by-Step Derivations: Write down intermediate mathematical steps, proof logic, and notation.\n"
+        "5. Tensor Dimensionality Audit: Trace exact tensor shapes [B, C, H, W] or [B, N, D] at each layer transformation to guarantee validity.\n"
+        "6. PyTorch Implementation Strategy: Mentally construct the clean nn.Module architecture and arguments.\n"
+        "7. Hardware Constraints: Evaluate compute complexity and RTX 4050 6GB VRAM safety margins.\n\n"
+        "Write your genuine, rich, step-by-step internal reasoning monologue. Be strictly honest about whether evidence exists."
     )
     user_cot = (
         f"[TARGET QUESTION / TOPIC]:\n{query}\n\n"
@@ -100,24 +105,41 @@ def build_answer_prompt(
             "thoroughly grounded in those quotes."
         )
     else:
-        instructions = (
-            "Follow your Chain-of-Thought blueprint to produce an exhaustive, textbook-grade masterclass tutorial. "
-            "Teach this concept with maximum technical depth, step-by-step mathematical rigor, and concrete PyTorch code. "
-            "Organize your answer with the following comprehensive sections:\n\n"
-            "### 1. Theoretical Motivation & The Problem Solved\n"
-            "Explain why this architecture was created, what historical bottleneck it resolves, and the core intuition.\n\n"
-            "### 2. Rigorous Mathematical Derivations\n"
-            "Write all display equations in $$ ... $$ on separate lines. Define every variable, trace derivations, and explain geometric meaning.\n\n"
-            "### 3. Tensor Transformation Walkthrough\n"
-            "Step-by-step shape transformations (e.g. Input: [B, C, H, W] -> Projection: [B, N, D] -> ...). Explain why dimensions match.\n\n"
-            "### 4. Complete PyTorch Implementation\n"
-            "Provide a clean, self-contained, modular nn.Module snippet with type annotations, docstrings, and forward pass explanation.\n\n"
-            "### 5. Empirical Performance & Ablation Findings\n"
-            "Reference original paper experiments, benchmark results, and what happens when key components are ablated.\n\n"
-            "### 6. Hardware Optimization & RTX 4050 Limits\n"
-            "Discuss VRAM usage (6GB limit), compute complexity (O(N^2) vs O(N)), recommended batch size, and FP16/BF16 stability.\n\n"
-            "Do NOT output raw JSON format. Write in clear, structured, readable academic Markdown."
-        )
+        # Check if user asks a specific targeted question vs broad comprehensive tutorial request
+        q_lower = query.lower()
+        broad_keywords = ["nasıl çalışır", "mimarisi", "baştan sona", "kapsamlı", "ders", "masterclass", "tüm detayları", "tutorial", "architecture", "explain in detail", "comprehensive", "karşılaştır"]
+        is_broad = any(kw in q_lower for kw in broad_keywords)
+        is_specific_inquiry = any(w in q_lower for w in ["var mı", "yazıyor mu", "geçiyor mu", "kaç", "değeri", "kim", "hangi", "kullanılmış mı", "is there", "does it", "what is the value", "did they"])
+
+        if is_specific_inquiry and not is_broad:
+            instructions = (
+                "Answer the user's specific question directly, factually, and concisely based on the retrieved evidence.\n"
+                "- ABSOLUTE HONESTY RULE: If the retrieved evidence does NOT contain the answer, or if the paper does not mention it, "
+                "explicitly and honestly state: 'Makale metninde ve yerel hafızada bu bilgi yer almıyor, bu yüzden bilmiyorum.'\n"
+                "- Do NOT invent, assume, or extrapolate facts or numbers that are not in the context.\n"
+                "- If the evidence answers the question, explain it clearly with exact quotes, citations, and formulas."
+            )
+        else:
+            instructions = (
+                "CRITICAL EVIDENCE RULE: If your Chain-of-Thought indicates that the retrieved evidence does NOT contain "
+                "the answer or the topic is not in the text, state honestly: 'Makale metninde ve yerel hafızada bu bilgi yer almıyor, bu yüzden bilmiyorum.'\n\n"
+                "Otherwise, follow your Chain-of-Thought blueprint to produce an exhaustive, textbook-grade masterclass tutorial. "
+                "Teach this concept with maximum technical depth, step-by-step mathematical rigor, and concrete PyTorch code. "
+                "Organize your answer with the following comprehensive sections:\n\n"
+                "### 1. Theoretical Motivation & The Problem Solved\n"
+                "Explain why this architecture was created, what historical bottleneck it resolves, and the core intuition.\n\n"
+                "### 2. Rigorous Mathematical Derivations\n"
+                "Write all display equations in $$ ... $$ on separate lines. Define every variable, trace derivations, and explain geometric meaning.\n\n"
+                "### 3. Tensor Transformation Walkthrough\n"
+                "Step-by-step shape transformations (e.g. Input: [B, C, H, W] -> Projection: [B, N, D] -> ...). Explain why dimensions match.\n\n"
+                "### 4. Complete PyTorch Implementation\n"
+                "Provide a clean, self-contained, modular nn.Module snippet with type annotations, docstrings, and forward pass explanation.\n\n"
+                "### 5. Empirical Performance & Ablation Findings\n"
+                "Reference original paper experiments, benchmark results, and what happens when key components are ablated.\n\n"
+                "### 6. Hardware Optimization & RTX 4050 Limits\n"
+                "Discuss VRAM usage (6GB limit), compute complexity (O(N^2) vs O(N)), recommended batch size, and FP16/BF16 stability.\n\n"
+                "Do NOT output raw JSON format. Write in clear, structured, readable academic Markdown."
+            )
 
     quote_guidance = ""
     if ">" in query:

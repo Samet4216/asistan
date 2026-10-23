@@ -55,12 +55,16 @@ class Reranker:
         ranked = sorted(candidates, key=lambda x: x["rerank_score"], reverse=True)
         top_candidates = ranked[:top_n]
 
-        # Check if best result meets minimum confidence threshold
-        best_score = top_candidates[0]["rerank_score"] if top_candidates else -999.0
-        # For MS MARCO cross-encoders, logits are typically in [-10, 10]. A logit > 0 or > -2 indicates relevance.
-        has_sufficient_evidence = best_score > -2.0
+        # Filter candidates meeting minimum relevance threshold
+        # For MS MARCO cross-encoders, logits > -2.0 indicate genuine semantic relevance.
+        # Negative extremes (-10 to -12) indicate completely unrelated content.
+        valid_candidates = [c for c in top_candidates if c["rerank_score"] >= -2.0]
+        has_sufficient_evidence = len(valid_candidates) > 0
 
-        return top_candidates, has_sufficient_evidence
+        if not has_sufficient_evidence:
+            return [], False
+
+        return valid_candidates, True
 
 
 # Global reranker instance
