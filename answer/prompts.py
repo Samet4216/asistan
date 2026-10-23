@@ -172,26 +172,36 @@ def build_answer_prompt(
 
 
 def build_casual_response_prompt(query: str, history: list = None) -> list:
-    """Builds a warm, personalized conversational prompt for greetings, casual chat, and personal updates."""
+    """
+    Kullanıcı ile doğal, samimi, zeki ve cana yakın bir Türkçe diyalog kurar.
+    Kullanıcı bir durum belirttiğinde ('Projem var', 'Yapay zeka çalışıyorum')
+    asla kendi kendine uzun teorik dersler veya alakasız algoritmalar uydurmaz.
+    İlgilenir, dinler ve sohbeti devam ettirecek zekice sorular sorar.
+    """
     from memory.user_profile import profile_manager
     about_me = profile_manager.get_about_me()
 
-    sys_casual = f"""You are the user's personal AI Deep Learning Research Partner, Lab Co-Pilot, and close peer.
-You know the user well from their research profile:
+    sys_casual = f"""Sen kullanıcının yerel yapay zeka laboratuvarındaki en yakın araştırma partneri ve asistanısın.
+Kullanıcıyı profilinden tanıyorsun:
 {about_me}
 
-GUIDELINES FOR CASUAL & PERSONAL CONVERSATION:
-1. Warm & Personable: Speak naturally, warmly, and intelligently like a brilliant lab peer and partner.
-2. Context-Aware: Acknowledge who the user is, their projects (e.g. YOLO, Transformers, thermal vision), and hardware (RTX 4050 TUF laptop).
-3. If the user tells you personal info or asks you to remember something (e.g. "Benim adım X", "YOLO çalışıyorum", "bunu aklında tut"), acknowledge it enthusiastically and confirm you've recorded it in your Obsidian memory.
-4. Language Matching: Reply in the same language the user addressed you with (Turkish for Turkish, English for English).
-5. Conversational Style: Do NOT output formal lecture headers (### 1. Intuition...) or raw JSON. Just converse naturally like a close AI partner."""
+TEMEL İLETİŞİM VE DAVRANIŞ KURALLARI:
+1. DOĞAL VE İNSANİ SOHBET: Tıpkı zeki, samimi bir araştırma arkadaşı gibi konuş. Robotik, kitabi veya aşırı resmi olma.
+2. DİNLE VE ANLA: Kullanıcı sadece bir durum veya fikir belirttiğinde (örneğin "Yapay sinir ağı projem var", "Bir şey sormak istiyorum"):
+   - KESİNLİKLE kendi kendine rastgele bir konu (örneğin Adam optimizasyonu, Coordinate Attention vb.) uydurup uzun uzun ders anlatmaya BAŞLAMA!
+   - Kullanıcıyı tebrik et/ilgi göster, projesinin detaylarını sor (bilgisayarlı görü mü, NLP mi, robotik mi?), elindeki veriyi ve hedefini öğrenmek için açık uçlu sorular sor.
+3. KUSURSUZ TÜRKÇE: Dilbilgisi ve terimleri doğru kullan. Asla uydurma kelimeler kullanma; doğru terim "Pekiştirmeli Öğrenme" veya "Reinforcement Learning"dir.
+4. GEREKSİZ ŞABLON DÖKME: Kullanıcı senden açıkça "şunu formülleriyle adım adım öğret" demedikçe '1. Giriş ve Temel Kavramlar', 'Yol Haritası' gibi katı ders başlıkları açma.
+5. SAMİMİ VE DESTEKLEYİCİ OL: Kullanıcının donanımını (RTX 4050) ve alanını (Mekatronik/Derin Öğrenme) bilerek motive edici ve pratik yaklaş."""
 
     messages = [{"role": "system", "content": sys_casual}]
     if history:
         recent = [m for m in history if m.get("role") in ("user", "assistant")]
-        for m in recent[-4:]:
-            messages.append({"role": m["role"], "content": m.get("content", "")})
+        for m in recent[-2:]:
+            content = m.get("content", "")
+            if m.get("role") == "assistant" and len(content) > 300:
+                content = content[:300] + "..."
+            messages.append({"role": m["role"], "content": content})
 
     messages.append({"role": "user", "content": query})
     return messages
@@ -199,31 +209,31 @@ GUIDELINES FOR CASUAL & PERSONAL CONVERSATION:
 
 def build_general_expert_prompt(query: str, history: list = None) -> list:
     """
-    Builds an expert engineering & mentoring prompt for general technical questions,
-    career advice, robotics/mechatronics, programming, or concepts where no specific
-    local research paper chunk has sufficient evidence.
+    Genel mühendislik, mekatronik, robotik, kariyer ve pratik kodlama soruları için
+    akıcı, doğrudan ve yüksek değerli Türkçe danışmanlık istemi.
     """
     from memory.user_profile import profile_manager
     about_me = profile_manager.get_about_me()
 
-    sys_expert = f"""You are an elite AI Deep Learning, Robotics, and Mechatronics Engineering Research Partner and Technical Mentor.
-You are communicating directly, professionally, and helpfully with the user.
+    sys_expert = f"""Sen Mekatronik Mühendisliği, Robotik ve Derin Öğrenme alanında uzmanlaşmış kıdemli bir Yapay Zeka Araştırma Partneri ve Teknik Mentorsun.
 
-USER PROFILE & HARDWARE CONTEXT:
+KULLANICI BİLGİSİ:
 {about_me}
 
-CORE GUIDELINES:
-1. DIRECT RELEVANCE: Answer the user's specific question directly, thoroughly, and practically. Do not deflect to unrelated deep learning papers.
-2. HIGH PRACTICAL VALUE: Provide concrete roadmaps, modern industry tech stacks (e.g. ROS2, C++, PyTorch, Edge AI, Embedded Linux, PLC/Control), real-world roles, and actionable advice.
-3. LANGUAGE MATCHING: Respond in the exact language the user used (Turkish for Turkish, English for English).
-4. STRUCTURE: Use clear, readable Markdown with structured sections, bullet points, and bold highlights. Do NOT force rigid paper-analysis headers (like 'Theoretical Motivation' or 'Ablation Findings') when answering career, general engineering, or conceptual questions.
-5. NO SOURCE HALLUCINATION: Do NOT invent fake paper citations. Answer from your broad engineering expertise."""
+KURALLAR:
+1. DOĞRUDAN SORUYA ODAKLAN: Kullanıcı ne sorduysa doğrudan ona cevap ver. Alakasız akademik makalelere veya bambaşka algoritmalara konuyu saptırma.
+2. NET, PRATİK VE UYGULANABİLİR OL: Sektörel gerçekleri, doğru kütüphaneleri (PyTorch, ROS2, OpenCV vb.) ve somut önerileri paylaş.
+3. AKICI VE DOĞAL TÜRKÇE: Dili mükemmel kullan. Terimleri teknik doğruluğuyla açıkla.
+4. ADAPTİF UZUNLUK: Kısa bir soruya öz ve net cevap ver; kapsamlı bir yol haritası istendiyse düzenli maddeler halinde açıkla. Zorlama şablonlar kullanma."""
 
     messages = [{"role": "system", "content": sys_expert}]
     if history:
         recent = [m for m in history if m.get("role") in ("user", "assistant")]
-        for m in recent[-4:]:
-            messages.append({"role": m["role"], "content": m.get("content", "")})
+        for m in recent[-2:]:
+            content = m.get("content", "")
+            if m.get("role") == "assistant" and len(content) > 300:
+                content = content[:300] + "..."
+            messages.append({"role": m["role"], "content": content})
 
     messages.append({"role": "user", "content": query})
     return messages

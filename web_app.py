@@ -731,9 +731,9 @@ with tab_chat:
         with st.chat_message("assistant"):
             # 1. Check if Casual Chat or Personal Profile Statement
             if is_casual_or_personal(prompt):
-                # Stream warm casual response
+                # Stream warm, natural casual response
                 casual_msgs = build_casual_response_prompt(prompt, history=st.session_state.messages[:-1])
-                stream = llm.stream_generate(casual_msgs, max_tokens=600)
+                stream = llm.stream_generate(casual_msgs, max_tokens=600, temperature=0.6)
                 full_response = st.write_stream(stream)
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 st.rerun()
