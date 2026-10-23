@@ -10,12 +10,12 @@ import config
 
 def estimate_tokens(text: str) -> int:
     """
-    Fast, reliable heuristic token counter for English technical and code text.
-    In technical text, 1 token is roughly 3.6 - 3.8 characters or 0.75 words.
+    Conservative token counter for bilingual (Turkish/English) technical and LaTeX text.
+    Uses 3.0 chars/token so Turkish suffixes and LaTeX macros never overflow NUM_CTX.
     """
     if not text:
         return 0
-    return max(1, int(len(text) / 3.7))
+    return max(1, int(len(text) / 3.0))
 
 
 def truncate_to_tokens(text: str, max_tokens: int) -> Tuple[str, bool]:
@@ -28,7 +28,7 @@ def truncate_to_tokens(text: str, max_tokens: int) -> Tuple[str, bool]:
         return text, False
 
     # Target character limit
-    char_limit = int(max_tokens * 3.7)
+    char_limit = int(max_tokens * 3.0)
     truncated = text[:char_limit]
 
     # Try to break cleanly at last newline or period

@@ -45,6 +45,10 @@ class Reranker:
         if not candidates:
             return [], False
 
+        for c in candidates:
+            if "\\sysname" in c.get("content", ""):
+                c["content"] = c["content"].replace("\\sysname", "FlashAttention")
+
         pairs = [[query, c.get("content", "")] for c in candidates]
         scores = self.model.predict(pairs)
 

@@ -118,6 +118,42 @@ class QueryTransformer:
 
         return query
 
+    def to_english_search_query(self, query: str) -> str:
+        """
+        The embedder (bge-base-en) and reranker (ms-marco) are English-only and the papers
+        are English, so Turkish questions retrieve poorly. Translate non-English questions
+        into a concise English search query. Returns the original query if it is already
+        English or translation fails.
+        """
+        try:
+            import lang_guard
+            is_tr, _ = lang_guard.detect_turkish(query)
+        except Exception:
+            is_tr = bool(re.search(r"[çğıöşüÇĞİÖŞÜ]", query))
+        if not is_tr:
+            return query
+
+        prompt_messages = [
+            {
+                "role": "system",
+                "content": (
+                    "Translate the user's Turkish question into ONE complete, natural English question "
+                    "for searching a Deep Learning paper database (starts with How, Why, What, etc.). "
+                    "Keep technical terms, model names, symbols, and acronyms intact (e.g. PPO, DPO, FlashAttention, HBM, SRAM, ViT). "
+                    "Output ONLY the English question, no quotes, no explanation."
+                )
+            },
+            {"role": "user", "content": query[:600]}
+        ]
+        try:
+            out = llm.generate(prompt_messages, max_tokens=80, temperature=0.0)
+            out = (out or "").strip().strip('"').splitlines()[0].strip() if out else ""
+            if out and not out.startswith("[LLM ERROR]") and len(out) > 5:
+                return out
+        except Exception as e:
+            print(f"[!] Query translation fallback: {e}")
+        return query
+
 
 # Global instance
 query_transformer = QueryTransformer()

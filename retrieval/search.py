@@ -28,6 +28,38 @@ class HybridSearcher:
         self.embedder = embedder
         self.reranker = reranker
         self.query_transformer = query_transformer
+        self._bm25_cache: Dict[Tuple[str, int], Dict[str, Any]] = {}
+
+    @staticmethod
+    def clean_title(raw_title: str) -> str:
+        if not raw_title:
+            return "Academic Paper"
+        t = raw_title.replace("\\sysname", "FlashAttention").replace("\\\\", " ").replace("\\", "")
+        t = " ".join(t.split())
+        return t
+
+    def _get_bm25_index(self, col_name: str, col, count: int) -> Dict[str, Any]:
+        cache_key = (col_name, count)
+        if cache_key in self._bm25_cache:
+            return self._bm25_cache[cache_key]
+
+        all_data = col.get()
+        all_ids = all_data.get("ids", [])
+        all_docs = [d.replace("\\sysname", "FlashAttention") for d in all_data.get("documents", [])]
+        all_metas = all_data.get("metadatas", [])
+        bm25 = None
+        if all_docs:
+            tokenized_corpus = [doc.lower().split() for doc in all_docs]
+            bm25 = BM25Okapi(tokenized_corpus)
+
+        entry = {
+            "ids": all_ids,
+            "docs": all_docs,
+            "metas": all_metas,
+            "bm25": bm25
+        }
+        self._bm25_cache[cache_key] = entry
+        return entry
 
     def search(
         self,
@@ -41,24 +73,28 @@ class HybridSearcher:
         """
         Executes hybrid search across specified collections.
         Supports:
+        - Automatic Turkish -> English search query translation
         - Sub-Query Decomposition for complex multi-part queries
         - HyDE (Hypothetical Document Embeddings) for bridging vocabulary gaps
         1. Dense Vector Search (top 20)
-        2. Sparse BM25 Search (top 20)
+        2. Sparse BM25 Search (top 20, cached)
         3. Reciprocal Rank Fusion (RRF)
         4. Cross-Encoder Reranking (top_k)
-        5. Token Budget Context Packaging
+        5. Numbered [S1]..[Sk] Context Packaging
         """
         cols = collection_names or ["paper_chunks", "paper_cards", "code", "errors"]
 
+        # Embedder/reranker and corpus are English: translate Turkish questions first.
+        search_query = self.query_transformer.to_english_search_query(query)
+
         # Determine sub-queries and hypothetical passage
-        sub_queries = [query]
+        sub_queries = [search_query]
         if use_decomposition:
-            sub_queries = self.query_transformer.decompose(query)
+            sub_queries = self.query_transformer.decompose(search_query)
 
         hyde_passage = None
         if use_hyde:
-            hyde_passage = self.query_transformer.generate_hyde(query)
+            hyde_passage = self.query_transformer.generate_hyde(search_query)
 
         master_candidates: Dict[str, Dict[str, Any]] = {}
 
@@ -108,15 +144,14 @@ class HybridSearcher:
                         "bm25_rank": 999
                     }
 
-                # 2. Sparse BM25 Query
-                all_data = col.get()
-                all_ids = all_data.get("ids", [])
-                all_docs = all_data.get("documents", [])
-                all_metas = all_data.get("metadatas", [])
+                # 2. Sparse BM25 Query (Cached)
+                bm25_entry = self._get_bm25_index(col_name, col, count)
+                bm25 = bm25_entry["bm25"]
+                all_ids = bm25_entry["ids"]
+                all_docs = bm25_entry["docs"]
+                all_metas = bm25_entry["metas"]
 
-                if all_docs:
-                    tokenized_corpus = [doc.lower().split() for doc in all_docs]
-                    bm25 = BM25Okapi(tokenized_corpus)
+                if bm25 is not None and all_docs:
                     tokenized_query = sq.lower().split()
                     bm25_scores = bm25.get_scores(tokenized_query)
 
@@ -151,17 +186,27 @@ class HybridSearcher:
         all_candidates.sort(key=lambda x: x["rrf_score"], reverse=True)
         top_candidates = all_candidates[:25]
 
-        # 4. Cross-Encoder Reranking
-        reranked, has_sufficient_evidence = self.reranker.rerank(query, top_candidates, top_n=top_k)
+        # 4. Cross-Encoder Reranking (using translated English search_query)
+        reranked, has_sufficient_evidence = self.reranker.rerank(search_query, top_candidates, top_n=top_k)
 
-        # 5. Pack Context with Budget
-        packed_chunks = "\n\n---\n\n".join([
-            f"[Source: {c['metadata'].get('title', c['id'])}, Section: {c['metadata'].get('section_name', 'N/A')}]\n{c['content']}"
-            for c in reranked
-        ])
+        # 5. Numbered Source Packaging [S1]..[Sk] and Clean Titles
+        packed_blocks = []
+        for idx, c in enumerate(reranked):
+            tag = f"S{idx + 1}"
+            c["source_tag"] = tag
+            meta = c.get("metadata", {})
+            cleaned_title = self.clean_title(meta.get("title", c.get("id", "Academic Paper")))
+            meta["title"] = cleaned_title
+            sec = meta.get("section_name", "N/A")
+            packed_blocks.append(
+                f"[{tag}] Source: \"{cleaned_title}\" (Chunk ID: {c['id']}, Section: {sec})\n{c['content']}"
+            )
+
+        packed_chunks = "\n\n---\n\n".join(packed_blocks)
 
         return {
             "query": query,
+            "search_query": search_query,
             "sub_queries": sub_queries,
             "hyde_passage": hyde_passage,
             "results": reranked,

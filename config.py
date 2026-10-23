@@ -17,20 +17,20 @@ CHROMA_DIR = DATA_DIR / "chroma_db"
 # LLM Configuration (Ollama HTTP Backend)
 OLLAMA_BASE_URL = "http://localhost:11434"
 MODEL = "qwen2.5:7b-instruct-q4_K_M"
-NUM_CTX = 5120
+NUM_CTX = 8192
 TEMPERATURE = 0.2
 KEEP_ALIVE = "5m"
 
-# Token Budget Allocations (Total <= NUM_CTX = 5120)
+# Token Budget Allocations (Total <= NUM_CTX = 8192)
 TOKEN_BUDGET = {
-    "system_and_style": 350,
+    "system_and_style": 450,
     "telemetry": 300,
     "git_diff": 300,
-    "thought_plan": 450,
-    "paper_cards": 350,
-    "paper_chunks": 1200,
+    "thought_plan": 700,
+    "paper_cards": 400,
+    "paper_chunks": 2200,
     "error_history": 200,
-    "user_query": 250,
+    "user_query": 300,
     "max_answer": 2500
 }
 

@@ -62,6 +62,45 @@ def verify_quotes(model_quotes: List[Dict[str, str]], retrieved_context: str) ->
     return verified_list, round(verified_ratio, 2)
 
 
+def audit_markdown_response(markdown_text: str, retrieved_context: str) -> Dict[str, Any]:
+    """
+    Extracts [S1]..[S10] inline source citations and quoted excerpts ("...")
+    outside fenced code blocks, and verifies each quote against retrieved_context.
+    """
+    if not markdown_text:
+        return {
+            "cited_tags": [],
+            "quotes": [],
+            "verified_count": 0,
+            "total_quotes": 0,
+            "verified_ratio": 1.0
+        }
+
+    # Remove fenced code blocks so Python docstrings/strings are not treated as paper quotes
+    prose_only = re.sub(r"```[\s\S]*?```", "", markdown_text)
+
+    cited_tags = sorted(set(re.findall(r"\[(S\d+)\]", prose_only)), key=lambda x: int(x[1:]))
+
+    # Find double-quoted substrings of at least 5 words
+    raw_quotes = re.findall(r"\"([^\"\n]{25,400})\"", prose_only)
+    candidate_quotes = []
+    for rq in raw_quotes:
+        words = rq.strip().split()
+        if len(words) >= 5:
+            candidate_quotes.append({"source": "Paper", "text": rq.strip()})
+
+    verified_list, ratio = verify_quotes(candidate_quotes, retrieved_context)
+    verified_count = sum(1 for v in verified_list if v["verified"])
+
+    return {
+        "cited_tags": cited_tags,
+        "quotes": verified_list,
+        "verified_count": verified_count,
+        "total_quotes": len(verified_list),
+        "verified_ratio": ratio if verified_list else 1.0
+    }
+
+
 if __name__ == "__main__":
     context = "Coordinate Attention factorizes 2D spatial pooling into horizontal and vertical 1D pooling kernels."
     quotes = [

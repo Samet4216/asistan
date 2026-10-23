@@ -40,8 +40,14 @@ class AutoMemoryEngine:
         vault.ensure_layout()
 
     def has_personal_cues(self, text: str) -> bool:
-        """Lightweight check to see if message contains potential user profile info."""
+        """Lightweight check to see if message is a personal profile declaration rather than a technical question."""
         lower = text.lower().strip()
+        explicit_save = ["benim adım", "adım ", "aklında tut", "hafızana kaydet", "beni hatırla", "my name is", "remember that"]
+        if any(c in lower for c in explicit_save):
+            return True
+        # Avoid running profile extraction on technical questions
+        if "?" in lower:
+            return False
         return any(cue in lower for cue in FIRST_PERSON_CUES)
 
     def extract_and_update(self, user_message: str) -> Optional[str]:
