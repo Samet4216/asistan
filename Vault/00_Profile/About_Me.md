@@ -9,7 +9,7 @@ tags:
 # Araştırmacı Profili (Benim Hakkımda)
 
 ### 👤 Kimlik & Akademik Durum
-- **Kullanıcı / Araştırmacı:** Samet
+- **Kullanıcı / Araştırmacı:** ism
 - **Bölüm / Meslek:** Mekatronik Mühendisliği 4. sınıf öğrencisi
 - **Teknik Araçlar & Diller:** Python, PyTorch, Derin Öğrenme
 
@@ -20,8 +20,7 @@ tags:
 ### 🚀 Aktif Projeler & İlgi Alanları
   - Hafif dikkat mekanizmaları ve model optimizasyonu (YOLO, Coordinate Attention)
   - Yerel, gizlilik odaklı derin öğrenme asistanı
-  - termal kamera ile nesne tespiti projesi
 
 ### 🎯 Tercih Edilen Öğrenme & Anlatım Tarzı
-  - kod ağırlıklı
+  - Standart akademik ve pratik derin öğrenme yaklaşımı
 
