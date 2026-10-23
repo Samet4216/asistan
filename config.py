@@ -24,14 +24,14 @@ KEEP_ALIVE = "5m"
 # Token Budget Allocations (Total <= NUM_CTX = 8192)
 TOKEN_BUDGET = {
     "system_and_style": 450,
-    "telemetry": 300,
-    "git_diff": 300,
+    "telemetry": 200,
+    "git_diff": 200,
     "thought_plan": 700,
     "paper_cards": 400,
-    "paper_chunks": 2200,
-    "error_history": 200,
+    "paper_chunks": 3000,
+    "error_history": 150,
     "user_query": 300,
-    "max_answer": 2500
+    "max_answer": 3500
 }
 
 # Embedding & Reranker Configuration (CPU execution)
@@ -41,7 +41,7 @@ RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 DEVICE = "cpu"
 
 # Retrieval & Telemetry Thresholds
-RETRIEVAL_TOP_K = 5
+RETRIEVAL_TOP_K = 7
 RETRIEVAL_SCORE_THRESHOLD = 0.35  # Below this, assistant refrains (No sufficient source found)
 
 # Telemetry Auto-Symptom Thresholds (ingest/log_parser.py)

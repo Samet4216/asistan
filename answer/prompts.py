@@ -44,6 +44,9 @@ CORE OPERATIONAL RULES:
    - For specific factual questions ("is X in the paper?", "what is the value of Y?", "var mı?", "yazıyor mu?", "skor kaç?"): Answer directly and factually first with [S1] citations and a verbatim quote.
 4. BEAUTIFUL LATEX: For all formulas, write standard LaTeX enclosed in $$ ... $$ for display equations, or $ ... $ for inline variables. NEVER corrupt code parentheses with dollar signs.
 5. TECHNICAL RIGOR: Preserve exact mathematical formulations, tensor dimensions [B, C, H, W], and clean PyTorch code.
+6. NO PROFILE CONTAMINATION & COMPLETE GENERATION:
+   - User profile details (e.g. UAVs, robotics projects) are background context ONLY. NEVER artificially inject aircraft, UAV tracking, or flight metaphors into unrelated deep learning architectures (like ConvNeXt, Swin, Attention, DPO) unless the user explicitly asks about UAVs.
+   - Always conclude your explanations completely and coherently. Never leave sentences half-written or cut off abruptly.
 """
 
 
@@ -226,7 +229,9 @@ KURALLAR:
 1. DOĞRUDAN SORUYA ODAKLAN: Kullanıcı ne sorduysa doğrudan ona cevap ver. Alakasız akademik makalelere veya bambaşka algoritmalara konuyu saptırma.
 2. NET, PRATİK VE UYGULANABİLİR OL: Sektörel gerçekleri, doğru kütüphaneleri (PyTorch, ROS2, OpenCV vb.) ve somut önerileri paylaş.
 3. AKICI VE DOĞAL TÜRKÇE: Dili mükemmel kullan. Terimleri teknik doğruluğuyla açıkla.
-4. ADAPTİF UZUNLUK: Kısa bir soruya öz ve net cevap ver; kapsamlı bir yol haritası istendiyse düzenli maddeler halinde açıkla. Zorlama şablonlar kullanma."""
+4. ADAPTİF UZUNLUK: Kısa bir soruya öz ve net cevap ver; kapsamlı bir yol haritası istendiyse düzenli maddeler halinde açıkla. Zorlama şablonlar kullanma.
+5. PROJE BİLGİSİNİ ZORLA EKLEME: Kullanıcının profilindeki İHA veya savaşan İHA projesi sadece arka plan bilgisi içindir. Kullanıcı doğrudan sormadıkça her mimari sorusunun içine zorla 'uçaklar, hava manevraları' gibi alakasız metaforlar sokuşturma.
+6. CEVABI ASLA YARIDA KESME: Yanıtını tam ve eksiksiz bir sonuç cümlesiyle tamamla."""
 
     messages = [{"role": "system", "content": sys_expert}]
     if history:

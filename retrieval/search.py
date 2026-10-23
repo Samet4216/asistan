@@ -184,7 +184,7 @@ class HybridSearcher:
         # Rank all accumulated candidates
         all_candidates = list(master_candidates.values())
         all_candidates.sort(key=lambda x: x["rrf_score"], reverse=True)
-        top_candidates = all_candidates[:25]
+        top_candidates = all_candidates[:50]
 
         # 4. Cross-Encoder Reranking (using translated English search_query)
         reranked, has_sufficient_evidence = self.reranker.rerank(search_query, top_candidates, top_n=top_k)

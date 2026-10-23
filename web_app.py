@@ -740,7 +740,7 @@ with tab_chat:
             if is_casual_or_personal(prompt):
                 # Stream warm, natural casual response
                 casual_msgs = build_casual_response_prompt(prompt, history=st.session_state.messages[:-1])
-                stream = llm.stream_generate(casual_msgs, max_tokens=600, temperature=0.6)
+                stream = llm.stream_generate(casual_msgs, max_tokens=1000, temperature=0.6)
                 full_response = st.write_stream(stream)
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 st.rerun()
@@ -773,7 +773,7 @@ with tab_chat:
                     disclaimer = "> ⚠️ **Genel Mühendislik Bilgisi:** Bu mod yerel makale kütüphanesinden kanıt aramadan genel mühendislik bilgisiyle yanıt üretir.\n\n"
                     st.markdown(disclaimer)
                     mentor_msgs = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
-                    stream = llm.stream_generate(mentor_msgs, max_tokens=1600)
+                    stream = llm.stream_generate(mentor_msgs, max_tokens=3000)
                     full_response = st.write_stream(stream)
                     clean_full = disclaimer + normalize_latex(full_response)
                     st.session_state.messages.append({"role": "assistant", "content": clean_full})
@@ -819,7 +819,7 @@ with tab_chat:
                 # answer naturally and conversationally using broad expert AI & engineering intelligence:
                 if not has_sufficient_evidence:
                     expert_msgs = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
-                    stream = llm.stream_generate(expert_msgs, max_tokens=1600, temperature=0.6)
+                    stream = llm.stream_generate(expert_msgs, max_tokens=3000, temperature=0.6)
                     full_response = st.write_stream(stream)
                     clean_full = normalize_latex(full_response)
                     st.session_state.messages.append({"role": "assistant", "content": clean_full})
@@ -845,7 +845,7 @@ with tab_chat:
                     t_start = time.time()
                     with st.status("💭 Derin Düşünme & Analiz (Model kendi kendine muhakeme yapıyor...)", expanded=True) as status_cot:
                         cot_prompt_msgs = build_thought_plan_prompt(clean_q, safe_packed.get("paper_chunks", ""))
-                        thought_stream = llm.stream_generate(cot_prompt_msgs, max_tokens=650, temperature=0.2)
+                        thought_stream = llm.stream_generate(cot_prompt_msgs, max_tokens=750, temperature=0.2)
                         thought_plan = st.write_stream(thought_stream)
                         elapsed_sec = max(1, int(time.time() - t_start))
                         status_cot.update(label=f"💭 Düşünce Süreci ({elapsed_sec} saniye boyunca derin analiz yapıldı)", state="complete", expanded=False)
@@ -862,7 +862,7 @@ with tab_chat:
                     history=st.session_state.messages[:-1]
                 )
 
-                target_max_tokens = config.TOKEN_BUDGET.get("max_answer", 2500) if is_deep_cot else 1000
+                target_max_tokens = config.TOKEN_BUDGET.get("max_answer", 3500) if is_deep_cot else 3000
 
                 stream = llm.stream_generate(
                     messages,
