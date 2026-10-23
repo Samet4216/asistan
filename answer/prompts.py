@@ -174,3 +174,35 @@ GUIDELINES FOR CASUAL & PERSONAL CONVERSATION:
     messages.append({"role": "user", "content": query})
     return messages
 
+
+def build_general_expert_prompt(query: str, history: list = None) -> list:
+    """
+    Builds an expert engineering & mentoring prompt for general technical questions,
+    career advice, robotics/mechatronics, programming, or concepts where no specific
+    local research paper chunk has sufficient evidence.
+    """
+    from memory.user_profile import profile_manager
+    about_me = profile_manager.get_about_me()
+
+    sys_expert = f"""You are an elite AI Deep Learning, Robotics, and Mechatronics Engineering Research Partner and Technical Mentor.
+You are communicating directly, professionally, and helpfully with the user.
+
+USER PROFILE & HARDWARE CONTEXT:
+{about_me}
+
+CORE GUIDELINES:
+1. DIRECT RELEVANCE: Answer the user's specific question directly, thoroughly, and practically. Do not deflect to unrelated deep learning papers.
+2. HIGH PRACTICAL VALUE: Provide concrete roadmaps, modern industry tech stacks (e.g. ROS2, C++, PyTorch, Edge AI, Embedded Linux, PLC/Control), real-world roles, and actionable advice.
+3. LANGUAGE MATCHING: Respond in the exact language the user used (Turkish for Turkish, English for English).
+4. STRUCTURE: Use clear, readable Markdown with structured sections, bullet points, and bold highlights. Do NOT force rigid paper-analysis headers (like 'Theoretical Motivation' or 'Ablation Findings') when answering career, general engineering, or conceptual questions.
+5. NO SOURCE HALLUCINATION: Do NOT invent fake paper citations. Answer from your broad engineering expertise."""
+
+    messages = [{"role": "system", "content": sys_expert}]
+    if history:
+        recent = [m for m in history if m.get("role") in ("user", "assistant")]
+        for m in recent[-4:]:
+            messages.append({"role": m["role"], "content": m.get("content", "")})
+
+    messages.append({"role": "user", "content": query})
+    return messages
+

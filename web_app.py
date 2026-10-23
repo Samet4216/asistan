@@ -31,7 +31,8 @@ from retrieval.git_context import get_git_diff
 from answer.prompts import (
     build_answer_prompt,
     build_thought_plan_prompt,
-    build_casual_response_prompt
+    build_casual_response_prompt,
+    build_general_expert_prompt
 )
 from answer.challenge import challenger
 from memory.approval import approval_manager
@@ -371,8 +372,10 @@ def is_casual_or_personal(text: str) -> bool:
     p = text.strip().lower()
     greetings = [
         "naber", "nasılsın", "whats up", "what's up", "selam", "merhaba",
-        "günaydın", "iyi akşamlar", "hey", "kimsin", "neler yapabilirsin",
-        "beni tanıyor musun", "adın ne", "naber?", "nasılsın?", "ne haber", "ne yapıyorsun"
+        "günaydın", "iyi akşamlar", "iyi günler", "kolay gelsin", "hey",
+        "kimsin", "sen kimsin", "kimsin sen", "neler yapabilirsin", "ne yapabilirsin",
+        "ne işe yararsın", "beni tanıyor musun", "adın ne", "naber?", "nasılsın?",
+        "ne haber", "ne yapıyorsun", "merhabalar", "selamlar", "selamün aleyküm"
     ]
     personal_cues = [
         "benim adım", "adım ", "aklında tut", "hafızana kaydet",
@@ -387,12 +390,13 @@ def is_casual_or_personal(text: str) -> bool:
 
 def contextualize_query(current_query: str, history: list) -> str:
     """
-    Augments follow-up questions or quoted replies with conversation context for accurate hybrid retrieval.
+    Augments genuine follow-up questions or quoted replies with conversation context.
+    NEVER overrides standalone or topic-changing questions.
     """
     if not history or len(history) <= 1:
         return current_query
 
-    # If query contains a blockquote reply (> ...):
+    # If query contains an explicit blockquote reply (> ...):
     if ">" in current_query:
         lines = current_query.split("\n")
         quote_lines = [l.replace(">", "").strip() for l in lines if l.strip().startswith(">")]
@@ -401,16 +405,23 @@ def contextualize_query(current_query: str, history: list) -> str:
         user_q = " ".join(user_lines)
         return f"{quote_text} : {user_q}"
 
-    followup_triggers = [
-        "it", "its", "this", "these", "they", "that", "the same",
-        "bu", "bunun", "bunu", "onun", "ona", "peki", "neden", "nasıl",
-        "farkı", "avantajı", "dezavantajı", "karmaşıklığı", "nedir"
+    lower_q = current_query.strip().lower()
+
+    # Explicit triggers that signify a dependent follow-up referencing previous turn
+    followup_starters = [
+        "peki ", "peki ya ", "peki bu ", "peki bunun ", "peki onun ",
+        "what about ", "and what about ", "how about ", "and why is "
     ]
-    words = set(current_query.lower().split())
+    referential_keywords = [
+        "bunun", "bunu", "buna", "bunda", "ondan", "onun", "ona", "onu",
+        "aralarındaki fark", "yukarıdaki", "bahsettiğin", "bu formül", "bu kod",
+        "the former", "the latter", "difference between them"
+    ]
 
-    is_followup = len(current_query.split()) < 10 or bool(words.intersection(followup_triggers))
+    is_starter = any(lower_q.startswith(s) for s in followup_starters)
+    is_referential = any(re.search(r'\b' + re.escape(w) + r'\b', lower_q) for w in referential_keywords)
 
-    if is_followup:
+    if is_starter or is_referential:
         last_user_query = ""
         for msg in reversed(history):
             if msg.get("role") == "user":
@@ -711,25 +722,19 @@ if prompt:
                 safe_packed = packed_report["packed"]
                 status.update(label="Literatür tarandı.", state="complete")
 
-            # Display decomposed sub-queries if any were generated
+            # Display decomposed sub-queries if any were generated for technical questions
             sub_qs = search_res.get("sub_queries", [])
-            if len(sub_qs) > 1:
+            if len(sub_qs) > 1 and has_sufficient_evidence:
                 st.info("🔀 **Ayrıştırılan Alt-Sorgular:**\n" + "\n".join([f"- `{sq}`" for sq in sub_qs]))
 
-            # Honest Abstention: If no evidence in local papers/notes, abstain politely and offer to ingest!
-            if not has_sufficient_evidence and not retrieved_context:
-                abstain_msg = (
-                    "### ⚠️ Yerel Hafızada Yeterli Kaynak Bulunamadı\n\n"
-                    f"Bu konu (*\"{clean_q}\"*) şu an yerel hafızamdaki makalelerde "
-                    "(Transformer, ResNet, ViT, Swin, Coordinate Attention, PPO, DPO vb.) doğrudan yer almıyor.\n\n"
-                    "Uydurma ve yanıltıcı bilgi vermemek için **bu konuyu henüz tam olarak bilmiyorum**.\n\n"
-                    "💡 **Hafızama Nasıl Ekleyebilirsin?**\n"
-                    "Sol menüdeki **'📥 Hafızaya Yeni Makale Ekle'** kutusundan bu konunun arXiv kodunu "
-                    "girip *'İndir & İndeksle'* dersen, makaleyi anında indirip parçalayarak hafızama eklerim "
-                    "ve ardından bu soruya derinlemesine ders kitabı kalitesinde cevap verebilirim!"
-                )
-                st.markdown(abstain_msg)
-                st.session_state.messages.append({"role": "assistant", "content": abstain_msg})
+            # Fallback for General Engineering, Career, Robotics, or Out-of-Corpus Questions:
+            # If the query does not match any indexed deep learning papers, do NOT force irrelevant
+            # papers or rigid lecture templates. Answer directly and practically using broad engineering intelligence!
+            if not has_sufficient_evidence:
+                expert_msgs = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
+                stream = llm.stream_generate(expert_msgs, max_tokens=1600)
+                full_response = st.write_stream(stream)
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
                 st.rerun()
 
             # Display source citations box if available
