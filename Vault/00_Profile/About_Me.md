@@ -20,6 +20,7 @@ tags:
 ### 🚀 Aktif Projeler & İlgi Alanları
   - Hafif dikkat mekanizmaları ve model optimizasyonu (YOLO, Coordinate Attention)
   - Yerel, gizlilik odaklı derin öğrenme asistanı
+  - savaşan iha takip görevi için yolo11s ile savaşan iha takip görevi için
 
 ### 🎯 Tercih Edilen Öğrenme & Anlatım Tarzı
   - Standart akademik ve pratik derin öğrenme yaklaşımı
