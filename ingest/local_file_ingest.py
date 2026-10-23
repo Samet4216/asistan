@@ -140,6 +140,4 @@ def ingest_uploaded_file(
 
 
 if __name__ == "__main__":
-    sample_text = b"# Test Notes\n\n## First Chapter\nDeep learning requires GPU acceleration.\n\n## Second Chapter\nCoordinate attention helps vision models."
-    res = ingest_uploaded_file(sample_text, "test_notes.md", custom_title="Sample Deep Learning Notes")
-    print("Upload Ingestion Test:", res)
+    print("[*] Local file ingest module ready. Use ingest_uploaded_file(file_bytes, filename) from UI.")

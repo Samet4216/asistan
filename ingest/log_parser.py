@@ -150,38 +150,39 @@ def format_telemetry_report(run_dir: Path) -> str:
 
 
 if __name__ == "__main__":
+    import tempfile
     print("[*] Testing LogParser with synthetic test cases...")
-    test_dir = Path("data/test_run")
-    test_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        test_dir = Path(tmp_dir)
 
-    # Synthetic Case 1: Overfitting
-    overfit_data = {
-        "epoch": list(range(1, 11)),
-        "train/box_loss": [0.8, 0.7, 0.6, 0.5, 0.45, 0.40, 0.35, 0.30, 0.25, 0.20],
-        "val/box_loss":   [0.85, 0.75, 0.65, 0.58, 0.60, 0.63, 0.67, 0.72, 0.78, 0.85],
-        "metrics/mAP50(B)": [0.3, 0.4, 0.5, 0.65, 0.64, 0.63, 0.61, 0.59, 0.57, 0.55]
-    }
-    pd.DataFrame(overfit_data).to_csv(test_dir / "results.csv", index=False)
-    with open(test_dir / "args.yaml", "w") as f:
-        yaml.dump({"model": "yolov8n.pt", "lr0": 0.01, "batch": 16, "epochs": 100}, f)
+        # Synthetic Case 1: Overfitting
+        overfit_data = {
+            "epoch": list(range(1, 11)),
+            "train/box_loss": [0.8, 0.7, 0.6, 0.5, 0.45, 0.40, 0.35, 0.30, 0.25, 0.20],
+            "val/box_loss":   [0.85, 0.75, 0.65, 0.58, 0.60, 0.63, 0.67, 0.72, 0.78, 0.85],
+            "metrics/mAP50(B)": [0.3, 0.4, 0.5, 0.65, 0.64, 0.63, 0.61, 0.59, 0.57, 0.55]
+        }
+        pd.DataFrame(overfit_data).to_csv(test_dir / "results.csv", index=False)
+        with open(test_dir / "args.yaml", "w") as f:
+            yaml.dump({"model": "yolov8n.pt", "lr0": 0.01, "batch": 16, "epochs": 100}, f)
 
-    parser = LogParser(test_dir)
-    res = parser.analyze_results()
-    print("\n[Synthetic Overfit Run]:")
-    print(res["evidence"])
-    assert not res["is_healthy"], "Should detect overfitting"
+        parser = LogParser(test_dir)
+        res = parser.analyze_results()
+        print("\n[Synthetic Overfit Run]:")
+        print(res["evidence"])
+        assert not res["is_healthy"], "Should detect overfitting"
 
-    # Synthetic Case 2: Healthy Run
-    healthy_data = {
-        "epoch": list(range(1, 11)),
-        "train/box_loss": [0.8, 0.7, 0.6, 0.5, 0.42, 0.36, 0.31, 0.27, 0.24, 0.21],
-        "val/box_loss":   [0.85, 0.76, 0.66, 0.55, 0.48, 0.41, 0.35, 0.30, 0.26, 0.23],
-        "metrics/mAP50(B)": [0.3, 0.4, 0.5, 0.60, 0.68, 0.74, 0.79, 0.82, 0.85, 0.87]
-    }
-    pd.DataFrame(healthy_data).to_csv(test_dir / "results.csv", index=False)
-    res_healthy = parser.analyze_results()
-    print("\n[Synthetic Healthy Run]:")
-    print(res_healthy["evidence"])
-    assert res_healthy["is_healthy"], "Should pass healthy run"
+        # Synthetic Case 2: Healthy Run
+        healthy_data = {
+            "epoch": list(range(1, 11)),
+            "train/box_loss": [0.8, 0.7, 0.6, 0.5, 0.42, 0.36, 0.31, 0.27, 0.24, 0.21],
+            "val/box_loss":   [0.85, 0.76, 0.66, 0.55, 0.48, 0.41, 0.35, 0.30, 0.26, 0.23],
+            "metrics/mAP50(B)": [0.3, 0.4, 0.5, 0.60, 0.68, 0.74, 0.79, 0.82, 0.85, 0.87]
+        }
+        pd.DataFrame(healthy_data).to_csv(test_dir / "results.csv", index=False)
+        res_healthy = parser.analyze_results()
+        print("\n[Synthetic Healthy Run]:")
+        print(res_healthy["evidence"])
+        assert res_healthy["is_healthy"], "Should pass healthy run"
 
-    print("\n>>> ALL LOG PARSER TESTS PASSED! <<<")
+        print("\n>>> ALL LOG PARSER TESTS PASSED! <<<")

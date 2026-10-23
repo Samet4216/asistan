@@ -115,6 +115,7 @@ telemetry/
 *.zip
 *.rar
 data/papers/*/source.tar.gz
+data/papers/
 
 # Editors and IDEs
 .vscode/

@@ -923,7 +923,7 @@ with tab_graph:
 
 with tab_corpus:
     st.markdown("### 📚 Yerel RAG Makale Kütüphanesi (arXiv Corpus)")
-    st.caption("Yerel ChromaDB vektör hafızamıza indekslenmiş 11 temel makale. Kartlardaki tek tıkla sorgulama butonunu kullanarak o makale hakkında anında analiz başlatabilirsiniz.")
+    st.caption("Yerel ChromaDB vektör hafızamıza indekslenmiş 21 temel makale (YOLO, ConvNeXt, SAC, Vision Transformer, Attention ve Edge AI). Kartlardaki tek tıkla sorgulama butonunu kullanarak o makale hakkında anında derinlemesine analiz başlatabilirsiniz.")
 
     papers_info = [
         {
@@ -1024,6 +1024,96 @@ with tab_corpus:
             "color": "#eab308",
             "desc": "Birinci ve ikinci moment tahminleri ile adaptif öğrenme oranı optimizasyonu.",
             "prompt": "Adam optimizer birinci ve ikinci moment düzeltmelerini formülleriyle açıkla."
+        },
+        {
+            "id": "2405.14458",
+            "title": "YOLOv10: Real-Time End-to-End Object Detection",
+            "authors": "Wang et al. (Tsinghua University)",
+            "domain": "Real-Time Object Detection",
+            "color": "#f97316",
+            "desc": "NMS-free ikili etiket atama ve hafif sınıflandırma başlıkları ile NMS gecikmesini sıfırlayan uçtan uca YOLO.",
+            "prompt": "YOLOv10 mimarisinde dual label assignment ve NMS-free eğitim yaklaşımı çıkarım süresini nasıl optimize eder?"
+        },
+        {
+            "id": "2207.02696",
+            "title": "YOLOv7: Trainable Bag-of-Freebies",
+            "authors": "Wang, Bochkovskiy & Liao",
+            "domain": "Real-Time Object Detection",
+            "color": "#ef4444",
+            "desc": "E-ELAN (Extended ELAN) ve planlanmış yeniden parametrelendirme (re-parameterization) ile hız ve doğruluk rekoru.",
+            "prompt": "YOLOv7'deki E-ELAN mimarisi gradyan akışını bozmadan modelin öğrenme kapasitesini nasıl artırır?"
+        },
+        {
+            "id": "1708.02002",
+            "title": "Focal Loss for Dense Object Detection (RetinaNet)",
+            "authors": "Lin et al. (FAIR)",
+            "domain": "Object Detection & Loss Functions",
+            "color": "#f43f5e",
+            "desc": "Tek aşamalı dedektörlerde ön plan-arka plan sınıf dengesizliğini çözen dinamik modüle edici kayıp fonksiyonu (1 - pt)^gamma.",
+            "prompt": "Focal Loss formülündeki (1 - pt)^gamma çarpanı kolay negatif örneklerin gradyan baskısını matematiksel olarak nasıl bastırır?"
+        },
+        {
+            "id": "2201.03545",
+            "title": "A ConvNet for the 2020s (ConvNeXt)",
+            "authors": "Liu et al. (FAIR & UC Berkeley)",
+            "domain": "Modern ConvNet Architecture",
+            "color": "#0ea5e9",
+            "desc": "ResNet-50'yi Swin Transformer tasarım ilkeleriyle (7x7 depthwise konvolüsyon, inverted bottleneck, GELU) modernize eden saf CNN.",
+            "prompt": "ConvNeXt mimarisi Vision Transformer tasarım kararlarını saf evrişimli ağlara nasıl entegre eder?"
+        },
+        {
+            "id": "2404.10518",
+            "title": "MobileNetV4: Universal Models for Mobile Ecosystem",
+            "authors": "Qin et al. (Google)",
+            "domain": "Mobile & Edge Architectures",
+            "color": "#10b981",
+            "desc": "Evrensel Ters Şişe Boynu (UIB) ve Mobile MQA ile CPU, DSP ve mobil GPU'larda donanım-farkında Pareto optimizasyonu.",
+            "prompt": "MobileNetV4 Universal Inverted Bottleneck (UIB) bloğu farklı donanım hızlandırıcılarında işlem verimini nasıl maksimize eder?"
+        },
+        {
+            "id": "1905.11946",
+            "title": "EfficientNet: Rethinking Model Scaling",
+            "authors": "Tan & Le (Google Brain)",
+            "domain": "Compound Scaling & CNNs",
+            "color": "#eab308",
+            "desc": "Ağ derinliği, genişliği ve çözünürlüğünü sabit bir bileşik katsayı (alpha * beta^2 * gamma^2 ~= 2) ile dengeli büyüten ölçekleme kuralı.",
+            "prompt": "EfficientNet bileşik ölçekleme (compound scaling) kuralı derinlik, genişlik ve çözünürlüğü hangi matematiksel prensiple dengeler?"
+        },
+        {
+            "id": "1801.01290",
+            "title": "Soft Actor-Critic: Off-Policy Max-Entropy Deep RL",
+            "authors": "Haarnoja et al. (UC Berkeley)",
+            "domain": "Deep Reinforcement Learning & Robotics",
+            "color": "#8b5cf6",
+            "desc": "Beklenen ödül ile birlikte eylem entropisini de maksimize ederek sürekli kontrol ve robotik eylemlerde olağanüstü kararlılık ve keşif.",
+            "prompt": "Soft Actor-Critic (SAC) algoritmasındaki maksimum entropi hedefi politika keşfini ve sağlamlığını nasıl garanti eder?"
+        },
+        {
+            "id": "1509.02971",
+            "title": "Continuous Control with Deep RL (DDPG)",
+            "authors": "Lillicrap et al. (DeepMind)",
+            "domain": "Continuous Control & Policy Gradients",
+            "color": "#6366f1",
+            "desc": "DQN'i sürekli eylem uzayına taşıyan deterministik politika gradyanı ve hedef ağ tabanlı aktör-kritik mimarisi.",
+            "prompt": "DDPG algoritmasında deterministic actor ve critic ağlarının birbirini güncelleme mekanizmasını formüllerle açıkla."
+        },
+        {
+            "id": "2306.00978",
+            "title": "AWQ: Activation-aware Weight Quantization",
+            "authors": "Lin et al. (MIT HAN Lab)",
+            "domain": "Model Quantization & Acceleration",
+            "color": "#d946ef",
+            "desc": "Ağırlık büyüklüğü yerine aktivasyon dağılımlarını koruyarak yeniden eğitime gerek kalmadan LLM'leri 4-bit INT4'e sıkıştıran yöntem.",
+            "prompt": "AWQ (Activation-aware Weight Quantization) en kritik %1 ağırlığı tespit etmek için aktivasyon büyüklüklerini nasıl kullanır?"
+        },
+        {
+            "id": "2101.03697",
+            "title": "RepVGG: Making VGG-style ConvNets Great Again",
+            "authors": "Ding et al. (Tsinghua University)",
+            "domain": "Structural Re-parameterization",
+            "color": "#14b8a6",
+            "desc": "Eğitimde çok kollu artık bağlantılar kullanıp çıkarım anında bunları cebirsel olarak tek bir 3x3 evrişim katmanına kaynaştıran (fuse) mimari.",
+            "prompt": "RepVGG eğitimdeki 1x1 ve identity artık bağlantıları çıkarımda tek bir 3x3 evrişim çekirdeğine cebirsel olarak nasıl indirger?"
         }
     ]
 
