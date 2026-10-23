@@ -1,0 +1,123 @@
+"""
+Query Transformation Module: Sub-Query Decomposition and HyDE (Hypothetical Document Embeddings).
+Enables multi-facet research question retrieval and bridging vocabulary gaps with academic hypothetical passages.
+"""
+
+import json
+import re
+import sys
+from pathlib import Path
+from typing import List, Dict, Any, Optional
+
+PROJECT_ROOT = Path(__file__).parent.parent.resolve()
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+import config
+import llm
+
+DECOMPOSITION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "sub_queries": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "List of 2 to 3 atomic, focused academic search queries."
+        }
+    },
+    "required": ["sub_queries"]
+}
+
+
+class QueryTransformer:
+    def __init__(self):
+        self.decomposition_schema = DECOMPOSITION_SCHEMA
+
+    def should_decompose(self, query: str) -> bool:
+        """
+        Detects if a query contains comparison, multiple concepts, or conjunctions
+        that would benefit from multi-path sub-query retrieval.
+        """
+        q_lower = query.lower()
+        signals = [
+            " vs ", " vs. ", " versus ", " difference between ", " compare ",
+            " and how ", " and why ", " as well as ",
+            " farkı", " fark ", " ile ", " karşılaştır", " ve "
+        ]
+        if any(sig in q_lower for sig in signals):
+            return True
+        if q_lower.count("?") > 1:
+            return True
+        if len(query.split()) >= 12:
+            return True
+        return False
+
+    def decompose(self, query: str, max_sub_queries: int = 3) -> List[str]:
+        """
+        Decomposes a complex deep learning research query into 2-3 focused sub-queries.
+        Falls back to original query on simple questions or failures.
+        """
+        if not self.should_decompose(query):
+            return [query]
+
+        prompt_messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are an academic retrieval optimizer for a Deep Learning research database. "
+                    "Your job is to break a complex user question into 2 or 3 atomic, highly targeted search queries. "
+                    "Keep each sub-query concise and focused on a single paper, concept, or mechanism. "
+                    "Return ONLY valid JSON matching the schema."
+                )
+            },
+            {
+                "role": "user",
+                "content": f"Decompose this deep learning research question into 2-3 atomic search queries:\n\"{query}\""
+            }
+        ]
+
+        try:
+            raw = llm.generate(prompt_messages, schema=self.decomposition_schema, max_tokens=150, temperature=0.1)
+            parsed = json.loads(raw)
+            subs = parsed.get("sub_queries", [])
+            valid_subs = [s.strip() for s in subs if s.strip() and len(s.strip()) > 5]
+            if valid_subs:
+                # Always ensure original query or keywords are retained
+                return valid_subs[:max_sub_queries]
+        except Exception as e:
+            print(f"[!] Sub-query decomposition fallback: {e}")
+
+        return [query]
+
+    def generate_hyde(self, query: str) -> str:
+        """
+        Generates a concise hypothetical academic passage (HyDE)
+        that serves as a semantic bridge between user intent and formal arXiv paper text.
+        """
+        prompt_messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a scientific AI writing an excerpt from an authoritative Deep Learning research paper. "
+                    "Write a direct, 2-to-3 sentence academic paragraph answering the user's question with precise technical terms, "
+                    "mathematical variables, and architectural concepts. Do not include introductory conversational filler."
+                )
+            },
+            {
+                "role": "user",
+                "content": f"Question: {query}\n\nWrite hypothetical research paper excerpt:"
+            }
+        ]
+
+        try:
+            hyde_passage = llm.generate(prompt_messages, max_tokens=220, temperature=0.2)
+            if hyde_passage and len(hyde_passage.strip()) > 30:
+                return hyde_passage.strip()
+        except Exception as e:
+            print(f"[!] HyDE generation fallback: {e}")
+
+        return query
+
+
+# Global instance
+query_transformer = QueryTransformer()

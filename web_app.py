@@ -2,7 +2,8 @@
 Local Deep Learning Lab Assistant — Modern Web Chat Interface (Streamlit).
 Provides a ChatGPT/Open-WebUI-grade browser interface with KaTeX math rendering,
 real-time streaming generation, multi-turn conversational context, Obsidian Vault integration,
-Two-Stage Chain-of-Thought deep reasoning, and live RTX 4050 & CPU hardware telemetry.
+Two-Stage Chain-of-Thought deep reasoning, interactive ChatGPT-style text quoting/reply,
+and live RTX 4050 & CPU hardware telemetry.
 """
 
 import sys
@@ -16,6 +17,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import streamlit as st
+import streamlit.components.v1 as components
 import psutil
 import config
 import llm
@@ -67,7 +69,17 @@ st.markdown("""
         padding: 8px 12px;
         border-radius: 8px;
     }
-    /* Hide Streamlit exception debug buttons (Copy, Ask Google, Ask ChatGPT) */
+    /* Sleek Blockquote Styling for Quoted Replies */
+    blockquote {
+        border-left: 3px solid #38bdf8 !important;
+        background: rgba(56, 189, 248, 0.06);
+        padding: 8px 16px !important;
+        border-radius: 6px;
+        margin: 8px 0 14px 0 !important;
+        color: #94a3b8 !important;
+        font-style: italic;
+    }
+    /* Hide Streamlit exception debug buttons */
     [data-testid="stExceptionActionButtons"],
     .stException > div:last-child {
         display: none !important;
@@ -76,59 +88,165 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+# Interactive JavaScript for ChatGPT-style text selection and quote popover
+components.html("""
+<script>
+const parentDoc = window.parent.document;
+
+function setupQuoteButton() {
+    if (parentDoc.getElementById("agy-quote-btn")) return;
+
+    const btn = parentDoc.createElement("div");
+    btn.id = "agy-quote-btn";
+    btn.innerHTML = "💬 <b>Alıntı Yap (Reply)</b>";
+    btn.style.position = "fixed";
+    btn.style.display = "none";
+    btn.style.zIndex = "9999999";
+    btn.style.backgroundColor = "#0f172a";
+    btn.style.color = "#38bdf8";
+    btn.style.border = "1px solid #38bdf8";
+    btn.style.borderRadius = "20px";
+    btn.style.padding = "6px 14px";
+    btn.style.fontSize = "13px";
+    btn.style.cursor = "pointer";
+    btn.style.boxShadow = "0 8px 24px rgba(0,0,0,0.6)";
+    btn.style.transition = "transform 0.1s ease, background 0.2s ease";
+    btn.style.userSelect = "none";
+
+    btn.onmouseenter = () => {
+        btn.style.backgroundColor = "#1e293b";
+        btn.style.transform = "scale(1.05)";
+    };
+    btn.onmouseleave = () => {
+        btn.style.backgroundColor = "#0f172a";
+        btn.style.transform = "scale(1.0)";
+    };
+
+    parentDoc.body.appendChild(btn);
+
+    let activeSelectedText = "";
+
+    function handleSelection() {
+        const selection = parentDoc.getSelection();
+        const selectedText = selection ? selection.toString().trim() : "";
+
+        if (selectedText && selectedText.length > 2) {
+            const anchorNode = selection.anchorNode;
+            const chatMsg = anchorNode ? (anchorNode.nodeType === 3 ? anchorNode.parentElement : anchorNode).closest(".stChatMessage") : null;
+            if (chatMsg) {
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+                if (rect.width > 0 && rect.height > 0) {
+                    activeSelectedText = selectedText;
+                    btn.style.top = Math.max(10, rect.top - 42) + "px";
+                    btn.style.left = Math.max(10, rect.left + (rect.width / 2) - 65) + "px";
+                    btn.style.display = "block";
+                    return;
+                }
+            }
+        }
+        btn.style.display = "none";
+    }
+
+    parentDoc.addEventListener("mouseup", () => setTimeout(handleSelection, 30));
+    parentDoc.addEventListener("keyup", () => setTimeout(handleSelection, 30));
+    parentDoc.addEventListener("selectionchange", () => {
+        if (!parentDoc.getSelection().toString().trim()) {
+            btn.style.display = "none";
+        }
+    });
+
+    btn.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!activeSelectedText) return;
+
+        const chatInput = parentDoc.querySelector('textarea[data-testid="stChatInputTextArea"]');
+        if (chatInput) {
+            const quoteLines = activeSelectedText.split("\\n").map(l => "> " + l).join("\\n");
+            const existingVal = chatInput.value ? chatInput.value.trim() + "\\n\\n" : "";
+            const newVal = existingVal + quoteLines + "\\n\\n";
+
+            const nativeSetter = Object.getOwnPropertyDescriptor(window.parent.HTMLTextAreaElement.prototype, "value").set;
+            nativeSetter.call(chatInput, newVal);
+            chatInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+            chatInput.focus();
+            chatInput.selectionStart = chatInput.selectionEnd = chatInput.value.length;
+            chatInput.scrollIntoView({ behavior: "smooth" });
+        }
+
+        btn.style.display = "none";
+        parentDoc.getSelection().removeAllRanges();
+    });
+}
+
+setupQuoteButton();
+setInterval(setupQuoteButton, 1000);
+</script>
+""", height=0)
+
+
 def normalize_latex(text: str) -> str:
     """
     Cleans LaTeX delimiters so KaTeX in Streamlit renders formulas crisply:
-    - \\[ ... \\] -> $$ ... $$
-    - \\( ... \\) -> $ ... $
-    - Standalone bracketed lines [ ... ] -> $$ ... $$
-    - Mathematical terms inside parentheses ( Q ), ( B \\times T \\times D ) -> $...$
+    - Protects code blocks (```...```) so Python code parentheses are NEVER corrupted.
+    - Converts \\[ ... \\] -> $$ ... $$
+    - Converts \\( ... \\) -> $ ... $
+    - Converts standalone bracketed lines [ \\text{...} ] -> $$ ... $$
     """
     if not text:
         return ""
 
-    # 1. Standard display math: \[ ... \] -> $$ ... $$
-    text = re.sub(r'\\\[([\s\S]*?)\\\]', r'$$\n\1\n$$', text)
+    # Split text into code blocks and normal prose so code is 100% protected
+    parts = re.split(r'(```[\s\S]*?```)', text)
+    processed = []
 
-    # 2. Standard inline math: \( ... \) -> $ ... $
-    text = re.sub(r'\\\(([\s\S]*?)\\\)', r'$\1$', text)
+    for part in parts:
+        # If this is a fenced code block, keep it completely untouched!
+        if part.startswith("```"):
+            processed.append(part)
+            continue
 
-    # 3. Standalone bracket lines [ ... ] that contain math indicators
-    def _bracket_repl(m):
-        inner = m.group(1).strip()
-        indicators = ["=", "\\text", "\\frac", "\\times", "^", "_", "\\cdot", "\\left", "\\sum", "softmax", "ReLU"]
-        if any(tok in inner for tok in indicators):
-            return f"\n$$\n{inner}\n$$\n"
-        return m.group(0)
+        # 1. Standard display math: \[ ... \] -> $$ ... $$
+        p = re.sub(r'\\\[([\s\S]*?)\\\]', r'$$\n\1\n$$', part)
 
-    text = re.sub(r'(?m)^\s*\[\s*([^\n\]]+)\s*\]\s*$', _bracket_repl, text)
+        # 2. Standard inline math: \( ... \) -> $ ... $
+        p = re.sub(r'\\\(([\s\S]*?)\\\)', r'$\1$', p)
 
-    # 4. Math variables or dimensions inside parentheses: ( Q ), ( K ), ( B \times T \times D ), ( x )
-    def _paren_repl(m):
-        inner = m.group(1).strip()
-        # Single variable like ( Q ), ( K ), ( V ), ( x ), ( z )
-        if len(inner) == 1 and inner.isalpha():
-            return f"${inner}$"
-        # Equations or dimension shapes like ( B \times T \times D ) or ( F(x) = x + G(x) )
-        indicators = ["\\times", "\\cdot", "\\sum", "\\in", "=", "^", "_", "\\frac", "\\approx", "\\leq", "\\geq"]
-        if any(tok in inner for tok in indicators):
-            return f"${inner}$"
-        return m.group(0)
+        # 3. Standalone bracket lines [ ... ] that contain math indicators
+        def _bracket_repl(m):
+            inner = m.group(1).strip()
+            indicators = ["=", "\\text", "\\frac", "\\times", "^", "_", "\\cdot", "\\left", "\\sum", "softmax", "ReLU"]
+            if any(tok in inner for tok in indicators):
+                return f"\n$$\n{inner}\n$$\n"
+            return m.group(0)
 
-    text = re.sub(r'\(\s*([A-Za-z0-9_\\^+\-*\/=, \t]+)\s*\)', _paren_repl, text)
+        p = re.sub(r'(?m)^\s*\[\s*([^\n\]]+)\s*\]\s*$', _bracket_repl, p)
 
-    # 5. Clean excessive $$$ to $$
-    text = re.sub(r'\${3,}', '$$', text)
-    return text
+        # 4. Clean excessive $$$ to $$
+        p = re.sub(r'\${3,}', '$$', p)
+        processed.append(p)
+
+    return "".join(processed)
 
 
 def contextualize_query(current_query: str, history: list) -> str:
     """
-    Augments follow-up questions with conversation context for accurate hybrid retrieval.
-    Example: "What is its computational complexity?" -> "ResNet residual connections : What is its computational complexity?"
+    Augments follow-up questions or quoted replies with conversation context for accurate hybrid retrieval.
     """
     if not history or len(history) <= 1:
         return current_query
+
+    # If query contains a blockquote reply (> ...):
+    if ">" in current_query:
+        lines = current_query.split("\n")
+        quote_lines = [l.replace(">", "").strip() for l in lines if l.strip().startswith(">")]
+        user_lines = [l.strip() for l in lines if l.strip() and not l.strip().startswith(">")]
+        quote_text = " ".join(quote_lines)[:80]
+        user_q = " ".join(user_lines)
+        return f"{quote_text} : {user_q}"
 
     followup_triggers = [
         "it", "its", "this", "these", "they", "that", "the same",
@@ -209,11 +327,22 @@ with st.sidebar:
 
     st.caption("ℹ️ *Laptop fanları hem CPU hem de GPU ısısına göre hızlanır. Gösterilen sıcaklık NVIDIA GPU çipinin sıcaklığıdır.*")
 
-    # Unload Button
-    if st.button("❄️ VRAM'i Boşalt (Modeli Kapat)", help="Modeli VRAM'den siler, laptop sıcaklığını ve güç tüketimini anında düşürür."):
-        llm.unload()
-        st.success("Model VRAM'den kaldırıldı, GPU boşa alındı.")
-        st.rerun()
+    # Unload & Clear Buttons
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn1:
+        if st.button("❄️ Boşalt", help="Modeli VRAM'den siler, GPU'yu soğutur."):
+            llm.unload()
+            st.success("VRAM boşaltıldı.")
+            st.rerun()
+    with col_btn2:
+        if st.button("🗑️ Temizle", help="Sohbet geçmişini sıfırlar ve yeni bir seans açar."):
+            st.session_state.messages = [
+                {
+                    "role": "assistant",
+                    "content": "Merhaba! Ben yerel Derin Öğrenme Laboratuvar Asistanınızım. İndekslenmiş makalelerimiz hakkında teknik sorular sorabilir, fareyle herhangi bir cümleyi veya formülü seçip '💬 Alıntı Yap' diyerek doğrudan o kısım hakkında soru sorabilirsiniz."
+                }
+            ]
+            st.rerun()
 
     st.divider()
 
@@ -227,6 +356,12 @@ with st.sidebar:
         ],
         index=0
     )
+
+    st.divider()
+
+    st.subheader("🔍 Arama Motoru Ayarları")
+    use_decomp = st.checkbox("🔀 Alt-Sorgu Ayrıştırma (Decomposition)", value=True, help="Karmaşık veya karşılaştırmalı soruları otomatik 2-3 bağımsız sorguya bölerek arar.")
+    use_hyde = st.checkbox("💡 HyDE (Hipotetik Belge Vektörü)", value=False, help="Soyut sorular için önce akademik bir varsayımsal yanıt üretip onun vektörüyle arar.")
 
     st.divider()
 
@@ -255,7 +390,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = [
         {
             "role": "assistant",
-            "content": "Merhaba! Ben yerel Derin Öğrenme Laboratuvar Asistanınızım. İndekslenmiş makalelerimiz (Transformer, ResNet, ViT, Coordinate Attention, Swin) hakkında teknik sorular sorabilir, iki aşamalı derin akıl yürütme (Two-Stage CoT) ile ders kitabı kalitesinde kapsamlı analizler alabilir veya yeni fikirlerinizi Devil's Advocate modunda test edebilirsiniz."
+            "content": "Merhaba! Ben yerel Derin Öğrenme Laboratuvar Asistanınızım. İndekslenmiş makalelerimiz hakkında teknik sorular sorabilir, fareyle herhangi bir cümleyi veya formülü seçip '💬 Alıntı Yap' diyerek doğrudan o kısım hakkında soru sorabilirsiniz."
         }
     ]
 
@@ -264,11 +399,11 @@ for i, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):
         st.markdown(normalize_latex(msg["content"]))
         
-        # If assistant message (and not the initial welcome message), provide Save to Vault button
+        # If assistant message (and not the initial welcome message), provide Save & Quote buttons
         if msg["role"] == "assistant" and i > 0:
-            btn_col, _ = st.columns([1, 4])
-            with btn_col:
-                if st.button("💾 Obsidian Vault'a Kaydet", key=f"save_draft_{i}", help="Bu cevabı Obsidian Vault/Drafts/ klasörüne taslak olarak kaydeder."):
+            btn_col1, btn_col2, _ = st.columns([1, 1, 3])
+            with btn_col1:
+                if st.button("💾 Obsidian'a Kaydet", key=f"save_draft_{i}", help="Bu cevabı Obsidian Vault/Drafts/ klasörüne taslak olarak kaydeder."):
                     user_q = "Theory_Note"
                     for prev_msg in reversed(st.session_state.messages[:i]):
                         if prev_msg["role"] == "user":
@@ -286,7 +421,7 @@ for i, msg in enumerate(st.session_state.messages):
                     st.rerun()
 
 # User input box
-if prompt := st.chat_input("Bir soru sorun, hipotez belirtin veya konu anlatımı isteyin..."):
+if prompt := st.chat_input("Bir soru sorun veya yukarıdan bir satırı seçip '💬 Alıntı Yap' ile soru yöneltin..."):
     # Render user query
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -319,12 +454,17 @@ if prompt := st.chat_input("Bir soru sorun, hipotez belirtin veya konu anlatım�
             is_deep_cot = "Two-Stage CoT" in mode or prompt.startswith("/explain")
             clean_q = prompt.replace("/explain", "").strip()
 
-            # Multi-turn context resolution: augment search query with prior conversational topic
+            # Multi-turn context resolution: augment search query with prior conversational topic or quote
             augmented_search_query = contextualize_query(clean_q, st.session_state.messages[:-1])
 
             # Step 1: Hybrid Retrieval
             with st.status("📚 Literatür ve yerel hafıza taranıyor...", expanded=False) as status:
-                search_res = searcher.search(augmented_search_query, top_k=config.RETRIEVAL_TOP_K)
+                search_res = searcher.search(
+                    augmented_search_query,
+                    top_k=config.RETRIEVAL_TOP_K,
+                    use_decomposition=use_decomp,
+                    use_hyde=use_hyde
+                )
                 retrieved_context = search_res.get("packed_context", "")
                 has_sufficient_evidence = search_res.get("has_sufficient_evidence", False)
                 error_evidence = error_manager.get_relevant_errors(augmented_search_query)
@@ -337,23 +477,35 @@ if prompt := st.chat_input("Bir soru sorun, hipotez belirtin veya konu anlatım�
                 safe_packed = packed_report["packed"]
                 status.update(label="Literatür tarandı.", state="complete")
 
+            # Display decomposed sub-queries if any were generated
+            sub_qs = search_res.get("sub_queries", [])
+            if len(sub_qs) > 1:
+                st.info("🔀 **Ayrıştırılan Alt-Sorgular:**\n" + "\n".join([f"- `{sq}`" for sq in sub_qs]))
+
             # Display source citations box if available
             sources = search_res.get("results", [])
             if sources:
                 with st.expander(f"📚 Referans Alınan Makale Parçaları ({len(sources)} Bölüm)"):
                     for s in sources:
-                        st.markdown(f"- **{s.get('id')}** (Skor: `{s.get('score', 0):.2f}`) — *{s.get('title')}*")
+                        meta = s.get("metadata", {})
+                        title = meta.get("title", "Akademik Makale")
+                        section = meta.get("section_name", "")
+                        score = s.get("rerank_score", 0.0)
+                        sec_info = f" • Bölüm: *{section}*" if section else ""
+                        st.markdown(f"- 📄 **{title}**{sec_info} (`{s.get('id')}`) — *Alaka Skoru: `{score:.2f}`*")
 
             thought_plan = ""
-            # Step 2: Stage 1 - Chain-of-Thought Deep Planning (if in Two-Stage CoT mode)
+            # Step 2: Extended Thinking Mode - Model Thinks Deeply in Public
             if is_deep_cot:
-                with st.status("🧠 1. Aşama: Derin Muhakeme & Çözüm Planı Çıkarılıyor (Chain-of-Thought)...", expanded=True) as status_cot:
+                import time
+                t_start = time.time()
+                with st.status("💭 Derin Düşünme & Analiz (Model kendi kendine muhakeme yapıyor...)", expanded=True) as status_cot:
                     cot_prompt_msgs = build_thought_plan_prompt(clean_q, safe_packed.get("paper_chunks", ""))
-                    thought_plan = llm.generate(cot_prompt_msgs, max_tokens=450, temperature=0.1)
-                    status_cot.update(label="✅ Akıl Yürütme Planı Hazırlandı. 2. Aşama: Kapsamlı Ders Yazılıyor...", state="complete")
-                
-                with st.expander("🧠 Akıl Yürütme ve Çözüm Planı (Chain-of-Thought Blueprint)", expanded=False):
-                    st.markdown(normalize_latex(thought_plan))
+                    # Stream the actual thought monologue live into the container
+                    thought_stream = llm.stream_generate(cot_prompt_msgs, max_tokens=650, temperature=0.2)
+                    thought_plan = st.write_stream(thought_stream)
+                    elapsed_sec = max(1, int(time.time() - t_start))
+                    status_cot.update(label=f"💭 Düşünce Süreci ({elapsed_sec} saniye boyunca derin analiz yapıldı)", state="complete", expanded=False)
 
             # Step 3: Stage 2 - Comprehensive Masterclass Synthesis
             messages = build_answer_prompt(

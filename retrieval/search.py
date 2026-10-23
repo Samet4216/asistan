@@ -19,6 +19,7 @@ import budget
 from ingest.indexer import Indexer
 from retrieval.embed import embedder
 from retrieval.rerank import reranker
+from retrieval.query_transform import query_transformer
 
 
 class HybridSearcher:
@@ -26,16 +27,22 @@ class HybridSearcher:
         self.indexer = indexer or Indexer()
         self.embedder = embedder
         self.reranker = reranker
+        self.query_transformer = query_transformer
 
     def search(
         self,
         query: str,
         collection_names: List[str] = None,
         top_k: int = 5,
-        section_filter: Optional[List[str]] = None
+        section_filter: Optional[List[str]] = None,
+        use_decomposition: bool = False,
+        use_hyde: bool = False
     ) -> Dict[str, Any]:
         """
         Executes hybrid search across specified collections.
+        Supports:
+        - Sub-Query Decomposition for complex multi-part queries
+        - HyDE (Hypothetical Document Embeddings) for bridging vocabulary gaps
         1. Dense Vector Search (top 20)
         2. Sparse BM25 Search (top 20)
         3. Reciprocal Rank Fusion (RRF)
@@ -43,95 +50,106 @@ class HybridSearcher:
         5. Token Budget Context Packaging
         """
         cols = collection_names or ["paper_chunks", "paper_cards", "code", "errors"]
-        all_candidates = []
 
-        # 1. Fetch documents for BM25 and Chroma
-        for col_name in cols:
-            if col_name not in self.indexer.collections:
-                continue
-            col = self.indexer.collections[col_name]
-            count = col.count()
-            if count == 0:
-                continue
+        # Determine sub-queries and hypothetical passage
+        sub_queries = [query]
+        if use_decomposition:
+            sub_queries = self.query_transformer.decompose(query)
 
-            # Query vector store
-            query_emb = self.embedder.embed_query(query)
-            n_fetch = min(20, count)
-            
-            # Apply section filter if provided (for reverse-RAG / challenge mode)
-            where_filter = None
-            if section_filter and col_name == "paper_chunks":
-                where_filter = {"section_name": {"$in": section_filter}}
+        hyde_passage = None
+        if use_hyde:
+            hyde_passage = self.query_transformer.generate_hyde(query)
 
-            try:
-                vector_results = col.query(
-                    query_texts=[query],
-                    n_results=n_fetch,
-                    where=where_filter
-                )
-            except Exception:
-                # If filter produces 0 matches, query without filter
-                vector_results = col.query(
-                    query_texts=[query],
-                    n_results=n_fetch
-                )
+        master_candidates: Dict[str, Dict[str, Any]] = {}
 
+        for sq in sub_queries:
+            # Query vector text is either the HyDE passage or the sub-query
+            dense_query_text = hyde_passage if (use_hyde and hyde_passage) else sq
 
-            v_ids = vector_results.get("ids", [[]])[0]
-            v_docs = vector_results.get("documents", [[]])[0]
-            v_metas = vector_results.get("metadatas", [[]])[0]
+            for col_name in cols:
+                if col_name not in self.indexer.collections:
+                    continue
+                col = self.indexer.collections[col_name]
+                count = col.count()
+                if count == 0:
+                    continue
 
-            # Build candidate list with initial vector ranks
-            col_candidates = {}
-            for rank, cid in enumerate(v_ids):
-                col_candidates[cid] = {
-                    "id": cid,
-                    "content": v_docs[rank],
-                    "metadata": v_metas[rank] if rank < len(v_metas) else {},
-                    "collection": col_name,
-                    "vector_rank": rank + 1,
-                    "bm25_rank": 999
-                }
+                n_fetch = min(20, count)
 
-            # 2. Sparse BM25 Search over the same collection
-            all_data = col.get()
-            all_ids = all_data.get("ids", [])
-            all_docs = all_data.get("documents", [])
-            all_metas = all_data.get("metadatas", [])
+                # 1. Dense Vector Query
+                where_filter = None
+                if section_filter and col_name == "paper_chunks":
+                    where_filter = {"section_name": {"$in": section_filter}}
 
-            if all_docs:
-                tokenized_corpus = [doc.lower().split() for doc in all_docs]
-                bm25 = BM25Okapi(tokenized_corpus)
-                tokenized_query = query.lower().split()
-                bm25_scores = bm25.get_scores(tokenized_query)
+                try:
+                    vector_results = col.query(
+                        query_texts=[dense_query_text],
+                        n_results=n_fetch,
+                        where=where_filter
+                    )
+                except Exception:
+                    vector_results = col.query(
+                        query_texts=[dense_query_text],
+                        n_results=n_fetch
+                    )
 
-                # Get top N by BM25 score
-                bm25_ranked_indices = sorted(range(len(bm25_scores)), key=lambda i: bm25_scores[i], reverse=True)[:n_fetch]
+                v_ids = vector_results.get("ids", [[]])[0]
+                v_docs = vector_results.get("documents", [[]])[0]
+                v_metas = vector_results.get("metadatas", [[]])[0]
 
-                for rank, idx in enumerate(bm25_ranked_indices):
-                    cid = all_ids[idx]
-                    if cid in col_candidates:
-                        col_candidates[cid]["bm25_rank"] = rank + 1
+                col_candidates = {}
+                for rank, cid in enumerate(v_ids):
+                    col_candidates[cid] = {
+                        "id": cid,
+                        "content": v_docs[rank],
+                        "metadata": v_metas[rank] if rank < len(v_metas) else {},
+                        "collection": col_name,
+                        "vector_rank": rank + 1,
+                        "bm25_rank": 999
+                    }
+
+                # 2. Sparse BM25 Query
+                all_data = col.get()
+                all_ids = all_data.get("ids", [])
+                all_docs = all_data.get("documents", [])
+                all_metas = all_data.get("metadatas", [])
+
+                if all_docs:
+                    tokenized_corpus = [doc.lower().split() for doc in all_docs]
+                    bm25 = BM25Okapi(tokenized_corpus)
+                    tokenized_query = sq.lower().split()
+                    bm25_scores = bm25.get_scores(tokenized_query)
+
+                    bm25_ranked_indices = sorted(range(len(bm25_scores)), key=lambda i: bm25_scores[i], reverse=True)[:n_fetch]
+
+                    for rank, idx in enumerate(bm25_ranked_indices):
+                        cid = all_ids[idx]
+                        if cid in col_candidates:
+                            col_candidates[cid]["bm25_rank"] = rank + 1
+                        else:
+                            col_candidates[cid] = {
+                                "id": cid,
+                                "content": all_docs[idx],
+                                "metadata": all_metas[idx] if idx < len(all_metas) else {},
+                                "collection": col_name,
+                                "vector_rank": 999,
+                                "bm25_rank": rank + 1
+                            }
+
+                # 3. Accumulate Reciprocal Rank Fusion (RRF) Scores across sub-queries
+                for cid, c in col_candidates.items():
+                    rrf_contrib = (1.0 / (60.0 + c["vector_rank"])) + (1.0 / (60.0 + c["bm25_rank"]))
+                    key = f"{col_name}:{cid}"
+                    if key in master_candidates:
+                        master_candidates[key]["rrf_score"] += rrf_contrib
                     else:
-                        col_candidates[cid] = {
-                            "id": cid,
-                            "content": all_docs[idx],
-                            "metadata": all_metas[idx] if idx < len(all_metas) else {},
-                            "collection": col_name,
-                            "vector_rank": 999,
-                            "bm25_rank": rank + 1
-                        }
+                        c["rrf_score"] = rrf_contrib
+                        master_candidates[key] = c
 
-            # 3. Reciprocal Rank Fusion (RRF)
-            # RRF Score = 1 / (60 + vector_rank) + 1 / (60 + bm25_rank)
-            for c in col_candidates.values():
-                rrf_score = (1.0 / (60.0 + c["vector_rank"])) + (1.0 / (60.0 + c["bm25_rank"]))
-                c["rrf_score"] = rrf_score
-                all_candidates.append(c)
-
-        # Sort combined candidates by RRF score
+        # Rank all accumulated candidates
+        all_candidates = list(master_candidates.values())
         all_candidates.sort(key=lambda x: x["rrf_score"], reverse=True)
-        top_candidates = all_candidates[:20]
+        top_candidates = all_candidates[:25]
 
         # 4. Cross-Encoder Reranking
         reranked, has_sufficient_evidence = self.reranker.rerank(query, top_candidates, top_n=top_k)
@@ -144,6 +162,8 @@ class HybridSearcher:
 
         return {
             "query": query,
+            "sub_queries": sub_queries,
+            "hyde_passage": hyde_passage,
             "results": reranked,
             "has_sufficient_evidence": has_sufficient_evidence,
             "packed_context": packed_chunks,
