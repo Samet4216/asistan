@@ -42,6 +42,14 @@ class PaperParser:
             main_tex = max(tex_files, key=lambda f: f.stat().st_size)
 
         if main_tex:
+            try:
+                tex_raw = main_tex.read_text(encoding="utf-8", errors="ignore")
+                if "includepdf" in tex_raw or len(tex_raw) < 500:
+                    pdf_files = list(paper_folder.glob("*.pdf"))
+                    if pdf_files:
+                        return self._parse_pdf(pdf_files[0], arxiv_id, default_title=title, year=year)
+            except Exception:
+                pass
             return self._parse_latex(main_tex, arxiv_id, default_title=title, year=year)
 
         # Fallback: check for PDF
@@ -61,6 +69,28 @@ class PaperParser:
             stripped = re.sub(r"(?<!\\)%.*$", "", line)
             clean_lines.append(stripped)
         text = "\n".join(clean_lines)
+
+        # Recursively expand \input{...} and \include{...}
+        base_dir = tex_path.parent
+        def replace_input(match):
+            rel_file = match.group(1).strip()
+            if not rel_file.endswith(".tex"):
+                rel_file += ".tex"
+            sub_path = base_dir / rel_file
+            if sub_path.exists():
+                try:
+                    sub_raw = sub_path.read_text(encoding="utf-8", errors="replace")
+                    clean_sub = [re.sub(r"(?<!\\)%.*$", "", l) for l in sub_raw.splitlines()]
+                    return "\n".join(clean_sub)
+                except Exception:
+                    return ""
+            return ""
+
+        for _ in range(3):
+            if "\\input{" in text or "\\include{" in text:
+                text = re.sub(r"\\(?:input|include)\{([^}]+)\}", replace_input, text)
+            else:
+                break
 
         # Extract title
         title_match = re.search(r"\\title\{([^}]+)\}", text)

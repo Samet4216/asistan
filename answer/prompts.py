@@ -1,7 +1,7 @@
 """
-Prompts Module for Structured Answer Pipeline (Faz 7).
+Prompts Module for Structured Answer Pipeline (Faz 7 & Web UI).
 Incorporates personal learning style from Vault/00_Profile/Style.md,
-enforces strict source attribution, and demands honest abstention when evidence is lacking.
+enforces strict source attribution, beautiful LaTeX math, and clean textbook formatting.
 """
 
 from pathlib import Path
@@ -29,11 +29,15 @@ SYSTEM_PROMPT = """You are a rigorous, academic Deep Learning Lab Assistant and 
 Your role is to assist with neural network architecture design, training telemetry autopsies, and paper synthesis.
 
 CORE OPERATIONAL RULES:
-1. CITATION FIRST: You must extract verbatim quotes from the provided context before generating your answer.
-2. NO HALLUCINATIONS: If the context does not contain enough evidence to answer with certainty, set "has_evidence": false, and state: "Insufficient evidence in local knowledge base to verify this."
-3. TECHNICAL RIGOR: Preserve mathematical equations, layer configurations, and tensor dimensions.
-4. LANGUAGE: Answer strictly in technical English. Domain terms must stay in original English.
-5. FORMULA READABILITY: Write mathematical equations and tensor dimensions in clear, readable notation (e.g. C × H × W, z_c^h, f = δ(...), σ(...)). Avoid broken escaped macros like \\text{...} or raw \\times that corrupt inside JSON strings.
+1. CITATION FIRST: Reference the indexed papers and equations from the provided context.
+2. NO HALLUCINATIONS: If the context does not contain enough evidence to answer with certainty, state: "Insufficient evidence in local knowledge base to verify this."
+3. FORMATTING & READABILITY: Output cleanly structured, beautiful GitHub-flavored Markdown:
+   - Use clear markdown headers (e.g. ### 1. Core Intuition, ### 2. Mathematical Formulation, ### 3. Tensor Shapes).
+   - Use generous spacing and distinct paragraphs for comfortable reading.
+   - For all formulas, write standard LaTeX enclosed in $$ ... $$ for display equations, or $ ... $ for inline variables.
+   - NEVER output raw JSON or curly brace schemas unless the user explicitly commands you to output JSON.
+4. TECHNICAL RIGOR: Preserve exact mathematical formulations, layer configurations, and tensor dimensions.
+5. DOMAIN TERMS: Keep domain terms in original technical English (e.g. multi-head attention, bottleneck, patch embedding).
 """
 
 
@@ -43,7 +47,8 @@ def build_answer_prompt(
     telemetry_context: str = "",
     git_diff: str = "",
     error_context: str = "",
-    deep_dive: bool = False
+    deep_dive: bool = False,
+    json_mode: bool = False
 ) -> list:
     """Constructs prompt messages for Ollama chat API."""
     style_text = get_profile_style()
@@ -60,22 +65,31 @@ def build_answer_prompt(
 
     full_evidence = "\n\n".join(evidence_blocks) if evidence_blocks else "No relevant local sources found."
 
-    if deep_dive:
+    if json_mode:
         instructions = (
-            "Provide an exhaustive, textbook-grade, highly structured pedagogical tutorial. "
-            "Teach this concept thoroughly from first principles. "
-            "Use clear Markdown formatting with generous line spacing:\n"
-            "1. Core Intuition & The Fundamental Problem it Solves.\n"
-            "2. Mathematical Equations (write equations clearly on their own lines, e.g. z_c^h(h) = 1/W ∑ x_c(h, i)).\n"
-            "3. Tensor Transformation Walkthrough (trace batch, channel, height, width at each step).\n"
-            "4. PyTorch Code Implementation (complete, self-contained nn.Module snippet).\n"
-            "5. Engineering Bottlenecks & Hardware Limits on RTX 4050 6GB GPU."
+            "Fill the required JSON schema. First extract verbatim quotes, then synthesize your answer "
+            "thoroughly grounded in those quotes."
+        )
+    elif deep_dive:
+        instructions = (
+            "Provide an exhaustive, textbook-grade pedagogical tutorial. Teach this concept thoroughly from first principles. "
+            "Use clear Markdown formatting with generous line spacing and sections:\n"
+            "### 1. Core Intuition & The Fundamental Problem it Solves\n"
+            "### 2. Mathematical Formulation (write display equations in $$ ... $$ on their own lines)\n"
+            "### 3. Tensor Transformation Walkthrough (trace batch, channel, height, width at each step)\n"
+            "### 4. PyTorch Code Implementation (complete, clean nn.Module snippet)\n"
+            "### 5. Engineering Gotchas & Hardware Limits on RTX 4050 6GB GPU.\n"
+            "Do NOT output raw JSON format. Write in clear academic Markdown."
         )
     else:
         instructions = (
-            "Fill the required JSON schema. First extract verbatim quotes, then synthesize your answer "
-            "thoroughly grounded in those quotes. Ensure mathematical formulations and tensor dimensions "
-            "are completely spelled out and formatted with clean, readable spacing."
+            "Provide a well-structured, clear academic answer in GitHub-flavored Markdown. "
+            "Organize your explanation with clear sections:\n"
+            "### 1. Intuition & Architectural Role\n"
+            "### 2. Mathematical Equations (write display equations inside $$ ... $$ on separate lines)\n"
+            "### 3. Tensor Dimensions & Dataflow (e.g., shapes like [B, N, C] or [B, C, H, W])\n"
+            "### 4. Summary & Key Takeaways\n"
+            "Do NOT output raw JSON format. Write in clean, formatted Markdown."
         )
 
     user_message = (

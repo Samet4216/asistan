@@ -56,6 +56,42 @@ class LLMClient:
         except requests.exceptions.RequestException as e:
             return f"[LLM ERROR]: Failed to communicate with Ollama at {self.chat_endpoint}: {e}"
 
+    def stream_generate(
+        self,
+        messages: List[Dict[str, str]],
+        max_tokens: int = 1500,
+        temperature: float = None
+    ):
+        """Streams generation token by token from Ollama /api/chat."""
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "stream": True,
+            "keep_alive": config.KEEP_ALIVE,
+            "options": {
+                "num_ctx": config.NUM_CTX,
+                "temperature": temperature if temperature is not None else config.TEMPERATURE,
+                "num_predict": max_tokens
+            }
+        }
+        try:
+            response = requests.post(
+                self.chat_endpoint,
+                headers={"Content-Type": "application/json"},
+                json=payload,
+                stream=True,
+                timeout=120
+            )
+            response.raise_for_status()
+            for line in response.iter_lines():
+                if line:
+                    data = json.loads(line.decode("utf-8"))
+                    content = data.get("message", {}).get("content", "")
+                    if content:
+                        yield content
+        except Exception as e:
+            yield f"\n[LLM STREAM ERROR]: {e}"
+
     def unload(self):
         """Immediately unloads model weights from VRAM to reduce idle heat."""
         payload = {
@@ -76,6 +112,11 @@ client = LLMClient()
 def generate(messages: List[Dict[str, str]], schema: Optional[Dict[str, Any]] = None, max_tokens: int = 800) -> str:
     """Convenience functional interface."""
     return client.generate(messages=messages, schema=schema, max_tokens=max_tokens)
+
+
+def stream_generate(messages: List[Dict[str, str]], max_tokens: int = 1500, temperature: float = None):
+    """Convenience streaming functional interface."""
+    return client.stream_generate(messages=messages, max_tokens=max_tokens, temperature=temperature)
 
 
 def unload():

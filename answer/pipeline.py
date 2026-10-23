@@ -143,7 +143,8 @@ class AnswerPipeline:
             telemetry_context=safe_packed.get("telemetry", ""),
             git_diff=safe_packed.get("git_diff", ""),
             error_context=safe_packed.get("error_history", ""),
-            deep_dive=False
+            deep_dive=False,
+            json_mode=True
         )
 
         raw_output = llm.generate(messages, schema=ANSWER_SCHEMA, max_tokens=config.TOKEN_BUDGET.get("max_answer", 1500))

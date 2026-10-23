@@ -1,7 +1,7 @@
 """
 Local Deep Learning Lab Assistant — Modern Web Chat Interface (Streamlit).
 Provides a ChatGPT/Open-WebUI-grade browser interface with KaTeX math rendering,
-syntax-highlighted copyable code blocks, live RTX 4050 thermals, and Obsidian memory integration.
+real-time streaming generation, live RTX 4050 & CPU thermals, and Obsidian memory integration.
 """
 
 import sys
@@ -13,10 +13,16 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import streamlit as st
+import psutil
 import config
-from answer.pipeline import pipeline
+import llm
+import budget
+from retrieval.search import searcher
+from retrieval.git_context import get_git_diff
+from answer.prompts import build_answer_prompt
 from answer.challenge import challenger
 from memory.approval import approval_manager
+from memory.errors import error_manager
 import lang_guard
 
 
@@ -28,7 +34,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom Styling for ChatGPT-like Typography
+# Custom Styling for ChatGPT/Ollama-like Typography
 st.markdown("""
 <style>
     /* Dark comfortable font & line height */
@@ -49,7 +55,13 @@ st.markdown("""
     .katex-display {
         margin: 1.2em 0 !important;
         padding: 0.8em;
-        background: rgba(255, 255, 255, 0.03);
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 8px;
+        overflow-x: auto;
+    }
+    .stMetric {
+        background-color: rgba(255, 255, 255, 0.03);
+        padding: 8px 12px;
         border-radius: 8px;
     }
 </style>
@@ -57,6 +69,7 @@ st.markdown("""
 
 
 def get_gpu_status():
+    """Queries NVIDIA SMI for real-time RTX 4050 metrics."""
     try:
         cmd = [
             "nvidia-smi",
@@ -83,26 +96,43 @@ def get_gpu_status():
 
 # --- SIDEBAR CONTROLS ---
 with st.sidebar:
-    st.title("🔬 Lab Hardware & Memory")
+    st.title("🔬 Donanım & Bellek")
     
     # GPU Monitor
     gpu = get_gpu_status()
     if gpu.get("available"):
-        st.subheader("RTX 4050 Laptop GPU")
+        st.markdown("**NVIDIA RTX 4050 Laptop (GPU)**")
         col1, col2 = st.columns(2)
-        col1.metric("Temperature", f"{gpu['temp']} °C")
-        col2.metric("GPU Load", f"{gpu['util']} %")
+        col1.metric("GPU Sıcaklık", f"{gpu['temp']} °C")
+        col2.metric("GPU Yükü", f"{gpu['util']} %")
         vram_pct = int((gpu['used'] / gpu['total']) * 100)
         st.progress(vram_pct, text=f"VRAM: {gpu['used']} / {gpu['total']} MiB")
     else:
-        st.info("GPU Telemetry Idle")
+        st.info("GPU Telemetrisi Beklemede")
+
+    # CPU & RAM Monitor
+    cpu_percent = psutil.cpu_percent(interval=None)
+    ram = psutil.virtual_memory()
+    st.markdown("**İşlemci (CPU) & Sistem Belleği**")
+    ccol1, ccol2 = st.columns(2)
+    ccol1.metric("CPU Yükü", f"{cpu_percent} %")
+    ccol2.metric("RAM", f"{ram.percent} %")
+    st.progress(ram.percent / 100.0, text=f"RAM: {ram.used // (1024**2)} / {ram.total // (1024**2)} MiB")
+
+    st.caption("ℹ️ *Laptop fanları hem CPU hem de GPU ısısına göre hızlanır. Gösterilen sıcaklık NVIDIA GPU çipinin sıcaklığıdır.*")
+
+    # Unload Button
+    if st.button("❄️ VRAM'i Boşalt (Modeli Kapat)", help="Modeli VRAM'den siler, laptop sıcaklığını ve güç tüketimini anında düşürür."):
+        llm.unload()
+        st.success("Model VRAM'den kaldırıldı, GPU boşa alındı.")
+        st.rerun()
 
     st.divider()
 
-    st.subheader("⚙️ Query Mode")
+    st.subheader("⚙️ Yanıt Modu")
     mode = st.radio(
-        "Select Response Depth:",
-        ["Standard Academic Q&A", "🎓 Deep-Dive Tutorial (/explain)", "🎯 Devil's Advocate (/challenge)"],
+        "Ayrıntı Seviyesi Seçin:",
+        ["Akademik Soru-Cevap (Hızlı & Kaynaklı)", "🎓 Detaylı Konu Anlatımı (/explain)", "🎯 Devil's Advocate (/challenge)"],
         index=0
     )
 
@@ -110,30 +140,30 @@ with st.sidebar:
 
     # Obsidian Pending Drafts
     drafts = approval_manager.list_drafts()
-    st.subheader(f"📝 Obsidian Drafts ({len(drafts)})")
+    st.subheader(f"📝 Obsidian Taslakları ({len(drafts)})")
     if drafts:
         for d in drafts[:5]:
             with st.expander(f"{d['title'][:25]}"):
-                st.caption(f"Category: {d['category']} | Created: {d['created_at'][:16]}")
+                st.caption(f"Kategori: {d['category']} | Tarih: {d['created_at'][:16]}")
                 st.write(d["preview"])
-                if st.button("✓ Approve Note", key=f"app_{d['id']}"):
+                if st.button("✓ Notu Onayla & Arşive Ekle", key=f"app_{d['id']}"):
                     approval_manager.approve_draft(d["id"])
-                    st.success("Moved to permanent Vault & indexed!")
+                    st.success("Kalıcı Vault'a taşındı ve indekslendi!")
                     st.rerun()
     else:
-        st.caption("No pending drafts in Vault/Drafts/")
+        st.caption("Bekleyen taslak yok (Vault/Drafts/)")
 
 
 # --- MAIN CHAT AREA ---
 st.title("Local Deep Learning Lab Assistant")
-st.caption("Hardware: RTX 4050 6GB | Engine: Ollama qwen2.5:7b | Embeddings: BAAI/bge-base-en-v1.5 (CPU) | Storage: Obsidian Vault")
+st.caption("Donanım: RTX 4050 6GB | Motor: Ollama qwen2.5:7b | Vektör Veritabanı: ChromaDB | Bellek: Obsidian Vault")
 
 # Initialize session messages
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
             "role": "assistant",
-            "content": "Hello! I am your local Deep Learning Lab Assistant. Ask technical questions about our indexed papers (Transformer, ResNet, ViT, Coordinate Attention, Swin), request a deep-dive tutorial, or stress-test your ideas with Devil's Advocate mode."
+            "content": "Merhaba! Ben yerel Derin Öğrenme Laboratuvar Asistanınızım. İndekslenmiş makalelerimiz (Transformer, ResNet, ViT, Coordinate Attention, Swin) hakkında teknik sorular sorabilir, kapsamlı konu anlatımı isteyebilir veya yeni fikirlerinizi Devil's Advocate modunda test edebilirsiniz."
         }
     ]
 
@@ -143,7 +173,7 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 # User input box
-if prompt := st.chat_input("Ask a question, propose a hypothesis, or enter a topic..."):
+if prompt := st.chat_input("Bir soru sorun, hipotez belirtin veya konu anlatımı isteyin..."):
     # Render user query
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -151,45 +181,66 @@ if prompt := st.chat_input("Ask a question, propose a hypothesis, or enter a top
 
     # Generate Response
     with st.chat_message("assistant"):
-        with st.spinner("Retrieving literature, checking past errors, and synthesizing..."):
-            if "Devil's Advocate" in mode or prompt.startswith("/challenge"):
+        # Check Mode
+        if "Devil's Advocate" in mode or prompt.startswith("/challenge"):
+            with st.spinner("Hipotez literatürle ve RTX 4050 donanım sınırlarıyla test ediliyor..."):
                 clean_q = prompt.replace("/challenge", "").strip()
                 res = challenger.challenge_hypothesis(clean_q)
                 
                 verdict = res.get("verdict", "HIGH_RISK")
                 v_color = "🔴" if verdict == "REJECT" else ("🟡" if verdict == "HIGH_RISK" else "🟢")
                 
-                output = f"### {v_color} Verdict: **{verdict}**\n\n"
-                output += f"**Executive Summary:** {res.get('summary')}\n\n"
-                output += "#### Critical Vulnerabilities & Literature Conflicts:\n"
+                output = f"### {v_color} Karar: **{verdict}**\n\n"
+                output += f"**Yönetici Özeti:** {res.get('summary')}\n\n"
+                output += "#### Kritik Zayıf Noktalar & Literatür Çelişkileri:\n"
                 for c in res.get("criticisms", []):
                     output += f"- **{c.get('vulnerability')}:** {c.get('evidence_or_rationale')}\n"
-                output += f"\n#### ⚠️ Hardware & VRAM Bottlenecks (RTX 4050 6GB):\n{res.get('hardware_and_vram_risk')}\n\n"
-                output += f"#### 🧪 Minimal Disproving Experiment:\n{res.get('minimal_disproving_experiment')}"
+                output += f"\n#### ⚠️ Donanım & VRAM Darboğazı (RTX 4050 6GB):\n{res.get('hardware_and_vram_risk')}\n\n"
+                output += f"#### 🧪 Hipotezi Çürütecek Asgari Deney:\n{res.get('minimal_disproving_experiment')}"
                 
-            elif "Deep-Dive" in mode or prompt.startswith("/explain"):
-                clean_q = prompt.replace("/explain", "").strip()
-                res = pipeline.run(clean_q, top_k=config.RETRIEVAL_TOP_K, deep_dive=True)
-                output = res.get("answer", "")
-            else:
-                res = pipeline.run(prompt, top_k=config.RETRIEVAL_TOP_K, deep_dive=False)
-                output = ""
-                
-                # Render quotes if verified
-                quotes = res.get("quotes", [])
-                if quotes:
-                    output += "> **📚 Grounded Citations & Verbatim Quotes:**\n"
-                    for q in quotes:
-                        output += f"> - *\"{q.get('text')}\"* — `[{q.get('source')}]`\n"
-                    output += "\n---\n\n"
-                
-                output += res.get("answer", "")
-                
-                takeaways = res.get("key_takeaways", [])
-                if takeaways:
-                    output += "\n\n#### 💡 Key Takeaways:\n"
-                    for t in takeaways:
-                        output += f"- {t}\n"
+                st.markdown(output)
+                st.session_state.messages.append({"role": "assistant", "content": output})
 
-            st.markdown(output)
-            st.session_state.messages.append({"role": "assistant", "content": output})
+        else:
+            is_deep_dive = "Detaylı Konu Anlatımı" in mode or prompt.startswith("/explain")
+            clean_q = prompt.replace("/explain", "").strip()
+
+            # Step 1: Hybrid Retrieval
+            with st.status("Literatür ve yerel hafıza taranıyor...", expanded=False) as status:
+                search_res = searcher.search(clean_q, top_k=config.RETRIEVAL_TOP_K)
+                retrieved_context = search_res.get("packed_context", "")
+                has_sufficient_evidence = search_res.get("has_sufficient_evidence", False)
+                error_evidence = error_manager.get_relevant_errors(clean_q)
+                
+                budget_parts = {
+                    "error_history": error_evidence,
+                    "paper_chunks": retrieved_context
+                }
+                packed_report = budget.pack_context(budget_parts)
+                safe_packed = packed_report["packed"]
+                status.update(label="Literatür tarandı, yanıt gerçek zamanlı üretiliyor...", state="complete")
+
+            # Display source citations box if available
+            sources = search_res.get("results", [])
+            if sources:
+                with st.expander(f"📚 Referans Alınan Makale Parçaları ({len(sources)} Bölüm)"):
+                    for s in sources:
+                        st.markdown(f"- **{s.get('id')}** (Skor: `{s.get('score', 0):.2f}`) — *{s.get('title')}*")
+
+            # Step 2: Build prompt
+            messages = build_answer_prompt(
+                query=clean_q,
+                packaged_context=safe_packed.get("paper_chunks", ""),
+                telemetry_context="",
+                git_diff="",
+                error_context=safe_packed.get("error_history", ""),
+                deep_dive=is_deep_dive
+            )
+
+            # Step 3: Stream output token-by-token
+            stream = llm.stream_generate(
+                messages,
+                max_tokens=config.TOKEN_BUDGET.get("max_answer", 1200)
+            )
+            full_response = st.write_stream(stream)
+            st.session_state.messages.append({"role": "assistant", "content": full_response})

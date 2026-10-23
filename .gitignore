@@ -59,15 +59,62 @@ ENV/
 env.bak/
 venv.bak/
 
-# Large model binaries
+# Large model binaries and checkpoints
 *.pth
 *.pt
 *.bin
 *.weights
 *.onnx
+*.safetensors
+*.gguf
+*.ggml
+*.ckpt
+*.tflite
 
-# Evaluation logs (generated during test runs)
-eval/logs/eval_*.json
+# Local AI Vector Store & Embeddings (ChromaDB, SQLite, etc.)
+chroma_db/
+chroma_data/
+**/chroma_db/
+**/chroma_data/
+*.sqlite3
+*.sqlite
+*.db
+file_hashes.json
+
+# Vector Indices & Array Dumps
+*.faiss
+*.index
+*.hnsw
+*.parquet
+*.arrow
+*.npy
+*.npz
+
+# Model & Embeddings Caches (Hugging Face, Sentence Transformers, PyTorch)
+.cache/
+hf_cache/
+huggingface/
+transformers_cache/
+torch_cache/
+sentence_transformers/
+*.pkl
+*.pickle
+*.joblib
+bm25_*.json
+
+# Local AI Session State, Memory & Evaluation Logs
+state/
+eval/logs/
+telemetry/
+*.log
+
+# Downloaded archives and temporary datasets
+*.tar.gz
+*.tgz
+*.gz
+*.zip
+*.rar
+data/papers/*/source.tar.gz
 
 # Editors and IDEs
 .vscode/
@@ -81,6 +128,8 @@ eval/logs/eval_*.json
 Thumbs.db
 desktop.ini
 
-# Obsidian cache
-.obsidian/workspace*
-.obsidian/cache*
+# Obsidian cache & local workspace layout
+**/.obsidian/workspace*
+**/.obsidian/cache*
+**/.obsidian/indexed*
+
