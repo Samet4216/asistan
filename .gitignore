@@ -133,3 +133,6 @@ desktop.ini
 **/.obsidian/cache*
 **/.obsidian/indexed*
 
+# User uploaded temporary docs
+data/uploaded_docs/
+

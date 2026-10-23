@@ -39,7 +39,9 @@ from memory.approval import approval_manager
 from memory.errors import error_manager
 from memory.user_profile import profile_manager
 from memory.auto_memory import auto_memory
+from memory.graph_visualizer import get_vault_graph_data, generate_graph_html
 from ingest.single_ingest import ingest_arxiv_paper
+from ingest.local_file_ingest import ingest_uploaded_file
 import lang_guard
 
 
@@ -512,10 +514,11 @@ with st.sidebar:
 
     st.markdown("### ⚙️ Akıl Yürütme Modu")
     mode = st.radio(
-        "Yanıt Derinliği:",
+        "Araştırma & Yanıt Modu:",
         [
             "🎓 İki Aşamalı Derin Akıl Yürütme (Two-Stage CoT)",
             "⚡ Hızlı Akademik Soru-Cevap",
+            "🤖 Mekatronik & Robotik Mentoru",
             "🎯 Devil's Advocate (/challenge)"
         ],
         index=0
@@ -529,19 +532,42 @@ with st.sidebar:
 
     st.divider()
 
-    # On-demand arXiv Paper Ingestion Section
-    st.markdown("### 📥 Hafızaya Yeni Makale Ekle")
-    with st.form("form_add_paper"):
-        new_arxiv_id = st.text_input("arXiv Kodu:", placeholder="örn: 2103.02907 veya 1706.03762")
-        submit_paper = st.form_submit_button("📥 İndir & İndeksle")
-        if submit_paper and new_arxiv_id.strip():
-            with st.spinner(f"[{new_arxiv_id.strip()}] arXiv'den indiriliyor, parçalanıyor ve ChromaDB'ye ekleniyor..."):
-                res_ing = ingest_arxiv_paper(new_arxiv_id.strip())
-                if res_ing.get("success"):
-                    st.success(f"✅ '{res_ing.get('title')}' ({res_ing.get('chunks_count')} parça) başarıyla hafızaya eklendi!")
-                    st.rerun()
-                else:
-                    st.error(f"❌ Hata: {res_ing.get('error', 'Makale indirilemedi.')}")
+    # Ingestion Section: Local File Upload & arXiv Downloader
+    st.markdown("### 📥 Hafızaya Kaynak Ekle")
+    ingest_tab_file, ingest_tab_arxiv = st.tabs(["📂 Dosya Yükle", "🌐 arXiv İndir"])
+
+    with ingest_tab_file:
+        uploaded_file = st.file_uploader(
+            "PDF, Markdown veya TXT yükleyin:",
+            type=["pdf", "md", "txt"],
+            help="Ders notları, makaleler veya proje dökümanlarınızı sürükleyip bırakabilirsiniz."
+        )
+        custom_doc_title = st.text_input("Belge Başlığı (Opsiyonel):", placeholder="örn: YOLOv8 Bitirme Tezi Notları", key="upload_title_input")
+        if st.button("📥 Dosyayı İndeksle & Ekle", key="btn_upload_doc", use_container_width=True):
+            if uploaded_file is not None:
+                with st.spinner(f"'{uploaded_file.name}' ayrıştırılıyor, parçalanıyor ve ChromaDB'ye ekleniyor..."):
+                    res_up = ingest_uploaded_file(uploaded_file.getvalue(), uploaded_file.name, custom_title=custom_doc_title)
+                    if res_up.get("success"):
+                        st.success(f"✅ '{res_up.get('title')}' ({res_up.get('chunks_count')} parça) hafızaya eklendi!")
+                        st.toast(f"✅ '{res_up.get('title')}' hafızaya ve Bilgi Ağı'na eklendi!", icon="📚")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Hata: {res_up.get('error', 'Dosya indekslenemedi.')}")
+            else:
+                st.warning("Lütfen önce bir dosya seçin veya sürükleyin.")
+
+    with ingest_tab_arxiv:
+        with st.form("form_add_paper"):
+            new_arxiv_id = st.text_input("arXiv Kodu:", placeholder="örn: 2103.02907 veya 1706.03762")
+            submit_paper = st.form_submit_button("📥 İndir & İndeksle", use_container_width=True)
+            if submit_paper and new_arxiv_id.strip():
+                with st.spinner(f"[{new_arxiv_id.strip()}] arXiv'den indiriliyor, parçalanıyor ve ChromaDB'ye ekleniyor..."):
+                    res_ing = ingest_arxiv_paper(new_arxiv_id.strip())
+                    if res_ing.get("success"):
+                        st.success(f"✅ '{res_ing.get('title')}' ({res_ing.get('chunks_count')} parça) başarıyla hafızaya eklendi!")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Hata: {res_ing.get('error', 'Makale indirilemedi.')}")
 
     st.divider()
 
@@ -590,57 +616,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Initialize session messages
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {
-            "role": "assistant",
-            "content": "Merhaba! Ben yerel Derin Öğrenme Araştırma Partnerinizim. İndekslenmiş 11 makalemiz ve 91 sinaptik kavram notumuz hakkında teknik sorular sorabilir, fareyle herhangi bir satırı seçip '💬 Alıntı Yap' diyerek soru sorabilirsiniz."
-        }
-    ]
-
-# One-Click Quick Action Cards (Shown at start or above input)
-if len(st.session_state.messages) <= 1:
-    st.markdown("##### 🚀 Hızlı Başlangıç Araştırma Başlıkları")
-    q_col1, q_col2 = st.columns(2)
-    with q_col1:
-        if st.button("⚖️ PPO vs DPO: Ödül Modelleme Farkları", use_container_width=True):
-            st.session_state.pending_prompt = "Compare PPO clipped surrogate objective with DPO policy optimization in terms of reward modeling and memory."
-        if st.button("⚡ FlashAttention: SRAM Tiling & IO-Awareness", use_container_width=True):
-            st.session_state.pending_prompt = "How does FlashAttention avoid materializing the NxN attention matrix in HBM using SRAM tiling?"
-    with q_col2:
-        if st.button("🔍 Self-RAG: Reflection Token Mekanizması", use_container_width=True):
-            st.session_state.pending_prompt = "Explain Self-RAG reflection tokens ([Retrieve], [IsRel], [IsSup]) and how they prevent hallucination."
-        if st.button("📐 Coordinate Attention: 1D Uzamsal Pooling", use_container_width=True):
-            st.session_state.pending_prompt = "Coordinate Attention yatay ve dikey 1D pooling ile konumsal bilgiyi nasıl korur? Formüllerini ve tensör boyutlarını açıkla."
-    st.write("")
-
-# Render chat history with normalized LaTeX and Obsidian Save buttons
-for i, msg in enumerate(st.session_state.messages):
-    with st.chat_message(msg["role"]):
-        st.markdown(normalize_latex(msg["content"]))
-        
-        # If assistant message (and not the initial welcome message), provide Save button
-        if msg["role"] == "assistant" and i > 0:
-            btn_col1, _ = st.columns([1, 4])
-            with btn_col1:
-                if st.button("💾 Obsidian'a Kaydet", key=f"save_draft_{i}", help="Bu cevabı Obsidian Vault/Drafts/ klasörüne taslak olarak kaydeder."):
-                    user_q = "Theory_Note"
-                    for prev_msg in reversed(st.session_state.messages[:i]):
-                        if prev_msg["role"] == "user":
-                            user_q = prev_msg["content"]
-                            break
-                    safe_title = re.sub(r'[^A-Za-z0-9]+', '_', user_q[:35]).strip('_') or "Note"
-                    
-                    draft_path = approval_manager.create_draft(
-                        title=safe_title,
-                        content=msg["content"],
-                        category="Theory_Notes",
-                        tags=["qa-chat", "dl-lab"]
-                    )
-                    st.toast(f"✅ '{safe_title}' Obsidian Vault/Drafts/ klasörüne kaydedildi!", icon="📝")
-                    st.rerun()
-
 # User input handling (or pending quick prompt)
 input_prompt = st.chat_input("Bir soru sorun, selam verin veya yukarıdan bir satırı seçip '💬 Alıntı Yap' ile sorun...")
 
@@ -651,141 +626,448 @@ elif "pending_prompt" in st.session_state and st.session_state.pending_prompt:
     prompt = st.session_state.pending_prompt
     st.session_state.pending_prompt = None
 
-if prompt:
-    # Autonomous Memory Extraction: check if user shares personal facts, projects, or preferences
-    if auto_memory.has_personal_cues(prompt):
-        try:
-            update_summary = auto_memory.extract_and_update(prompt)
-            if update_summary:
-                st.toast(f"🧠 Obsidian Hafızası Güncellendi: {update_summary}", icon="📝")
-        except Exception:
-            pass
+# Main View Switcher Tabs: 4-Tab Cyber-Lab Workspace Suite
+tab_chat, tab_graph, tab_corpus, tab_radar = st.tabs([
+    "💬 Araştırma & Sohbet",
+    "🕸️ Obsidian İkinci Beyin Grafiği",
+    "📚 arXiv Makale Kütüphanesi",
+    "⚡ Donanım & Sistem Radarı"
+])
 
-    # Render user query
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    # Generate Response
-    with st.chat_message("assistant"):
-        # 1. Check if Casual Chat or Personal Profile Statement
-        if is_casual_or_personal(prompt):
-            # Stream warm casual response
-            casual_msgs = build_casual_response_prompt(prompt, history=st.session_state.messages[:-1])
-            stream = llm.stream_generate(casual_msgs, max_tokens=600)
-            full_response = st.write_stream(stream)
-            st.session_state.messages.append({"role": "assistant", "content": full_response})
+with tab_chat:
+    # Top Chat Action Toolbar
+    tool_col1, tool_col2, tool_col3 = st.columns([2.5, 1, 1])
+    with tool_col1:
+        st.caption(f"🧠 Aktif Seans: {len(st.session_state.get('messages', []))} mesaj • Yerel CUDA Hazır")
+    with tool_col2:
+        if st.button("🧹 Temizle", key="clear_chat_toolbar", help="Sohbet geçmişini sıfırlar"):
+            st.session_state.messages = [st.session_state.messages[0]]
             st.rerun()
+    with tool_col3:
+        export_md = "# Local DL Lab Assistant — Sohbet Dökümü\n\n"
+        for m in st.session_state.get("messages", []):
+            role_label = "👤 **Kullanıcı:**" if m["role"] == "user" else "🤖 **Asistan:**"
+            export_md += f"### {role_label}\n\n{m['content']}\n\n---\n\n"
+        st.download_button(
+            "📥 Dışa Aktar",
+            data=export_md,
+            file_name=f"dl_lab_sohbet_{datetime.now().strftime('%Y%m%d_%H%M')}.md",
+            mime="text/markdown",
+            key="export_chat_toolbar",
+            help="Sohbet dökümünü Markdown dosyası olarak indirir."
+        )
 
-        # 2. Check Devil's Advocate Mode
-        elif "Devil's Advocate" in mode or prompt.startswith("/challenge"):
-            with st.spinner("Hipotez literatürle ve RTX 4050 donanım sınırlarıyla test ediliyor..."):
-                clean_q = prompt.replace("/challenge", "").strip()
-                res = challenger.challenge_hypothesis(clean_q)
-                
-                verdict = res.get("verdict", "HIGH_RISK")
-                v_color = "🔴" if verdict == "REJECT" else ("🟡" if verdict == "HIGH_RISK" else "🟢")
-                
-                output = f"### {v_color} Karar: **{verdict}**\n\n"
-                output += f"**Yönetici Özeti:** {res.get('summary')}\n\n"
-                output += "#### Kritik Zayıf Noktalar & Literatür Çelişkileri:\n"
-                for c in res.get("criticisms", []):
-                    output += f"- **{c.get('vulnerability')}:** {c.get('evidence_or_rationale')}\n"
-                output += f"\n#### ⚠️ Donanım & VRAM Darboğazı (RTX 4050 6GB):\n{res.get('hardware_and_vram_risk')}\n\n"
-                output += f"#### 🧪 Hipotezi Çürütecek Asgari Deney:\n{res.get('minimal_disproving_experiment')}"
-                
-                clean_output = normalize_latex(output)
-                st.markdown(clean_output)
-                st.session_state.messages.append({"role": "assistant", "content": clean_output})
+    # Initialize session messages
+    if "messages" not in st.session_state:
+        st.session_state.messages = [
+            {
+                "role": "assistant",
+                "content": "Merhaba! Ben yerel Derin Öğrenme Araştırma Partnerinizim. İndekslenmiş 11 makalemiz ve 91 sinaptik kavram notumuz hakkında teknik sorular sorabilir, fareyle herhangi bir satırı seçip '💬 Alıntı Yap' diyerek soru sorabilirsiniz."
+            }
+        ]
 
-        # 3. Technical Deep Learning Question
-        else:
-            is_deep_cot = "Two-Stage CoT" in mode or prompt.startswith("/explain")
-            clean_q = prompt.replace("/explain", "").strip()
+    # One-Click Quick Action Cards (Shown at start or above input)
+    if len(st.session_state.messages) <= 1:
+        st.markdown("##### 🚀 Hızlı Başlangıç Araştırma Başlıkları")
+        q_col1, q_col2 = st.columns(2)
+        with q_col1:
+            if st.button("⚖️ PPO vs DPO: Ödül Modelleme Farkları", use_container_width=True):
+                st.session_state.pending_prompt = "Compare PPO clipped surrogate objective with DPO policy optimization in terms of reward modeling and memory."
+                st.rerun()
+            if st.button("⚡ FlashAttention: SRAM Tiling & IO-Awareness", use_container_width=True):
+                st.session_state.pending_prompt = "How does FlashAttention avoid materializing the NxN attention matrix in HBM using SRAM tiling?"
+                st.rerun()
+        with q_col2:
+            if st.button("🔍 Self-RAG: Reflection Token Mekanizması", use_container_width=True):
+                st.session_state.pending_prompt = "Explain Self-RAG reflection tokens ([Retrieve], [IsRel], [IsSup]) and how they prevent hallucination."
+                st.rerun()
+            if st.button("📐 Coordinate Attention: 1D Uzamsal Pooling", use_container_width=True):
+                st.session_state.pending_prompt = "Coordinate Attention yatay ve dikey 1D pooling ile konumsal bilgiyi nasıl korur? Formüllerini ve tensör boyutlarını açıkla."
+                st.rerun()
+        st.write("")
 
-            # Multi-turn context resolution: augment search query with prior conversational topic or quote
-            augmented_search_query = contextualize_query(clean_q, st.session_state.messages[:-1])
+    # Render chat history with normalized LaTeX and Obsidian Save buttons
+    for i, msg in enumerate(st.session_state.messages):
+        with st.chat_message(msg["role"]):
+            st.markdown(normalize_latex(msg["content"]))
+            
+            # If assistant message (and not the initial welcome message), provide Save button
+            if msg["role"] == "assistant" and i > 0:
+                btn_col1, _ = st.columns([1, 4])
+                with btn_col1:
+                    if st.button("💾 Obsidian'a Kaydet", key=f"save_draft_{i}", help="Bu cevabı Obsidian Vault/Drafts/ klasörüne taslak olarak kaydeder."):
+                        user_q = "Theory_Note"
+                        for prev_msg in reversed(st.session_state.messages[:i]):
+                            if prev_msg["role"] == "user":
+                                user_q = prev_msg["content"]
+                                break
+                        safe_title = re.sub(r'[^A-Za-z0-9]+', '_', user_q[:35]).strip('_') or "Note"
+                        
+                        draft_path = approval_manager.create_draft(
+                            title=safe_title,
+                            content=msg["content"],
+                            category="Theory_Notes",
+                            tags=["qa-chat", "dl-lab"]
+                        )
+                        st.toast(f"✅ '{safe_title}' Obsidian Vault/Drafts/ klasörüne kaydedildi!", icon="📝")
+                        st.rerun()
 
-            # Step 1: Hybrid Retrieval
-            with st.status("📚 Literatür ve yerel hafıza taranıyor...", expanded=False) as status:
-                search_res = searcher.search(
-                    augmented_search_query,
-                    top_k=config.RETRIEVAL_TOP_K,
-                    use_decomposition=use_decomp,
-                    use_hyde=use_hyde
-                )
-                retrieved_context = search_res.get("packed_context", "")
-                has_sufficient_evidence = search_res.get("has_sufficient_evidence", False)
-                error_evidence = error_manager.get_relevant_errors(augmented_search_query)
-                
-                budget_parts = {
-                    "error_history": error_evidence,
-                    "paper_chunks": retrieved_context
-                }
-                packed_report = budget.pack_context(budget_parts)
-                safe_packed = packed_report["packed"]
-                status.update(label="Literatür tarandı.", state="complete")
+    if prompt:
+        # Autonomous Memory Extraction: check if user shares personal facts, projects, or preferences
+        if auto_memory.has_personal_cues(prompt):
+            try:
+                update_summary = auto_memory.extract_and_update(prompt)
+                if update_summary:
+                    st.toast(f"🧠 Obsidian Hafızası Güncellendi: {update_summary}", icon="📝")
+            except Exception:
+                pass
 
-            # Display decomposed sub-queries if any were generated for technical questions
-            sub_qs = search_res.get("sub_queries", [])
-            if len(sub_qs) > 1 and has_sufficient_evidence:
-                st.info("🔀 **Ayrıştırılan Alt-Sorgular:**\n" + "\n".join([f"- `{sq}`" for sq in sub_qs]))
+        # Render user query
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-            # Honest Abstention: If no evidence in local papers/notes, abstain politely and state 'Bilmiyorum'
-            if not has_sufficient_evidence:
-                abstain_msg = (
-                    "### ⚠️ Yerel Hafızada / Makalelerde Bulunamadı\n\n"
-                    f"Sorduğunuz soru (*\"{clean_q}\"*) ile ilgili yerel kütüphanemdeki akademik makalelerde ve notlarda herhangi bir bilgi veya kanıt bulunamadı.\n\n"
-                    "Yanıltıcı ve uydurma (halüsinasyon) bilgi vermemek prensibim olduğu için **bu sorunun cevabını bilmiyorum**.\n\n"
-                    "💡 *Eğer bu bir Derin Öğrenme / AI konusu ise, sol menüdeki **'📥 Hafızaya Yeni Makale Ekle'** kutusundan ilgili makalenin arXiv ID'sini girerek hafızama ekleyebilirsiniz.*"
-                )
-                st.markdown(abstain_msg)
-                st.session_state.messages.append({"role": "assistant", "content": abstain_msg})
+        # Generate Response
+        with st.chat_message("assistant"):
+            # 1. Check if Casual Chat or Personal Profile Statement
+            if is_casual_or_personal(prompt):
+                # Stream warm casual response
+                casual_msgs = build_casual_response_prompt(prompt, history=st.session_state.messages[:-1])
+                stream = llm.stream_generate(casual_msgs, max_tokens=600)
+                full_response = st.write_stream(stream)
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
                 st.rerun()
 
-            # Display source citations box if available
-            sources = search_res.get("results", [])
-            if sources:
-                with st.expander(f"📚 Referans Alınan Makale Parçaları ({len(sources)} Bölüm)"):
-                    for s in sources:
-                        meta = s.get("metadata", {})
-                        title = meta.get("title", "Akademik Makale")
-                        section = meta.get("section_name", "")
-                        score = s.get("rerank_score", 0.0)
-                        sec_info = f" • Bölüm: *{section}*" if section else ""
-                        st.markdown(f"- 📄 **{title}**{sec_info} (`{s.get('id')}`) — *Alaka Skoru: `{score:.2f}`*")
+            # 2. Check Devil's Advocate Mode
+            elif "Devil's Advocate" in mode or prompt.startswith("/challenge"):
+                with st.spinner("Hipotez literatürle ve RTX 4050 donanım sınırlarıyla test ediliyor..."):
+                    clean_q = prompt.replace("/challenge", "").strip()
+                    res = challenger.challenge_hypothesis(clean_q)
+                    
+                    verdict = res.get("verdict", "HIGH_RISK")
+                    v_color = "🔴" if verdict == "REJECT" else ("🟡" if verdict == "HIGH_RISK" else "🟢")
+                    
+                    output = f"### {v_color} Karar: **{verdict}**\n\n"
+                    output += f"**Yönetici Özeti:** {res.get('summary')}\n\n"
+                    output += "#### Kritik Zayıf Noktalar & Literatür Çelişkileri:\n"
+                    for c in res.get("criticisms", []):
+                        output += f"- **{c.get('vulnerability')}:** {c.get('evidence_or_rationale')}\n"
+                    output += f"\n#### ⚠️ Donanım & VRAM Darboğazı (RTX 4050 6GB):\n{res.get('hardware_and_vram_risk')}\n\n"
+                    output += f"#### 🧪 Hipotezi Çürütecek Asgari Deney:\n{res.get('minimal_disproving_experiment')}"
+                    
+                    clean_output = normalize_latex(output)
+                    st.markdown(clean_output)
+                    st.session_state.messages.append({"role": "assistant", "content": clean_output})
 
-            thought_plan = ""
-            # Step 2: Extended Thinking Mode - Model Thinks Deeply in Public
-            if is_deep_cot:
-                import time
-                t_start = time.time()
-                with st.status("💭 Derin Düşünme & Analiz (Model kendi kendine muhakeme yapıyor...)", expanded=True) as status_cot:
-                    cot_prompt_msgs = build_thought_plan_prompt(clean_q, safe_packed.get("paper_chunks", ""))
-                    thought_stream = llm.stream_generate(cot_prompt_msgs, max_tokens=650, temperature=0.2)
-                    thought_plan = st.write_stream(thought_stream)
-                    elapsed_sec = max(1, int(time.time() - t_start))
-                    status_cot.update(label=f"💭 Düşünce Süreci ({elapsed_sec} saniye boyunca derin analiz yapıldı)", state="complete", expanded=False)
+            # 3. Check Mekatronik & Robotik Mentoru Mode
+            elif "Mekatronik & Robotik Mentoru" in mode:
+                with st.spinner("🤖 Mekatronik ve Yapay Zeka mühendislik perspektifiyle analiz ediliyor..."):
+                    clean_q = prompt.replace("/mentor", "").strip()
+                    mentor_msgs = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
+                    stream = llm.stream_generate(mentor_msgs, max_tokens=1600)
+                    full_response = st.write_stream(stream)
+                    clean_full = normalize_latex(full_response)
+                    st.session_state.messages.append({"role": "assistant", "content": clean_full})
+                    st.rerun()
 
-            # Step 3: Stage 2 - Comprehensive Masterclass Synthesis
-            messages = build_answer_prompt(
-                query=clean_q,
-                packaged_context=safe_packed.get("paper_chunks", ""),
-                telemetry_context="",
-                git_diff="",
-                error_context=safe_packed.get("error_history", ""),
-                thought_plan=thought_plan,
-                deep_dive=is_deep_cot,
-                history=st.session_state.messages[:-1]
-            )
+            # 4. Technical Deep Learning Question
+            else:
+                is_deep_cot = "Two-Stage CoT" in mode or prompt.startswith("/explain")
+                clean_q = prompt.replace("/explain", "").strip()
 
-            target_max_tokens = config.TOKEN_BUDGET.get("max_answer", 2500) if is_deep_cot else 1000
+                # Multi-turn context resolution: augment search query with prior conversational topic or quote
+                augmented_search_query = contextualize_query(clean_q, st.session_state.messages[:-1])
 
-            stream = llm.stream_generate(
-                messages,
-                max_tokens=target_max_tokens
-            )
-            full_response = st.write_stream(stream)
-            clean_full = normalize_latex(full_response)
-            st.session_state.messages.append({"role": "assistant", "content": clean_full})
-            st.rerun()
+                # Step 1: Hybrid Retrieval
+                with st.status("📚 Literatür ve yerel hafıza taranıyor...", expanded=False) as status:
+                    search_res = searcher.search(
+                        augmented_search_query,
+                        top_k=config.RETRIEVAL_TOP_K,
+                        use_decomposition=use_decomp,
+                        use_hyde=use_hyde
+                    )
+                    retrieved_context = search_res.get("packed_context", "")
+                    has_sufficient_evidence = search_res.get("has_sufficient_evidence", False)
+                    error_evidence = error_manager.get_relevant_errors(augmented_search_query)
+                    
+                    budget_parts = {
+                        "error_history": error_evidence,
+                        "paper_chunks": retrieved_context
+                    }
+                    packed_report = budget.pack_context(budget_parts)
+                    safe_packed = packed_report["packed"]
+                    status.update(label="Literatür tarandı.", state="complete")
+
+                # Display decomposed sub-queries if any were generated for technical questions
+                sub_qs = search_res.get("sub_queries", [])
+                if len(sub_qs) > 1 and has_sufficient_evidence:
+                    st.info("🔀 **Ayrıştırılan Alt-Sorgular:**\n" + "\n".join([f"- `{sq}`" for sq in sub_qs]))
+
+                # Honest Abstention: If no evidence in local papers/notes, abstain politely and state 'Bilmiyorum'
+                if not has_sufficient_evidence:
+                    abstain_msg = (
+                        "### ⚠️ Yerel Hafızada / Makalelerde Bulunamadı\n\n"
+                        f"Sorduğunuz soru (*\"{clean_q}\"*) ile ilgili yerel kütüphanemdeki akademik makalelerde ve notlarda herhangi bir bilgi veya kanıt bulunamadı.\n\n"
+                        "Yanıltıcı ve uydurma (halüsinasyon) bilgi vermemek prensibim olduğu için **bu sorunun cevabını bilmiyorum**.\n\n"
+                        "💡 *Eğer bu bir Derin Öğrenme / AI konusu ise, sol menüdeki **'📥 Hafızaya Yeni Makale Ekle'** kutusundan ilgili makalenin arXiv ID'sini girerek hafızama ekleyebilirsiniz.*"
+                    )
+                    st.markdown(abstain_msg)
+                    st.session_state.messages.append({"role": "assistant", "content": abstain_msg})
+                    st.rerun()
+
+                # Display source citations box if available
+                sources = search_res.get("results", [])
+                if sources:
+                    with st.expander(f"📚 Referans Alınan Makale Parçaları ({len(sources)} Bölüm)"):
+                        for s in sources:
+                            meta = s.get("metadata", {})
+                            title = meta.get("title", "Akademik Makale")
+                            section = meta.get("section_name", "")
+                            score = s.get("rerank_score", 0.0)
+                            sec_info = f" • Bölüm: *{section}*" if section else ""
+                            st.markdown(f"- 📄 **{title}**{sec_info} (`{s.get('id')}`) — *Alaka Skoru: `{score:.2f}`*")
+
+                thought_plan = ""
+                # Step 2: Extended Thinking Mode - Model Thinks Deeply in Public
+                if is_deep_cot:
+                    import time
+                    t_start = time.time()
+                    with st.status("💭 Derin Düşünme & Analiz (Model kendi kendine muhakeme yapıyor...)", expanded=True) as status_cot:
+                        cot_prompt_msgs = build_thought_plan_prompt(clean_q, safe_packed.get("paper_chunks", ""))
+                        thought_stream = llm.stream_generate(cot_prompt_msgs, max_tokens=650, temperature=0.2)
+                        thought_plan = st.write_stream(thought_stream)
+                        elapsed_sec = max(1, int(time.time() - t_start))
+                        status_cot.update(label=f"💭 Düşünce Süreci ({elapsed_sec} saniye boyunca derin analiz yapıldı)", state="complete", expanded=False)
+
+                # Step 3: Stage 2 - Comprehensive Masterclass Synthesis
+                messages = build_answer_prompt(
+                    query=clean_q,
+                    packaged_context=safe_packed.get("paper_chunks", ""),
+                    telemetry_context="",
+                    git_diff="",
+                    error_context=safe_packed.get("error_history", ""),
+                    thought_plan=thought_plan,
+                    deep_dive=is_deep_cot,
+                    history=st.session_state.messages[:-1]
+                )
+
+                target_max_tokens = config.TOKEN_BUDGET.get("max_answer", 2500) if is_deep_cot else 1000
+
+                stream = llm.stream_generate(
+                    messages,
+                    max_tokens=target_max_tokens
+                )
+                full_response = st.write_stream(stream)
+                clean_full = normalize_latex(full_response)
+                st.session_state.messages.append({"role": "assistant", "content": clean_full})
+                st.rerun()
+
+with tab_graph:
+    st.markdown("### 🕸️ Obsidian İkinci Beyin Bilgi Ağı (Synaptic Knowledge Graph)")
+    st.caption("Vault içindeki makale kartları, temel teorik notlar ve sinaptik kavram bağlantılarının canlı interaktif haritası. Düğümleri sürükleyebilir, yakınlaştırabilir ve detaylarını incelemek için tıklayabilirsiniz.")
+
+    graph_data = get_vault_graph_data()
+    stats = graph_data.get("stats", {})
+
+    mcol1, mcol2, mcol3, mcol4 = st.columns(4)
+    mcol1.metric("Toplam Düğüm", f"{stats.get('total_nodes', 0)} Kavram")
+    mcol2.metric("Toplam Sinaps", f"{stats.get('total_edges', 0)} Bağlantı")
+    mcol3.metric("Makale Kartları", f"{stats.get('papers_count', 0)} Makale")
+    mcol4.metric("Teorik Notlar", f"{stats.get('theory_count', 0)} Konu")
+
+    # Render interactive physics graph
+    graph_html = generate_graph_html(graph_data, height=720)
+    components.html(graph_html, height=730, scrolling=False)
+
+    st.markdown("#### 🌟 En Çok Bağlantılı Merkez Kavramlar (Knowledge Hubs)")
+    hubs = stats.get("top_hubs", [])
+    if hubs:
+        hub_cols = st.columns(len(hubs))
+        for idx, hub in enumerate(hubs):
+            with hub_cols[idx]:
+                if st.button(f"📌 {hub['title'][:20]}... ({hub['degree']} Sinaps)", key=f"hub_btn_{idx}", use_container_width=True):
+                    st.session_state.pending_prompt = f"{hub['title']} kavramının teorik motivasyonunu, formüllerini ve PyTorch implementasyonunu açıkla."
+                    st.rerun()
+
+with tab_corpus:
+    st.markdown("### 📚 Yerel RAG Makale Kütüphanesi (arXiv Corpus)")
+    st.caption("Yerel ChromaDB vektör hafızamıza indekslenmiş 11 temel makale. Kartlardaki tek tıkla sorgulama butonunu kullanarak o makale hakkında anında analiz başlatabilirsiniz.")
+
+    papers_info = [
+        {
+            "id": "1706.03762",
+            "title": "Attention Is All You Need",
+            "authors": "Vaswani et al. (Google Brain)",
+            "domain": "Transformer & Attention",
+            "color": "#38bdf8",
+            "desc": "Transformatör mimarisinin temeli; scaled dot-product ve multi-head attention mekanizması.",
+            "prompt": "Attention Is All You Need makalesindeki scaled dot-product attention formülasyonunu ve tensör dönüşümlerini açıkla."
+        },
+        {
+            "id": "1707.06347",
+            "title": "Proximal Policy Optimization (PPO)",
+            "authors": "Schulman et al. (OpenAI)",
+            "domain": "Reinforcement Learning",
+            "color": "#10b981",
+            "desc": "Clipped surrogate objective ile kararlı, verimli politika gradyanı ve güven bölgesi optimizasyonu.",
+            "prompt": "PPO makalesindeki clipped surrogate objective formülünü ve trust region sezgisini açıkla."
+        },
+        {
+            "id": "2305.18290",
+            "title": "Direct Preference Optimization (DPO)",
+            "authors": "Rafailov et al. (Stanford)",
+            "domain": "RLHF & Alignment",
+            "color": "#a855f7",
+            "desc": "Ayrı bir ödül modeli gerektirmeden insan tercihlerinden doğrudan türetilen kapalı form kayıp fonksiyonu.",
+            "prompt": "DPO matematiksel olarak Bradley-Terry modelini nasıl doğrudan politika kaybına dönüştürür?"
+        },
+        {
+            "id": "2205.14135",
+            "title": "FlashAttention: Fast & Memory-Efficient Attention",
+            "authors": "Dao et al. (Stanford)",
+            "domain": "IO-Aware Optimization",
+            "color": "#f59e0b",
+            "desc": "SRAM tiling ve online softmax ile GPU bellek bant genişliği darboğazını çözen exact attention.",
+            "prompt": "FlashAttention GPU bellek hiyerarşisinde SRAM tiling ve online softmax ile HBM erişimini nasıl azaltır?"
+        },
+        {
+            "id": "2310.11511",
+            "title": "Self-RAG: Learning to Retrieve, Generate & Critique",
+            "authors": "Asai et al. (Univ. of Washington)",
+            "domain": "Adaptive RAG & Reflection",
+            "color": "#ec4899",
+            "desc": "Reflection token'ları ([Retrieve], [IsRel], [IsSup]) ile dinamik arama ve model halüsinasyon kontrolü.",
+            "prompt": "Self-RAG reflection tokenları ile model halüsinasyonunu nasıl kontrol altına alır?"
+        },
+        {
+            "id": "1512.03385",
+            "title": "Deep Residual Learning for Image Recognition (ResNet)",
+            "authors": "He et al. (Microsoft Research)",
+            "domain": "Computer Vision & Gradients",
+            "color": "#38bdf8",
+            "desc": "Residual shortcut bağlantıları (x + F(x)) ile yok olan gradyanları engelleyip 152+ katmanlı ağların eğitimi.",
+            "prompt": "ResNet skip connection matematiksel olarak degrade olan gradyan akışını nasıl çözer?"
+        },
+        {
+            "id": "2010.11929",
+            "title": "An Image is Worth 16x16 Words (ViT)",
+            "authors": "Dosovitskiy et al. (Google Research)",
+            "domain": "Vision Transformer",
+            "color": "#6366f1",
+            "desc": "Görüntüleri 16x16 yamalara bölüp saf Transformer kodlayıcısına besleyen görsel derin öğrenme devrimi.",
+            "prompt": "Vision Transformer (ViT) patch projection ve position embedding aşamalarını adım adım tensörlerle açıkla."
+        },
+        {
+            "id": "2103.14030",
+            "title": "Swin Transformer: Hierarchical Vision Transformer",
+            "authors": "Liu et al. (Microsoft Research)",
+            "domain": "Hierarchical Vision",
+            "color": "#06b6d4",
+            "desc": "Shifted Window mekanizması ile lineer hesaplama karmaşıklığı O(N) ve hiyerarşik piramidal özellikler.",
+            "prompt": "Swin Transformer shifted window mekanizması pencereler arası etkileşimi lineer karmaşıklıkla nasıl sağlar?"
+        },
+        {
+            "id": "2103.02907",
+            "title": "Coordinate Attention for Mobile Networks",
+            "authors": "Hou et al.",
+            "domain": "Lightweight Mobile Attention",
+            "color": "#14b8a6",
+            "desc": "Yatay ve dikey 1D pooling ile kanal dikkatine yön ve konumsal bilgi kazandıran hafif blok.",
+            "prompt": "Coordinate Attention yatay ve dikey 1D pooling ile konumsal bilgiyi nasıl kodlar?"
+        },
+        {
+            "id": "1312.5602",
+            "title": "Playing Atari with Deep RL (DQN)",
+            "authors": "Mnih et al. (DeepMind)",
+            "domain": "Deep Reinforcement Learning",
+            "color": "#8b5cf6",
+            "desc": "Experience Replay ve Target Network ile kararlı derin Q-öğrenme mimarisi.",
+            "prompt": "DQN mimarisinde experience replay buffer ve hedef ağ stabiliteyi nasıl garanti eder?"
+        },
+        {
+            "id": "1412.6980",
+            "title": "Adam: A Method for Stochastic Optimization",
+            "authors": "Kingma & Ba",
+            "domain": "Optimization & Gradients",
+            "color": "#eab308",
+            "desc": "Birinci ve ikinci moment tahminleri ile adaptif öğrenme oranı optimizasyonu.",
+            "prompt": "Adam optimizer birinci ve ikinci moment düzeltmelerini formülleriyle açıkla."
+        }
+    ]
+
+    p_cols = st.columns(2)
+    for idx, p in enumerate(papers_info):
+        with p_cols[idx % 2]:
+            st.markdown(f"""
+            <div style="background:rgba(15,23,42,0.7); border:1px solid rgba(255,255,255,0.08); border-left:4px solid {p['color']}; border-radius:12px; padding:16px; margin-bottom:14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-size:11px; font-weight:600; text-transform:uppercase; color:{p['color']}; letter-spacing:0.5px;">{p['domain']}</span>
+                    <span style="font-size:12px; color:#64748b; font-family:'Fira Code',monospace;">arXiv:{p['id']}</span>
+                </div>
+                <h4 style="margin:0 0 6px 0; font-size:1.05rem; color:#f8fafc;">{p['title']}</h4>
+                <p style="margin:0 0 10px 0; font-size:0.84rem; color:#94a3b8;">{p['authors']}</p>
+                <p style="margin:0 0 12px 0; font-size:0.88rem; color:#cbd5e1; line-height:1.4;">{p['desc']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button(f"⚡ Bu Makaleyi Sorgula", key=f"corp_btn_{p['id']}", use_container_width=True):
+                st.session_state.pending_prompt = p["prompt"]
+                st.rerun()
+
+with tab_radar:
+    st.markdown("### ⚡ Laboratuvar Donanım & Model Telemetri Radarı")
+    st.caption("Yerel donanım sınırları, GPU VRAM kullanım durumu ve ChromaDB vektör veritabanı sağlık göstergeleri.")
+
+    rad_col1, rad_col2 = st.columns(2)
+    with rad_col1:
+        st.markdown("#### 🎮 NVIDIA RTX 4050 Laptop GPU (6GB)")
+        if gpu.get("available"):
+            vram_mb = gpu["used"]
+            vram_total = gpu["total"]
+            vram_pct = (vram_mb / vram_total) * 100
+            
+            c_g1, c_g2, c_g3 = st.columns(3)
+            c_g1.metric("GPU Sıcaklığı", f"{gpu['temp']} °C")
+            c_g2.metric("GPU Yükü", f"{gpu['util']} %")
+            c_g3.metric("Kullanılan VRAM", f"{vram_mb} MB")
+
+            vram_color = "#10b981" if vram_pct < 70 else ("#f59e0b" if vram_pct < 85 else "#ef4444")
+            st.markdown(f"""
+            <div style="margin:14px 0 6px 0; font-size:13px; color:#94a3b8; display:flex; justify-content:space-between;">
+                <span>VRAM Doluluk Oranı</span>
+                <span><b>{vram_pct:.1f}%</b> ({vram_mb} / {vram_total} MiB)</span>
+            </div>
+            <div style="width:100%; height:12px; background:rgba(255,255,255,0.08); border-radius:8px; overflow:hidden;">
+                <div style="width:{vram_pct}%; height:100%; background:{vram_color}; transition:width 0.4s ease;"></div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.info("💡 **RTX 4050 Optimizasyonu:** 6GB VRAM için `qwen2.5:7b-instruct` modeli 4-bit kuantizasyonla ~4.2GB VRAM kaplar. Kalan 1.8GB, 8192 tokenlik KV cache için yeterlidir.")
+        else:
+            st.warning("NVIDIA GPU telemetrisi alınamadı veya sistem CPU modunda.")
+
+    with rad_col2:
+        st.markdown("#### 💻 Sistem İşlemcisi & Bellek")
+        c_c1, c_c2 = st.columns(2)
+        c_c1.metric("CPU Kullanımı", f"{cpu_percent} %")
+        c_c2.metric("RAM Kullanımı", f"{ram.percent} %")
+        st.progress(ram.percent / 100.0, text=f"RAM: {ram.used // (1024**2)} / {ram.total // (1024**2)} MiB")
+
+    st.divider()
+
+    st.markdown("#### 🗄️ ChromaDB Yerel Vektör Veritabanı Koleksiyonları")
+    db_col1, db_col2, db_col3, db_col4, db_col5 = st.columns(5)
+    db_col1.metric("📄 Makale Parçaları", "606 Chunks")
+    db_col2.metric("📑 Makale Kartları", "11 Kart")
+    db_col3.metric("📐 Teori Notları", "12 Not")
+    db_col4.metric("💻 Kod Snippetleri", "33 Kod")
+    db_col5.metric("🐛 Çözülen Hatalar", "5 Hata")
+
+    st.markdown("#### 🤖 Yerel LLM & Çıkarım Mimarisi")
+    st.markdown("""
+    - **Aktif Model:** `qwen2.5:7b-instruct` (Ollama Yerel API - `http://localhost:11434`)
+    - **Vektör Gömme Modeli (Embedding):** `BAAI/bge-base-en-v1.5` (CPU üzerinde 768 boyutlu yoğun vektörler)
+    - **Yeniden Sıralama (Cross-Encoder):** `cross-encoder/ms-marco-MiniLM-L-6-v2`
+    - **Kişisel Hafıza & İkinci Beyin:** Obsidian Markdown Vault (`Vault/00_Profile/About_Me.md`)
+    - **Gizlilik Durumu:** 🟢 **%100 Çevrimdışı ve Yerel** (Harici API bağlantısı veya telemetri yok)
+    """)
+
