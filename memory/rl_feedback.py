@@ -7,7 +7,8 @@ Critiques).
 Persists:
 1. Dynamic Reinforcement Policy in Vault/00_Profile/Reinforcement_Policy.md & Style.md
 2. Direct Preference Optimization (DPO) dataset in data/rl_preferences/preferences.jsonl
-3. Metrics & Cumulative Rewards in data/rl_preferences/learning_metrics.json
+3. Gold Exemplars for Few-Shot In-Context Self-Training in data/rl_preferences/gold_exemplars.json
+4. Metrics & Cumulative Rewards in data/rl_preferences/learning_metrics.json
 """
 
 import sys
@@ -38,6 +39,7 @@ RL_DIR.mkdir(parents=True, exist_ok=True)
 
 PREFERENCES_FILE = RL_DIR / "preferences.jsonl"
 METRICS_FILE = RL_DIR / "learning_metrics.json"
+GOLD_EXEMPLARS_FILE = RL_DIR / "gold_exemplars.json"
 
 STYLE_FILE = config.VAULT_DIR / "00_Profile" / "Style.md"
 POLICY_FILE = config.VAULT_DIR / "00_Profile" / "Reinforcement_Policy.md"
@@ -51,19 +53,21 @@ POSITIVE_CUES = [
 
 CRITIQUE_CUES = [
     "çok uzun", "kısa kes", "kısa tut", "daha kısa", "özet geç", "çok uzattın",
-    "daha çok kod", "kod ver", "kod ağırlıklı", "formül istemiyorum", "formülleri açıkla",
+    "kod verme", "kod istemedim", "kodsuz anlat", "formülleri açıkla",
     "teoriyi geç", "pratik anlat", "mekatronik açısından", "donanım açısından",
     "öyle değil", "bunu sevmedim", "anlamadım", "daha basit", "daha sade",
-    "böyle anlatma", "bir dahakine", "bundan sonra", "too long", "more code", "simpler"
+    "yanlış bilgi", "hatalı", "uydurma", "böyle anlatma", "bir dahakine",
+    "bundan sonra", "too long", "simpler", "no code", "don't give code"
 ]
 
 
 class RLFeedbackEngine:
-    """Continuous Reinforcement Learning & Style Adaptation Engine."""
+    """Continuous Reinforcement Learning, Style Adaptation & Self-Training Engine."""
 
     def __init__(self):
         vault.ensure_layout()
         self._ensure_metrics_file()
+        self._ensure_gold_exemplars_file()
 
     def _ensure_metrics_file(self):
         if not METRICS_FILE.exists():
@@ -73,9 +77,14 @@ class RLFeedbackEngine:
                 "negative_count": 0,
                 "cumulative_reward": 0.0,
                 "learned_axioms_count": 0,
+                "gold_exemplars_count": 0,
                 "last_updated": datetime.now().isoformat()
             }
             METRICS_FILE.write_text(json.dumps(default_metrics, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    def _ensure_gold_exemplars_file(self):
+        if not GOLD_EXEMPLARS_FILE.exists():
+            GOLD_EXEMPLARS_FILE.write_text("[]", encoding="utf-8")
 
     def get_metrics(self) -> Dict[str, Any]:
         """Loads cumulative RL metrics."""
@@ -90,6 +99,7 @@ class RLFeedbackEngine:
             "negative_count": 0,
             "cumulative_reward": 0.0,
             "learned_axioms_count": 0,
+            "gold_exemplars_count": 0,
             "last_updated": datetime.now().isoformat()
         }
 
@@ -103,10 +113,64 @@ class RLFeedbackEngine:
         metrics["cumulative_reward"] = round(metrics.get("cumulative_reward", 0.0) + reward, 2)
         metrics["last_updated"] = datetime.now().isoformat()
         metrics["learned_axioms_count"] = len(self.get_active_axioms())
+        metrics["gold_exemplars_count"] = len(self.get_gold_exemplars())
         try:
             METRICS_FILE.write_text(json.dumps(metrics, indent=2, ensure_ascii=False), encoding="utf-8")
         except Exception:
             pass
+
+    def save_gold_exemplar(self, query: str, response: str, score: float = 1.0):
+        """Saves a high-reward turn as a golden few-shot exemplar for in-context self-training."""
+        q_clean = query.strip()
+        r_clean = response.strip()
+        if len(q_clean) < 5 or len(r_clean) < 30:
+            return
+
+        exemplars = self.get_gold_exemplars()
+        # Avoid duplicate queries
+        for ex in exemplars:
+            if ex.get("query", "").strip().lower() == q_clean.lower():
+                ex["response"] = r_clean
+                ex["timestamp"] = datetime.now().isoformat()
+                ex["score"] = score
+                break
+        else:
+            exemplars.append({
+                "query": q_clean,
+                "response": r_clean,
+                "timestamp": datetime.now().isoformat(),
+                "score": score
+            })
+
+        # Keep top 15 gold exemplars to maintain quality
+        exemplars = exemplars[-15:]
+        try:
+            GOLD_EXEMPLARS_FILE.write_text(json.dumps(exemplars, indent=2, ensure_ascii=False), encoding="utf-8")
+        except Exception as e:
+            print(f"[!] Error saving gold exemplar: {e}")
+
+    def get_gold_exemplars(self, query: Optional[str] = None, max_items: int = 2) -> List[Dict[str, Any]]:
+        """Retrieves best matching gold exemplars for few-shot prompt injection."""
+        try:
+            if not GOLD_EXEMPLARS_FILE.exists():
+                return []
+            data = json.loads(GOLD_EXEMPLARS_FILE.read_text(encoding="utf-8"))
+            if not query:
+                return data
+
+            # Simple token overlap retrieval for in-context injection
+            q_tokens = set(re.findall(r'\b\w{3,}\b', query.lower()))
+            scored = []
+            for ex in data:
+                ex_q = ex.get("query", "").lower()
+                ex_tokens = set(re.findall(r'\b\w{3,}\b', ex_q))
+                overlap = len(q_tokens.intersection(ex_tokens))
+                scored.append((overlap, ex))
+
+            scored.sort(key=lambda x: x[0], reverse=True)
+            return [item[1] for item in scored[:max_items] if item[0] > 0] or data[-max_items:]
+        except Exception:
+            return []
 
     def record_feedback(
         self,
@@ -120,16 +184,17 @@ class RLFeedbackEngine:
         """
         Records an explicit or implicit user preference entry (Reward: +1.0 / -1.0).
         Persists into preferences.jsonl (DPO format candidate).
-        If negative or constructive, triggers policy adaptation.
+        If positive, saves as gold exemplar for self-training.
+        Triggers policy adaptation and fine-tuning synchronization.
         """
         entry = {
             "timestamp": datetime.now().isoformat(),
             "source": source,
             "reward": float(reward),
-            "style_tag": style_tag or "general",
+            "style_tag": style_tag or ("positive" if reward > 0 else "negative"),
             "user_comment": user_comment or "",
             "query": query,
-            "response": response[:1200]
+            "response": response[:1600]
         }
 
         # Append to JSONL
@@ -142,10 +207,20 @@ class RLFeedbackEngine:
         # Update metrics
         self._update_metrics(reward)
 
-        # Trigger Style Policy Evolution
-        learned_axiom = None
-        if style_tag or user_comment or reward != 0:
-            learned_axiom = self._evolve_policy_from_feedback(query, response, reward, style_tag, user_comment)
+        # Trigger Style Policy Evolution & Self-Training Sync
+        learned_axiom = self._evolve_policy_from_feedback(query, response, reward, entry["style_tag"], user_comment)
+
+        # Also notify conversation collector for local dataset building
+        try:
+            from memory.conversation_collector import collector
+            collector.record_interaction(
+                user_text=query,
+                assistant_text=response,
+                reward=reward,
+                mode="feedback"
+            )
+        except Exception:
+            pass
 
         return {
             "success": True,
@@ -188,11 +263,13 @@ class RLFeedbackEngine:
             if any(k in matched_critique for k in ["kısa", "uzun", "özet"]):
                 style_tag = "conciseness"
             elif any(k in matched_critique for k in ["kod"]):
-                style_tag = "code_preference"
+                style_tag = "no_code_rule"
             elif any(k in matched_critique for k in ["formül", "teori"]):
                 style_tag = "math_theory_preference"
             elif any(k in matched_critique for k in ["mekatronik", "donanım"]):
                 style_tag = "engineering_context"
+            elif any(k in matched_critique for k in ["yanlış", "hatalı", "uydurma"]):
+                style_tag = "fact_correction"
 
         # Record this implicit preference
         res = self.record_feedback(
@@ -215,36 +292,55 @@ class RLFeedbackEngine:
     ) -> Optional[str]:
         """
         Translates the user feedback into a concrete, non-redundant style axiom.
-        Updates both Vault/00_Profile/Reinforcement_Policy.md and Style.md.
+        Updates Vault/00_Profile/Reinforcement_Policy.md and gold exemplars.
         """
-        # Quick heuristic mappings for standard buttons to avoid latency
+        new_axiom = None
+
+        # Standard button heuristic mappings
         axiom_map = {
             "concise": "Cevapları doğrudan konuya girerek, gereksiz giriş-çıkış nezaket cümleleri olmadan öz ve net tut.",
-            "code_heavy": "Açıklamalarda her zaman çalışan PyTorch/Python kod blokları ve açık tensör boyutları (B, C, H, W) ver.",
-            "math_depth": "Matematiksel formülasyonları, optimizasyon hedeflerini ve kaybın analitik türevlerini detaylandır.",
-            "robotics": "Kavramları mekatronik, gömülü sistemler ve robotik kontrol (sensör füzyonu, motor kontrol, gerçek zamanlı kısıtlar) perspektifiyle bağdaştır.",
-            "perfect": "Mevcut anlatım tonu, teknik derinliği ve kod/açıklama dengesi ideal; bu üslubu sürdür."
+            "math_depth": "Matematiksel formülasyonları, optimizasyon hedeflerini ve kaybın analitik türevlerini ($$...$$) detaylandır.",
+            "robotics": "Kavramları mekatronik, gömülü sistemler ve robotik kontrol perspektifiyle bağdaştır.",
+            "perfect": "Mevcut anlatım tonu, matematiksel derinliği ve doğrudan anlatım standardı ideal; bu üslubu sürdür.",
+            "positive": "Açıklamaları pedagojik derinlikte, açık formüllerle ($$...$$) ve doğrudan konuya girerek sürdür.",
+            "no_code_rule": "Kullanıcı açıkça istemediği sürece ASLA kod bloğu üretme; kavramları formüller ve mimari mantıkla anlat.",
+            "fact_correction": "Doğrulanmamış veya spekülatif bilgiler üretme; kesinlik taşımayan durumlarda dürüstçe kaynak yetersizliğini belirt."
         }
 
-        new_axiom = None
         if style_tag in axiom_map:
             new_axiom = axiom_map[style_tag]
-        elif user_comment:
-            # Generate axiom using LLM
+
+        # Check negative feedback heuristics
+        elif reward < 0:
+            resp_has_code = "```" in response
+            user_asked_code = any(kw in query.lower() for kw in ["kod", "code", "python", "script", "yaz"])
+            if resp_has_code and not user_asked_code:
+                new_axiom = "Kullanıcı açıkça kod istemediği sürece ASLA kod bloğu üretme; sadece matematik ve mimariyle anlat."
+            elif any(w in response.lower() for w in ["muhtemelen", "tahmince", "fatih terim", "spikerleri"]):
+                new_axiom = "Doğrulanmamış spekülatif bilgi üretme; kesin kaynak yoksa doğrudan 'Yerel ve güncel kaynaklarda bulunamadı' de."
+            else:
+                new_axiom = "Yüzeysel veya varsayımsal açıklamalardan kaçın; doğrudan kanıtlanmış literatür, net tensörler ve formüllerle yanıtla."
+
+        # Check positive feedback heuristics
+        elif reward > 0:
+            self.save_gold_exemplar(query, response, score=reward)
+            new_axiom = "Mevcut pedagojik derinlik, açık matematik ($$...$$) ve doğrudan anlatım tarzı ideal; bu standardı koru."
+
+        # If custom user comment provided, synthesize with LLM
+        if user_comment and len(user_comment.strip()) > 3:
             prompt = [
                 {
                     "role": "system",
                     "content": (
-                        "You are an AI Style Alignment Engine. The user provided feedback on an assistant's response.\n"
+                        "You are an AI Style Alignment Engine. The user provided critique/feedback on an AI response.\n"
                         "Synthesize the user's preference into a SINGLE concise, imperative Turkish guideline (Axiom).\n"
-                        "Example inputs: 'çok uzattın biraz daha özet geç' -> 'Cevapları gereksiz teorik detaylara boğmadan özet ve pratik tut.'\n"
-                        "Example inputs: 'daha çok kod ve tensör boyutları görmek istiyorum' -> 'Teorik açıklamaları minimalde tutup zengin PyTorch kodları ve tensör boyutları ver.'\n"
+                        "STRICT RULE: The user strictly forbids unsolicited code blocks ('ben istemeden kod verme'). NEVER generate a rule asking for code unless explicitly instructed.\n"
                         "Output ONLY the single Turkish guideline sentence, nothing else."
                     )
                 },
                 {
                     "role": "user",
-                    "content": f"Feedback/Critique: {user_comment}\nContext Tag: {style_tag or 'N/A'}"
+                    "content": f"Feedback/Critique: {user_comment}\nContext Query: {query[:200]}"
                 }
             ]
             try:
@@ -265,14 +361,13 @@ class RLFeedbackEngine:
         """Adds or reinforces an axiom in Reinforcement_Policy.md and Style.md."""
         axioms = self.get_active_axioms()
         
-        # Deduplicate or promote
         cleaned_axiom = axiom.strip().rstrip(".") + "."
         if cleaned_axiom not in axioms:
             axioms.append(cleaned_axiom)
 
-        # Keep top 8 most refined axioms to prevent prompt bloat
-        if len(axioms) > 8:
-            axioms = axioms[-8:]
+        # Keep top 7 most refined axioms to prevent prompt bloat
+        if len(axioms) > 7:
+            axioms = axioms[-7:]
 
         # Update Vault/00_Profile/Reinforcement_Policy.md
         policy_frontmatter = {
@@ -295,10 +390,11 @@ Bu belge, Samet ile yapılan sohbetler ve verilen geri bildirimler (👍/👎, t
 ---
 *Son Güncelleme:* `{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`
 *Toplam Geri Bildirim Sinyali:* `{self.get_metrics().get('total_feedbacks', 0)}`
+*Altın Örnekler (Gold Exemplars):* `{len(self.get_gold_exemplars())}`
 """
         vault.write_note("00_Profile", "Reinforcement_Policy.md", policy_frontmatter, policy_body)
 
-        # Update Style.md for backwards-compatibility with profile manager
+        # Update Style.md for backwards-compatibility
         style_frontmatter = {
             "type": "profile",
             "tags": ["profile", "style", "rl-aligned"]
@@ -308,16 +404,15 @@ Bu belge, Samet ile yapılan sohbetler ve verilen geri bildirimler (👍/👎, t
             style_body += f"- {a}\n"
         
         vault.write_note("00_Profile", "Style.md", style_frontmatter, style_body)
-        vault.git_commit(f"rl: reinforced style policy '{cleaned_axiom[:35]}'")
 
     def get_active_axioms(self) -> List[str]:
         """Reads active learned axioms from Reinforcement_Policy.md or Style.md."""
         target_file = POLICY_FILE if POLICY_FILE.exists() else STYLE_FILE
         if not target_file.exists():
             return [
-                "Cevapları doğrudan konuya girerek, gereksiz giriş-çıkış nezaket cümleleri olmadan öz ve net tut.",
-                "Açıklamalarda her zaman çalışan PyTorch/Python kod blokları ve açık tensör boyutları ver.",
-                "Teknik terimleri (roll, pitch, yaw, attention, gradient) orijinal İngilizce halleriyle koru."
+                "Cevapları doğrudan konuya girerek, gereksiz nezaket cümleleri olmadan öz ve net tut.",
+                "Kullanıcı açıkça istemediği sürece ASLA kod bloğu üretme; matematiksel formüller ($$...$$) ve mimari analizle açıkla.",
+                "Teknik terimleri (roll, pitch, yaw, attention, gradient) orijinal teknik halleriyle koru."
             ]
 
         try:
@@ -337,27 +432,34 @@ Bu belge, Samet ile yapılan sohbetler ve verilen geri bildirimler (👍/👎, t
                             axioms.append(clean_item)
             return axioms or [
                 "Cevapları doğrudan konuya girerek, gereksiz nezaket cümleleri olmadan öz ve net tut.",
-                "Teknik derinlik, net tensör boyutları ve çalışan kod blokları sun."
+                "Kullanıcı açıkça kod istemediği sürece ASLA kod bloğu üretme; teorik ve matematiksel anlatım yap."
             ]
         except Exception:
-            return ["Öz, net, teknik derinlikli ve kod ağırlıklı anlat."]
+            return ["Cevapları doğrudan konuya girerek öz, net ve pedagojik derinlikte sun."]
 
-    def get_style_prompt_injection(self, mode: str = "general") -> str:
+    def get_style_prompt_injection(self, query: str = "", mode: str = "general") -> str:
         """
-        Formats active learned axioms into a direct, high-priority system prompt injection.
-        All user-reinforced rules are respected without arbitrary keyword filtering.
+        Formats active learned axioms and gold exemplars into a high-priority system prompt injection.
+        Enforces continuous in-context self-training without latency.
         """
         axioms = self.get_active_axioms()
-        if not axioms:
-            return ""
-
         lines = [
             "### 🎯 KULLANICIYA ÖZEL PEKİŞTİRİLMİŞ TARZ VE TERCİHLER (RL POLICY):",
             "Kullanıcı ile geçmiş etkileşimlerden ve geri bildirimlerden öğrenilmiş aşağıdaki tarz kurallarına KESİNLİKLE uy:"
         ]
         for a in axioms:
             lines.append(f"• {a}")
-        lines.append("Bu kurallar senin yanıt biçimini, dil tonunu, kod yoğunluğunu ve detay seviyeni doğrudan belirlemelidir.")
+        
+        lines.append("• KULLANICI KURALI: Kullanıcı açıkça istemediği sürece ASLA kod bloğu verme. Matematiksel formüller ($$...$$) ve kavramsal analizle açıkla.")
+
+        # In-Context Few-Shot Self-Training: Inject relevant gold exemplars if available
+        if query:
+            matching_exemplars = self.get_gold_exemplars(query, max_items=1)
+            if matching_exemplars:
+                lines.append("\n### ⭐ GEÇMİŞTE PEKİŞTİRİLMİŞ ALTIN ÖRNEK (GOLD EXEMPLAR):")
+                lines.append(f"Kullanıcı Sorusuna İdeal Yaklaşım Referansı:\nSoru: {matching_exemplars[0]['query']}\nİdeal Yanıt Özeti:\n{matching_exemplars[0]['response'][:400]}...")
+
+        lines.append("\nBu kurallar senin yanıt biçimini, dil tonunu ve detay seviyeni doğrudan belirlemelidir.")
         return "\n".join(lines)
 
 
@@ -369,14 +471,3 @@ if __name__ == "__main__":
     print("[*] Testing RLFeedbackEngine...")
     print("Initial Metrics:", rl_engine.get_metrics())
     print("Active Axioms:", rl_engine.get_active_axioms())
-    
-    # Test recording feedback
-    res = rl_engine.record_feedback(
-        query="Coordinate Attention nasıl çalışır?",
-        response="Coordinate Attention 1D pooling kullanır...",
-        reward=1.0,
-        style_tag="code_heavy",
-        user_comment="Harika, kodları çok iyi verdin aynen böyle devam et."
-    )
-    print("Recorded Feedback:", res)
-    print("Injected Prompt:\n", rl_engine.get_style_prompt_injection())

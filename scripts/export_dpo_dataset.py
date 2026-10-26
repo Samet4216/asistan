@@ -8,6 +8,7 @@ into standard HuggingFace / Unsloth DPO format for offline fine-tuning:
 import sys
 import io
 import json
+import re
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -54,27 +55,34 @@ def export_dpo_dataset(min_feedback: int = 1) -> str:
             query_map[q] = {"positives": [], "negatives": []}
         
         reward = float(e.get("reward", 0.0))
-        resp = e.get("response", "")
-        if reward > 0:
+        resp = e.get("response", "").strip()
+        if reward > 0 and resp:
             query_map[q]["positives"].append(resp)
-        elif reward < 0:
+        elif reward < 0 and resp:
             query_map[q]["negatives"].append(resp)
 
     dpo_pairs = []
     for q, data in query_map.items():
         if data["positives"] and data["negatives"]:
-            # Direct pair
+            # Direct preference pair
             dpo_pairs.append({
                 "prompt": q,
                 "chosen": data["positives"][-1],
                 "rejected": data["negatives"][-1]
             })
         elif data["positives"] and not data["negatives"]:
-            # Single chosen with implicit rejected note
+            # Positive chosen with baseline rejected
             dpo_pairs.append({
                 "prompt": q,
                 "chosen": data["positives"][-1],
-                "rejected": "Generic verbose or unfocused explanation."
+                "rejected": "Yüzeysel, teorik motivasyondan veya matematiksel formüllerden yoksun genel anlatım."
+            })
+        elif data["negatives"] and not data["positives"]:
+            # Negative rejected with baseline ideal response
+            dpo_pairs.append({
+                "prompt": q,
+                "chosen": "Bu soruya doğrulanmış kaynaklar, net formüller ve dürüst kanıtlarla doğrudan yanıt ver.",
+                "rejected": data["negatives"][-1]
             })
 
     with open(OUTPUT_DPO_FILE, "w", encoding="utf-8") as f:

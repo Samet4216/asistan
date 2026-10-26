@@ -4,6 +4,7 @@ Captures real user-assistant interactions, filters high-value dialogs,
 and formats them for both:
 1. Few-shot In-Context Ollama Modelfile Persona (Instant 0-VRAM model creation).
 2. QLoRA Fine-Tuning JSONL (ShareGPT / Alpaca format for RTX 4050 local training).
+3. Continuous Self-Training synchronization with DPO dataset and Modelfile.
 """
 
 import sys
@@ -23,6 +24,8 @@ if sys.platform == "win32":
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+import config
 
 CONV_DIR = PROJECT_ROOT / "data" / "my_conversations"
 CONV_DIR.mkdir(parents=True, exist_ok=True)
@@ -143,23 +146,37 @@ class ConversationCollector:
 
     def generate_ollama_modelfile(self, base_model: str = "qwen2.5:7b-instruct-q4_K_M") -> str:
         """
-        Creates a custom Ollama Modelfile with Samet's personal system prompt and
-        real few-shot conversation examples, ready for `ollama create samet-partner -f Modelfile.samet`.
+        Creates a custom Ollama Modelfile with Samet's personal system prompt,
+        learned active axioms, and real few-shot conversation examples.
         """
         from memory.user_profile import profile_manager
+        from memory.rl_feedback import rl_engine
         about_me = profile_manager.get_about_me()
+        axioms = rl_engine.get_active_axioms()
         interactions = self.get_all_interactions()
 
-        # Pick up to 5 best interactions as few-shot examples
+        # Pick top pristine interactions as few-shot examples (Prioritize verified Gold Exemplars)
+        from memory.rl_feedback import rl_engine
+        gold_list = rl_engine.get_gold_exemplars()
         clean_examples = []
-        for it in reversed(interactions):
-            if it.get("reward", 0) >= 0 and len(it.get("assistant", "")) > 15:
-                u = it.get("user", "").replace('"', '\\"').replace("\n", " ")
-                a = it.get("assistant", "").replace('"', '\\"').replace("\n", " ")
-                if len(u) < 150 and len(a) < 500:
-                    clean_examples.append((u, a))
-                if len(clean_examples) >= 4:
+        
+        for g in reversed(gold_list):
+            q = g.get("query", "").replace('"', '\\"').replace("\n", " ").strip()
+            r = g.get("response", "").replace('"', '\\"').replace("\n", " ").strip()
+            if q and r and len(q) < 160 and len(r) < 600 and "" not in r and "Özür dilerim" not in r:
+                clean_examples.append((q, r))
+                if len(clean_examples) >= 3:
                     break
+
+        if len(clean_examples) < 3:
+            for it in reversed(interactions):
+                if float(it.get("reward", 0)) >= 0.8:
+                    u = it.get("user", "").replace('"', '\\"').replace("\n", " ").strip()
+                    a = it.get("assistant", "").replace('"', '\\"').replace("\n", " ").strip()
+                    if u and a and "" not in a and "Özür dilerim" not in a and len(u) < 160 and len(a) < 600:
+                        clean_examples.append((u, a))
+                        if len(clean_examples) >= 3:
+                            break
 
         few_shot_lines = []
         for u, a in clean_examples:
@@ -168,26 +185,27 @@ class ConversationCollector:
 
         few_shot_block = "\n".join(few_shot_lines)
 
+        axiom_lines = "\n".join([f"- {ax}" for ax in axioms])
+
         modelfile_content = f"""FROM {base_model}
 
-# Çıkarım Parametreleri (Bol sohbetli, akıcı, sıcak ve samimi)
-PARAMETER temperature 0.75
+# Çıkarım Parametreleri (Dengeli, akıcı, deterministik)
+PARAMETER temperature 0.2
 PARAMETER top_p 0.9
 PARAMETER top_k 40
 PARAMETER repeat_penalty 1.15
 PARAMETER num_ctx 8192
 
-# Samet'e Özel Kişiselleştirilmiş Sistem İstemcisi
-SYSTEM \"\"\"Sen Samet'in kişisel yapay zeka araştırma ortağı ve en yakın laboratuvar arkadaşısın.
-Samet ile konuşurken son derece akıcı, samimi, esprili, cana yakın ve sohbeti bol bir arkadaş gibi konuşursun.
+# Samet'e Özel Kişiselleştirilmiş Sistem İstemcisi (Pekiştirilmiş Tarz)
+SYSTEM \"\"\"Sen Samet'in kişisel yapay zeka araştırma ortağı ve sinir ağları mühendisi asistanısın.
 Samet'i çok iyi tanıyorsun:
 {about_me}
 
-SOHBET TARZIN:
-- Samet "selam", "naber", "cano", "dostum" dediğinde içtenlikle hal hatır sorarsın, gününün nasıl geçtiğini merak edersin.
-- Sohbeti bol tutarsın; tek kelimelik kuru cevaplar vermez, laf lafı açacak şekilde sıcak ve doğal konuşursun.
-- Samet açıkça bir formül veya kod sormadıkça asla soğuk akademik kalıplara girmezsin.
-- Türkçe'yi günlük, sıcak ve akıcı konuşursun.
+PEKİŞTİRİLMİŞ TARZ VE ÖĞRENİLMİŞ KURALLAR:
+{axiom_lines}
+- KULLANICI KURALI: Samet açıkça kod istemediği sürece ASLA kod bloğu üretme. Teorik motivasyon, mimari analiz ve matematiksel formüller ($$...$$) üzerinden açıkla.
+- Bilmediğin veya doğrulanmamış konularda spekülasyon yapma, dürüstçe kaynak yetersizliğini belirt.
+- Türkçe'yi akıcı, teknik derinlikli ve doğrudan anlatımla konuş.
 \"\"\"
 
 {few_shot_block}
@@ -195,13 +213,28 @@ SOHBET TARZIN:
         MODELFILE_PATH.write_text(modelfile_content, encoding="utf-8")
         return str(MODELFILE_PATH)
 
+    def sync_self_training(self) -> Dict[str, Any]:
+        """
+        Consolidates reinforcement feedback into active self-training artifacts:
+        1. Builds ShareGPT training dataset (train_sharegpt.jsonl).
+        2. Exports DPO dataset (dpo_training_dataset.jsonl).
+        3. Updates Modelfile.samet with latest axioms and gold exemplars.
+        """
+        sharegpt_res = self.build_training_dataset()
+        from scripts.export_dpo_dataset import export_dpo_dataset
+        dpo_path = export_dpo_dataset(min_feedback=1)
+        modelfile_path = self.generate_ollama_modelfile(base_model=getattr(config, "MODEL", "qwen2.5:7b-instruct-q4_K_M"))
+        return {
+            "sharegpt_dialogs": sharegpt_res.get("total_dialogs", 0),
+            "dpo_path": dpo_path,
+            "modelfile_path": modelfile_path
+        }
+
 
 collector = ConversationCollector()
 
 
 if __name__ == "__main__":
-    print("[*] Testing ConversationCollector...")
-    res = collector.build_training_dataset()
-    print("Training dataset built:", res)
-    mf = collector.generate_ollama_modelfile()
-    print("Ollama Modelfile generated at:", mf)
+    print("[*] Testing ConversationCollector & Self-Training Sync...")
+    res = collector.sync_self_training()
+    print("Self-training synchronized:", res)

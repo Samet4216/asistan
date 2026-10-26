@@ -301,13 +301,21 @@ with tab_chat:
                 with act_col1:
                     if st.button("👍", key=f"btn_up_{idx}", help="Bu tarzı ve yaklaşımı pekiştir"):
                         rl_engine.record_feedback(user_query_for_msg, content, reward=1.0, style_tag="positive")
-                        collector.sync_self_training()
+                        try:
+                            if hasattr(collector, "sync_self_training"):
+                                collector.sync_self_training()
+                        except Exception:
+                            pass
                         st.toast("🎯 Yanıt altın örnek olarak mühürlendi ve model güncellendi! (+1.0)", icon="👍")
                         st.rerun()
                 with act_col2:
                     if st.button("👎", key=f"btn_down_{idx}", help="Bu cevabı beğenmedim / hatalı buldum"):
                         rl_engine.record_feedback(user_query_for_msg, content, reward=-1.0, style_tag="negative")
-                        collector.sync_self_training()
+                        try:
+                            if hasattr(collector, "sync_self_training"):
+                                collector.sync_self_training()
+                        except Exception:
+                            pass
                         st.toast("Geri bildirim kaydedildi (-1.0). İstersen '✏️ Doğrusunu Öğret' ile doğrusunu mühürleyebilirsin.", icon="👎")
                         st.rerun()
                 with act_col3:
