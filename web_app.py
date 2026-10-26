@@ -12,7 +12,7 @@ Provides a high-end, futuristic dark glassmorphism research laboratory interface
 
 import sys
 import re
-import subprocess
+import json
 from pathlib import Path
 from datetime import datetime
 
@@ -26,6 +26,13 @@ import psutil
 import config
 import llm
 import budget
+from utils import (
+    get_gpu_status,
+    normalize_latex,
+    is_casual_or_personal,
+    is_challenge_request,
+    contextualize_query
+)
 from retrieval.search import searcher
 from answer.prompts import (
     build_answer_prompt,
@@ -40,6 +47,7 @@ from memory.errors import error_manager
 from memory.user_profile import profile_manager
 from memory.auto_memory import auto_memory
 from memory.rl_feedback import rl_engine
+from memory.alignment_interview import alignment_interviewer
 from memory.graph_visualizer import get_vault_graph_data, generate_graph_html
 from ingest.single_ingest import ingest_arxiv_paper
 from ingest.local_file_ingest import ingest_uploaded_file
@@ -53,438 +61,23 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom High-End Cyber-Lab CSS & Typography
-st.markdown("""
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-<style>
-    /* Global Base Canvas */
-    .stApp {
-        background: radial-gradient(circle at 10% 10%, #0d1527 0%, #060911 100%) !important;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
-        color: #e2e8f0 !important;
-    }
-
-    /* Sidebar Glassmorphism */
-    section[data-testid="stSidebar"] {
-        background: rgba(10, 15, 29, 0.88) !important;
-        backdrop-filter: blur(28px) !important;
-        border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
-        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4) !important;
-    }
-
-    /* Sleek Custom Scrollbars */
-    ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-        background: transparent;
-    }
-    ::-webkit-scrollbar-thumb {
-        background: rgba(56, 189, 248, 0.28);
-        border-radius: 999px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-        background: rgba(56, 189, 248, 0.6);
-    }
-
-    /* Typography & Line Spacing */
-    p, li, span {
-        line-height: 1.72 !important;
-    }
-
-    /* Modern Chat Bubble Styling */
-    .stChatMessage {
-        border-radius: 14px !important;
-        padding: 20px 24px !important;
-        margin-bottom: 20px !important;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    /* Assistant Message Glass Card */
-    .stChatMessage:has([data-testid="chatAvatarIcon-assistant"]) {
-        background: linear-gradient(135deg, rgba(15, 23, 42, 0.75) 0%, rgba(20, 30, 55, 0.45) 100%) !important;
-        border: 1px solid rgba(56, 189, 248, 0.25) !important;
-        border-left: 4px solid #38bdf8 !important;
-        box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
-    }
-
-    /* User Message Gradient Card */
-    .stChatMessage:has([data-testid="chatAvatarIcon-user"]) {
-        background: linear-gradient(135deg, rgba(30, 27, 75, 0.55) 0%, rgba(15, 23, 42, 0.65) 100%) !important;
-        border: 1px solid rgba(129, 140, 248, 0.3) !important;
-        border-left: 4px solid #818cf8 !important;
-        box-shadow: 0 6px 24px -2px rgba(0, 0, 0, 0.4) !important;
-    }
-
-    /* KaTeX Mathematical Formula Styling */
-    .katex-display {
-        margin: 1.3em 0 !important;
-        padding: 1.1em 1.4em !important;
-        background: rgba(3, 7, 18, 0.65) !important;
-        border: 1px solid rgba(56, 189, 248, 0.25) !important;
-        border-radius: 10px !important;
-        box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5) !important;
-        overflow-x: auto;
-    }
-
-    /* Code Blocks */
-    pre, code {
-        font-family: 'Fira Code', 'JetBrains Mono', monospace !important;
-    }
-    pre {
-        background: #040711 !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 10px !important;
-        padding: 14px 18px !important;
-    }
-
-    /* Metric Cards */
-    div[data-testid="stMetric"] {
-        background: linear-gradient(180deg, rgba(22, 31, 53, 0.5) 0%, rgba(10, 15, 29, 0.7) 100%) !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 10px !important;
-        padding: 12px 14px !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
-    }
-    div[data-testid="stMetricValue"] {
-        font-size: 1.35rem !important;
-        font-weight: 700 !important;
-        color: #38bdf8 !important;
-    }
-
-    /* Sleek Blockquote Styling for Quoted Replies */
-    blockquote {
-        border-left: 3px solid #38bdf8 !important;
-        background: rgba(56, 189, 248, 0.07) !important;
-        padding: 10px 18px !important;
-        border-radius: 6px;
-        margin: 10px 0 16px 0 !important;
-        color: #cbd5e1 !important;
-        font-style: italic;
-    }
-
-    /* Status Widgets / Extended Thinking */
-    div[data-testid="stStatusWidget"] {
-        background: rgba(13, 19, 35, 0.8) !important;
-        border: 1px solid rgba(168, 85, 247, 0.35) !important;
-        border-radius: 12px !important;
-        box-shadow: 0 4px 20px rgba(168, 85, 247, 0.1) !important;
-    }
-
-    /* Live Header Status Pill */
-    .status-badge-container {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-bottom: 22px;
-    }
-    .status-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        background: rgba(15, 23, 42, 0.7);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 6px 14px;
-        border-radius: 999px;
-        font-size: 13px;
-        color: #94a3b8;
-    }
-    .status-dot {
-        width: 8px;
-        height: 8px;
-        background-color: #10b981;
-        border-radius: 50%;
-        box-shadow: 0 0 10px #10b981;
-        animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-        0%, 100% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.4; transform: scale(0.85); }
-    }
-
-    /* Quick Action Cards */
-    .quick-card {
-        background: linear-gradient(135deg, rgba(15, 23, 42, 0.6) 0%, rgba(30, 41, 59, 0.35) 100%);
-        border: 1px solid rgba(56, 189, 248, 0.2);
-        border-radius: 12px;
-        padding: 14px 18px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-    .quick-card:hover {
-        border-color: #38bdf8;
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(56, 189, 248, 0.15);
-    }
-
-    /* Hide Streamlit Debug / Ask ChatGPT buttons */
-    [data-testid="stExceptionActionButtons"],
-    .stException > div:last-child {
-        display: none !important;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Load modular CSS styling
+css_file = PROJECT_ROOT / "assets" / "style.css"
+if css_file.exists():
+    st.markdown(f"""
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+    {css_file.read_text(encoding='utf-8')}
+    </style>
+    """, unsafe_allow_html=True)
 
 
-# Interactive JavaScript for ChatGPT-style text selection and quote popover
-components.html("""
-<script>
-const parentDoc = window.parent.document;
-
-function setupQuoteButton() {
-    if (parentDoc.getElementById("agy-quote-btn")) return;
-
-    const btn = parentDoc.createElement("div");
-    btn.id = "agy-quote-btn";
-    btn.innerHTML = `
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-        </svg>
-        Alıntı Yap
-    `;
-    btn.style.position = "fixed";
-    btn.style.display = "none";
-    btn.style.zIndex = "999999";
-    btn.style.background = "#0f172a";
-    btn.style.color = "#38bdf8";
-    btn.style.border = "1px solid #38bdf8";
-    btn.style.borderRadius = "20px";
-    btn.style.padding = "6px 14px";
-    btn.style.fontSize = "13px";
-    btn.style.fontWeight = "600";
-    btn.style.fontFamily = "-apple-system, sans-serif";
-    btn.style.cursor = "pointer";
-    btn.style.boxShadow = "0 6px 20px rgba(0,0,0,0.6)";
-    btn.style.transition = "transform 0.12s ease, background 0.12s ease";
-
-    btn.onmouseenter = () => {
-        btn.style.backgroundColor = "#1e293b";
-        btn.style.transform = "scale(1.06)";
-    };
-    btn.onmouseleave = () => {
-        btn.style.backgroundColor = "#0f172a";
-        btn.style.transform = "scale(1.0)";
-    };
-
-    parentDoc.body.appendChild(btn);
-
-    let activeSelectedText = "";
-
-    function handleSelection() {
-        const selection = parentDoc.getSelection();
-        const selectedText = selection ? selection.toString().trim() : "";
-
-        if (selectedText && selectedText.length > 2) {
-            const anchorNode = selection.anchorNode;
-            const chatMsg = anchorNode ? (anchorNode.nodeType === 3 ? anchorNode.parentElement : anchorNode).closest(".stChatMessage") : null;
-            if (chatMsg) {
-                const range = selection.getRangeAt(0);
-                const rect = range.getBoundingClientRect();
-                if (rect.width > 0 && rect.height > 0) {
-                    activeSelectedText = selectedText;
-                    btn.style.top = Math.max(10, rect.top - 42) + "px";
-                    btn.style.left = Math.max(10, rect.left + (rect.width / 2) - 65) + "px";
-                    btn.style.display = "block";
-                    return;
-                }
-            }
-        }
-        btn.style.display = "none";
-    }
-
-    parentDoc.addEventListener("mouseup", () => setTimeout(handleSelection, 30));
-    parentDoc.addEventListener("keyup", () => setTimeout(handleSelection, 30));
-    parentDoc.addEventListener("selectionchange", () => {
-        if (!parentDoc.getSelection().toString().trim()) {
-            btn.style.display = "none";
-        }
-    });
-
-    btn.addEventListener("mousedown", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (!activeSelectedText) return;
-
-        const chatInput = parentDoc.querySelector('textarea[data-testid="stChatInputTextArea"]');
-        if (chatInput) {
-            const quoteLines = activeSelectedText.split("\\n").map(l => "> " + l).join("\\n");
-            const existingVal = chatInput.value ? chatInput.value.trim() + "\\n\\n" : "";
-            const newVal = existingVal + quoteLines + "\\n\\n";
-
-            const nativeSetter = Object.getOwnPropertyDescriptor(window.parent.HTMLTextAreaElement.prototype, "value").set;
-            nativeSetter.call(chatInput, newVal);
-            chatInput.dispatchEvent(new Event("input", { bubbles: true }));
-
-            chatInput.focus();
-            chatInput.selectionStart = chatInput.selectionEnd = chatInput.value.length;
-            chatInput.scrollIntoView({ behavior: "smooth" });
-        }
-
-        btn.style.display = "none";
-    });
-}
-
-setTimeout(setupQuoteButton, 500);
-</script>
-""", height=0)
-
-
-def normalize_latex(text: str) -> str:
-    """
-    Cleans LaTeX delimiters so KaTeX in Streamlit renders formulas crisply:
-    - Protects code blocks (```...```) so Python code parentheses are NEVER corrupted.
-    - Converts \\[ ... \\] -> $$ ... $$
-    - Converts \\( ... \\) -> $ ... $
-    - Converts standalone bracketed lines [ \\text{...} ] -> $$ ... $$
-    """
-    if not text:
-        return ""
-
-    parts = re.split(r'(```[\s\S]*?```)', text)
-    processed = []
-
-    for part in parts:
-        if part.startswith("```"):
-            processed.append(part)
-            continue
-
-        p = re.sub(r'\\\[([\s\S]*?)\\\]', r'$$\n\1\n$$', part)
-        p = re.sub(r'\\\(([\s\S]*?)\\\)', r'$\1$', p)
-
-        def _bracket_repl(m):
-            inner = m.group(1).strip()
-            indicators = ["=", "\\text", "\\frac", "\\times", "^", "_", "\\cdot", "\\left", "\\sum", "softmax", "ReLU"]
-            if any(tok in inner for tok in indicators):
-                return f"\n$$\n{inner}\n$$\n"
-            return m.group(0)
-
-        p = re.sub(r'(?m)^\s*\[\s*([^\n\]]+)\s*\]\s*$', _bracket_repl, p)
-        p = re.sub(r'\${3,}', '$$', p)
-        processed.append(p)
-
-    return "".join(processed)
-
-
-def is_casual_or_personal(text: str) -> bool:
-    """Detects whether prompt is a greeting, casual chat, idea sharing, or personal profile declaration."""
-    p = text.strip().lower()
-    conversational_starters = [
-        "whats up", "what's up", "sup", "hello", "hi", "hey", "how are you",
-        "how's it going", "good morning", "good evening", "who are you",
-        "kanka", "kankam", "hocam", "dostum", "reis", "selam", "merhaba",
-        "naber", "nasılsın", "günaydın", "iyi akşamlar", "iyi günler",
-        "kolay gelsin", "merhabalar", "selamlar", "selamün aleyküm", "bak şimdi",
-        "sen kimsin", "kimsin sen", "beni tanıyor musun", "adın ne", "ne yapıyorsun",
-        "ne haber", "ne var ne yok"
-    ]
-    personal_cues = [
-        "benim adım", "adım ", "aklında tut", "hafızana kaydet",
-        "beni hatırla", "projem", "çalışmaya başladım", "çalışıyorum",
-        "düşünüyorum", "planlıyorum", "yapmak istiyorum", "öğrenciyim", "okuyorum",
-        "fikrim var", "bir model eğiteceğim", "model eğitmeyi", "başlayacağım",
-        "yapacağım", "benim hakkımda", "hakkımda ne biliyorsun", "beni tanıyor musun",
-        "geçmişim", "okulum", "bölümüm", "tezim", "ben ", "benim "
-    ]
-    if any(p == g or p.startswith(g) or g in p.split()[:3] for g in conversational_starters):
-        return True
-    if any(cue in p for cue in personal_cues) and len(p.split()) < 40:
-        return True
-    return False
-
-
-def is_challenge_request(text: str) -> bool:
-    """Detects whether prompt is requesting a Devil's Advocate or hypothesis stress-test."""
-    p = text.strip().lower()
-    if p.startswith("/challenge") or p.startswith("/test-hypo"):
-        return True
-    triggers = [
-        "hipotezimi test et", "hipotezimi sına", "bu fikrimi çürüt",
-        "fikrimi eleştir", "fikrimi sına", "şeytanın avukatı",
-        "devil's advocate", "failure mode analizi", "hipotezi test et",
-        "hipotezimi değerlendir", "fikrimi değerlendir"
-    ]
-    return any(trig in p for trig in triggers)
-
-
-def contextualize_query(current_query: str, history: list) -> str:
-    """
-    Augments genuine follow-up questions or quoted replies with conversation context.
-    NEVER overrides standalone or topic-changing questions.
-    """
-    if not history or len(history) <= 1:
-        return current_query
-
-    # If query contains an explicit blockquote reply (> ...):
-    if ">" in current_query:
-        lines = current_query.split("\n")
-        quote_lines = [l.replace(">", "").strip() for l in lines if l.strip().startswith(">")]
-        user_lines = [l.strip() for l in lines if l.strip() and not l.strip().startswith(">")]
-        quote_text = " ".join(quote_lines)[:80]
-        user_q = " ".join(user_lines)
-        return f"{quote_text} : {user_q}"
-
-    lower_q = current_query.strip().lower()
-
-    # Explicit triggers that signify a dependent follow-up referencing previous turn
-    followup_starters = [
-        "peki ", "peki ya ", "peki bu ", "peki bunun ", "peki onun ",
-        "what about ", "and what about ", "how about ", "and why is "
-    ]
-    referential_keywords = [
-        "bunun", "bunu", "buna", "bunda", "ondan", "onun", "ona", "onu",
-        "aralarındaki fark", "yukarıdaki", "bahsettiğin", "bu formül", "bu kod",
-        "the former", "the latter", "difference between them"
-    ]
-
-    is_starter = any(lower_q.startswith(s) for s in followup_starters)
-    is_referential = any(re.search(r'\b' + re.escape(w) + r'\b', lower_q) for w in referential_keywords)
-
-    if is_starter or is_referential:
-        last_user_query = ""
-        for msg in reversed(history):
-            if msg.get("role") == "user":
-                last_user_query = msg.get("content", "")
-                break
-
-        if last_user_query and last_user_query != current_query:
-            clean_topic = last_user_query
-            for pfx in ["explain", "how does", "why do", "what is", "what are", "anlat", "açıkla"]:
-                clean_topic = re.sub(r"^" + re.escape(pfx) + r"\s+", "", clean_topic, flags=re.I)
-            clean_topic = clean_topic[:50].strip()
-            return f"{clean_topic} : {current_query}"
-
-    return current_query
-
-
-def get_gpu_status():
-    """Queries NVIDIA SMI for real-time RTX 4050 metrics."""
-    try:
-        cmd = [
-            "nvidia-smi",
-            "--query-gpu=name,memory.total,memory.used,memory.free,temperature.gpu,utilization.gpu",
-            "--format=csv,noheader,nounits"
-        ]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
-        if res.returncode == 0 and res.stdout.strip():
-            p = [x.strip() for x in res.stdout.strip().split(",")]
-            if len(p) >= 6:
-                return {
-                    "available": True,
-                    "name": p[0],
-                    "total": int(p[1]),
-                    "used": int(p[2]),
-                    "free": int(p[3]),
-                    "temp": int(p[4]),
-                    "util": int(p[5])
-                }
-    except Exception:
-        pass
-    return {"available": False}
+# Load modular quotation popover script
+js_file = PROJECT_ROOT / "assets" / "quote_popover.js"
+if js_file.exists():
+    components.html(f"<script>{js_file.read_text(encoding='utf-8')}</script>", height=0)
 
 
 # --- SIDEBAR CONTROLS ---
@@ -678,14 +271,18 @@ tab_chat, tab_graph, tab_corpus, tab_radar = st.tabs([
 
 with tab_chat:
     # Top Chat Action Toolbar
-    tool_col1, tool_col2, tool_col3 = st.columns([2.5, 1, 1])
+    tool_col1, tool_col2, tool_col3, tool_col4 = st.columns([2.0, 1.4, 0.9, 0.9])
     with tool_col1:
         st.caption(f"🧠 Aktif Seans: {len(st.session_state.get('messages', []))} mesaj • Yerel CUDA Hazır")
     with tool_col2:
+        if st.button("🎙️ Zihniyetimi Öğret", key="btn_start_align", help="Modelin sana derin mühendislik soruları sorarak projelerinin nedenini ve karar tarzını öğrenmesini başlatır (/align)"):
+            st.session_state.pending_prompt = "/align"
+            st.rerun()
+    with tool_col3:
         if st.button("🧹 Temizle", key="clear_chat_toolbar", help="Sohbet geçmişini sıfırlar"):
             st.session_state.messages = [st.session_state.messages[0]]
             st.rerun()
-    with tool_col3:
+    with tool_col4:
         export_md = "# Local DL Lab Assistant — Sohbet Dökümü\n\n"
         for m in st.session_state.get("messages", []):
             role_label = "👤 **Kullanıcı:**" if m["role"] == "user" else "🤖 **Asistan:**"
@@ -698,6 +295,10 @@ with tab_chat:
             key="export_chat_toolbar",
             help="Sohbet dökümünü Markdown dosyası olarak indirir."
         )
+
+    # Display interview banner if active
+    if st.session_state.get("interview_mode", False):
+        st.info("🎙️ **Bilişsel Zihniyet Hizalama Röportajı Devam Ediyor**\n\nModel şu anda projelerinin arkasındaki amacı ve mühendislik karar mantığını öğreniyor. Röportajı sonlandırmak için chat'e `/cikis` veya `Bitir` yazabilirsiniz.")
 
     # Initialize session messages
     if "messages" not in st.session_state:
@@ -726,6 +327,10 @@ with tab_chat:
             if st.button("📐 Coordinate Attention: 1D Uzamsal Pooling", use_container_width=True):
                 st.session_state.pending_prompt = "Coordinate Attention yatay ve dikey 1D pooling ile konumsal bilgiyi nasıl korur? Formüllerini ve tensör boyutlarını açıkla."
                 st.rerun()
+        st.write("")
+        if st.button("🎙️ /align: Bilişsel Zihniyet Hizalama Röportajı (Modelin Benim Gibi Düşünmesini Sağla)", use_container_width=True):
+            st.session_state.pending_prompt = "/align"
+            st.rerun()
         st.write("")
 
     # Render chat history with normalized LaTeX and Obsidian Save buttons
@@ -821,8 +426,84 @@ with tab_chat:
 
         # Generate Response
         with st.chat_message("assistant"):
+            clean_p = prompt.strip().lower()
+            is_align_cmd = clean_p in ["/align", "/hizala", "zihniyetimi öğret", "röportaj"] or clean_p.startswith("/align")
+
+            # 0. Alignment Interview Trigger
+            if is_align_cmd:
+                st.session_state.interview_mode = True
+                st.session_state.interview_history = []
+                with st.spinner("🧠 Samet'in projeleri ve zihniyetine özel soru hazırlanıyor..."):
+                    first_q = alignment_interviewer.generate_next_question([])
+                    st.session_state.current_interview_q = first_q
+                    
+                    response_text = (
+                        "### 🎙️ Bilişsel Zihniyet Hizalama Röportajı Başlatıldı\n\n"
+                        "Amacım yalnızca ne çalıştığını değil; **projelerini ne amaçla yaptığını, sahadaki hangi darboğazı çözdüğünü ve senin karar mantığını** "
+                        "öğrenerek tam bir bilişsel ikizin haline gelmek.\n\n"
+                        f"**Soru 1:** {first_q}\n\n"
+                        "*İstediğin zaman `/cikis` veya 'Bitir' yazarak normal moda dönebilirsin.*"
+                    )
+                    st.markdown(response_text)
+                    st.session_state.messages.append({"role": "assistant", "content": response_text})
+                    st.rerun()
+
+            # 0.1 Ongoing Alignment Interview Turn
+            elif st.session_state.get("interview_mode", False):
+                if clean_p in ["/cikis", "bitir", "çıkış", "exit", "tamam"]:
+                    st.session_state.interview_mode = False
+                    st.session_state.current_interview_q = None
+                    exit_msg = (
+                        "### 🏁 Zihniyet Hizalama Röportajı Tamamlandı\n\n"
+                        "Harika! Paylaştığın tüm karar ilkeleri, donanım öncelikleri ve projelerinin nihai amaçları "
+                        "pekiştirmeli hafızaya (`Vault/00_Profile/Reinforcement_Policy.md`) işlendi. "
+                        "Artık tüm teknik ve mimari analizlerde senin gözünden düşüneceğim!"
+                    )
+                    st.markdown(exit_msg)
+                    st.session_state.messages.append({"role": "assistant", "content": exit_msg})
+                    st.rerun()
+                else:
+                    curr_q = st.session_state.get("current_interview_q", "Genel Mühendislik Zihniyeti")
+                    with st.spinner("Düşünce tarzın ve projenin 'neden'i çözümleniyor..."):
+                        interview_res = alignment_interviewer.process_answer(curr_q, prompt)
+                        if "interview_history" not in st.session_state:
+                            st.session_state.interview_history = []
+                        st.session_state.interview_history.append({"question": curr_q, "answer": prompt})
+                        
+                        heuristic_badge = f"🧠 **Öğrenilen Karar İlkesi:** `{interview_res['heuristic']}`"
+                        st.toast("🎯 Zihniyet ilkesi kalıcı hafızaya işlendi!", icon="🧠")
+
+                        if len(st.session_state.interview_history) >= 3:
+                            st.session_state.interview_mode = False
+                            st.session_state.current_interview_q = None
+                            wrap_msg = (
+                                f"### ✅ 3/3 Zihniyet Analizi Başarıyla Tamamlandı!\n\n"
+                                f"{interview_res['confirmation']}\n\n"
+                                f"- {heuristic_badge}\n"
+                                f"- 🎯 **Proje Teleolojisi:** {interview_res['project_why']}\n\n"
+                                f"Tüm ilkeler model hafızasına (`Reinforcement_Policy.md`) mühürlendi. "
+                                f"Şimdi istediğin bir teknik soruyu sorabilirsin, artık senin zihnindeki önceliklerle yanıtlayacağım!"
+                            )
+                            st.markdown(wrap_msg)
+                            st.session_state.messages.append({"role": "assistant", "content": wrap_msg})
+                            st.rerun()
+                        else:
+                            next_q_num = len(st.session_state.interview_history) + 1
+                            next_q = alignment_interviewer.generate_next_question(st.session_state.interview_history)
+                            st.session_state.current_interview_q = next_q
+                            
+                            step_msg = (
+                                f"{interview_res['confirmation']}\n\n"
+                                f"{heuristic_badge}\n\n"
+                                f"---\n\n"
+                                f"**Soru {next_q_num}/3:** {next_q}"
+                            )
+                            st.markdown(step_msg)
+                            st.session_state.messages.append({"role": "assistant", "content": step_msg})
+                            st.rerun()
+
             # 1. Check if Casual Chat or Personal Profile Statement
-            if is_casual_or_personal(prompt):
+            elif is_casual_or_personal(prompt):
                 casual_msgs = build_casual_response_prompt(prompt, history=st.session_state.messages[:-1])
                 stream = llm.stream_generate(casual_msgs, max_tokens=1500, temperature=0.6)
                 full_response = st.write_stream(stream)
@@ -1016,197 +697,8 @@ with tab_corpus:
     st.markdown("### 📚 Yerel RAG Makale Kütüphanesi (arXiv Corpus)")
     st.caption("Yerel ChromaDB vektör hafızamıza indekslenmiş 21 temel makale (YOLO, ConvNeXt, SAC, Vision Transformer, Attention ve Edge AI). Kartlardaki tek tıkla sorgulama butonunu kullanarak o makale hakkında anında derinlemesine analiz başlatabilirsiniz.")
 
-    papers_info = [
-        {
-            "id": "1706.03762",
-            "title": "Attention Is All You Need",
-            "authors": "Vaswani et al. (Google Brain)",
-            "domain": "Transformer & Attention",
-            "color": "#38bdf8",
-            "desc": "Transformatör mimarisinin temeli; scaled dot-product ve multi-head attention mekanizması.",
-            "prompt": "Attention Is All You Need makalesindeki scaled dot-product attention formülasyonunu ve tensör dönüşümlerini açıkla."
-        },
-        {
-            "id": "1707.06347",
-            "title": "Proximal Policy Optimization (PPO)",
-            "authors": "Schulman et al. (OpenAI)",
-            "domain": "Reinforcement Learning",
-            "color": "#10b981",
-            "desc": "Clipped surrogate objective ile kararlı, verimli politika gradyanı ve güven bölgesi optimizasyonu.",
-            "prompt": "PPO makalesindeki clipped surrogate objective formülünü ve trust region sezgisini açıkla."
-        },
-        {
-            "id": "2305.18290",
-            "title": "Direct Preference Optimization (DPO)",
-            "authors": "Rafailov et al. (Stanford)",
-            "domain": "RLHF & Alignment",
-            "color": "#a855f7",
-            "desc": "Ayrı bir ödül modeli gerektirmeden insan tercihlerinden doğrudan türetilen kapalı form kayıp fonksiyonu.",
-            "prompt": "DPO matematiksel olarak Bradley-Terry modelini nasıl doğrudan politika kaybına dönüştürür?"
-        },
-        {
-            "id": "2205.14135",
-            "title": "FlashAttention: Fast & Memory-Efficient Attention",
-            "authors": "Dao et al. (Stanford)",
-            "domain": "IO-Aware Optimization",
-            "color": "#f59e0b",
-            "desc": "SRAM tiling ve online softmax ile GPU bellek bant genişliği darboğazını çözen exact attention.",
-            "prompt": "FlashAttention GPU bellek hiyerarşisinde SRAM tiling ve online softmax ile HBM erişimini nasıl azaltır?"
-        },
-        {
-            "id": "2310.11511",
-            "title": "Self-RAG: Learning to Retrieve, Generate & Critique",
-            "authors": "Asai et al. (Univ. of Washington)",
-            "domain": "Adaptive RAG & Reflection",
-            "color": "#ec4899",
-            "desc": "Reflection token'ları ([Retrieve], [IsRel], [IsSup]) ile dinamik arama ve model halüsinasyon kontrolü.",
-            "prompt": "Self-RAG reflection tokenları ile model halüsinasyonunu nasıl kontrol altına alır?"
-        },
-        {
-            "id": "1512.03385",
-            "title": "Deep Residual Learning for Image Recognition (ResNet)",
-            "authors": "He et al. (Microsoft Research)",
-            "domain": "Computer Vision & Gradients",
-            "color": "#38bdf8",
-            "desc": "Residual shortcut bağlantıları (x + F(x)) ile yok olan gradyanları engelleyip 152+ katmanlı ağların eğitimi.",
-            "prompt": "ResNet skip connection matematiksel olarak degrade olan gradyan akışını nasıl çözer?"
-        },
-        {
-            "id": "2010.11929",
-            "title": "An Image is Worth 16x16 Words (ViT)",
-            "authors": "Dosovitskiy et al. (Google Research)",
-            "domain": "Vision Transformer",
-            "color": "#6366f1",
-            "desc": "Görüntüleri 16x16 yamalara bölüp saf Transformer kodlayıcısına besleyen görsel derin öğrenme devrimi.",
-            "prompt": "Vision Transformer (ViT) patch projection ve position embedding aşamalarını adım adım tensörlerle açıkla."
-        },
-        {
-            "id": "2103.14030",
-            "title": "Swin Transformer: Hierarchical Vision Transformer",
-            "authors": "Liu et al. (Microsoft Research)",
-            "domain": "Hierarchical Vision",
-            "color": "#06b6d4",
-            "desc": "Shifted Window mekanizması ile lineer hesaplama karmaşıklığı O(N) ve hiyerarşik piramidal özellikler.",
-            "prompt": "Swin Transformer shifted window mekanizması pencereler arası etkileşimi lineer karmaşıklıkla nasıl sağlar?"
-        },
-        {
-            "id": "2103.02907",
-            "title": "Coordinate Attention for Mobile Networks",
-            "authors": "Hou et al.",
-            "domain": "Lightweight Mobile Attention",
-            "color": "#14b8a6",
-            "desc": "Yatay ve dikey 1D pooling ile kanal dikkatine yön ve konumsal bilgi kazandıran hafif blok.",
-            "prompt": "Coordinate Attention yatay ve dikey 1D pooling ile konumsal bilgiyi nasıl kodlar?"
-        },
-        {
-            "id": "1312.5602",
-            "title": "Playing Atari with Deep RL (DQN)",
-            "authors": "Mnih et al. (DeepMind)",
-            "domain": "Deep Reinforcement Learning",
-            "color": "#8b5cf6",
-            "desc": "Experience Replay ve Target Network ile kararlı derin Q-öğrenme mimarisi.",
-            "prompt": "DQN mimarisinde experience replay buffer ve hedef ağ stabiliteyi nasıl garanti eder?"
-        },
-        {
-            "id": "1412.6980",
-            "title": "Adam: A Method for Stochastic Optimization",
-            "authors": "Kingma & Ba",
-            "domain": "Optimization & Gradients",
-            "color": "#eab308",
-            "desc": "Birinci ve ikinci moment tahminleri ile adaptif öğrenme oranı optimizasyonu.",
-            "prompt": "Adam optimizer birinci ve ikinci moment düzeltmelerini formülleriyle açıkla."
-        },
-        {
-            "id": "2405.14458",
-            "title": "YOLOv10: Real-Time End-to-End Object Detection",
-            "authors": "Wang et al. (Tsinghua University)",
-            "domain": "Real-Time Object Detection",
-            "color": "#f97316",
-            "desc": "NMS-free ikili etiket atama ve hafif sınıflandırma başlıkları ile NMS gecikmesini sıfırlayan uçtan uca YOLO.",
-            "prompt": "YOLOv10 mimarisinde dual label assignment ve NMS-free eğitim yaklaşımı çıkarım süresini nasıl optimize eder?"
-        },
-        {
-            "id": "2207.02696",
-            "title": "YOLOv7: Trainable Bag-of-Freebies",
-            "authors": "Wang, Bochkovskiy & Liao",
-            "domain": "Real-Time Object Detection",
-            "color": "#ef4444",
-            "desc": "E-ELAN (Extended ELAN) ve planlanmış yeniden parametrelendirme (re-parameterization) ile hız ve doğruluk rekoru.",
-            "prompt": "YOLOv7'deki E-ELAN mimarisi gradyan akışını bozmadan modelin öğrenme kapasitesini nasıl artırır?"
-        },
-        {
-            "id": "1708.02002",
-            "title": "Focal Loss for Dense Object Detection (RetinaNet)",
-            "authors": "Lin et al. (FAIR)",
-            "domain": "Object Detection & Loss Functions",
-            "color": "#f43f5e",
-            "desc": "Tek aşamalı dedektörlerde ön plan-arka plan sınıf dengesizliğini çözen dinamik modüle edici kayıp fonksiyonu (1 - pt)^gamma.",
-            "prompt": "Focal Loss formülündeki (1 - pt)^gamma çarpanı kolay negatif örneklerin gradyan baskısını matematiksel olarak nasıl bastırır?"
-        },
-        {
-            "id": "2201.03545",
-            "title": "A ConvNet for the 2020s (ConvNeXt)",
-            "authors": "Liu et al. (FAIR & UC Berkeley)",
-            "domain": "Modern ConvNet Architecture",
-            "color": "#0ea5e9",
-            "desc": "ResNet-50'yi Swin Transformer tasarım ilkeleriyle (7x7 depthwise konvolüsyon, inverted bottleneck, GELU) modernize eden saf CNN.",
-            "prompt": "ConvNeXt mimarisi Vision Transformer tasarım kararlarını saf evrişimli ağlara nasıl entegre eder?"
-        },
-        {
-            "id": "2404.10518",
-            "title": "MobileNetV4: Universal Models for Mobile Ecosystem",
-            "authors": "Qin et al. (Google)",
-            "domain": "Mobile & Edge Architectures",
-            "color": "#10b981",
-            "desc": "Evrensel Ters Şişe Boynu (UIB) ve Mobile MQA ile CPU, DSP ve mobil GPU'larda donanım-farkında Pareto optimizasyonu.",
-            "prompt": "MobileNetV4 Universal Inverted Bottleneck (UIB) bloğu farklı donanım hızlandırıcılarında işlem verimini nasıl maksimize eder?"
-        },
-        {
-            "id": "1905.11946",
-            "title": "EfficientNet: Rethinking Model Scaling",
-            "authors": "Tan & Le (Google Brain)",
-            "domain": "Compound Scaling & CNNs",
-            "color": "#eab308",
-            "desc": "Ağ derinliği, genişliği ve çözünürlüğünü sabit bir bileşik katsayı (alpha * beta^2 * gamma^2 ~= 2) ile dengeli büyüten ölçekleme kuralı.",
-            "prompt": "EfficientNet bileşik ölçekleme (compound scaling) kuralı derinlik, genişlik ve çözünürlüğü hangi matematiksel prensiple dengeler?"
-        },
-        {
-            "id": "1801.01290",
-            "title": "Soft Actor-Critic: Off-Policy Max-Entropy Deep RL",
-            "authors": "Haarnoja et al. (UC Berkeley)",
-            "domain": "Deep Reinforcement Learning & Robotics",
-            "color": "#8b5cf6",
-            "desc": "Beklenen ödül ile birlikte eylem entropisini de maksimize ederek sürekli kontrol ve robotik eylemlerde olağanüstü kararlılık ve keşif.",
-            "prompt": "Soft Actor-Critic (SAC) algoritmasındaki maksimum entropi hedefi politika keşfini ve sağlamlığını nasıl garanti eder?"
-        },
-        {
-            "id": "1509.02971",
-            "title": "Continuous Control with Deep RL (DDPG)",
-            "authors": "Lillicrap et al. (DeepMind)",
-            "domain": "Continuous Control & Policy Gradients",
-            "color": "#6366f1",
-            "desc": "DQN'i sürekli eylem uzayına taşıyan deterministik politika gradyanı ve hedef ağ tabanlı aktör-kritik mimarisi.",
-            "prompt": "DDPG algoritmasında deterministic actor ve critic ağlarının birbirini güncelleme mekanizmasını formüllerle açıkla."
-        },
-        {
-            "id": "2306.00978",
-            "title": "AWQ: Activation-aware Weight Quantization",
-            "authors": "Lin et al. (MIT HAN Lab)",
-            "domain": "Model Quantization & Acceleration",
-            "color": "#d946ef",
-            "desc": "Ağırlık büyüklüğü yerine aktivasyon dağılımlarını koruyarak yeniden eğitime gerek kalmadan LLM'leri 4-bit INT4'e sıkıştıran yöntem.",
-            "prompt": "AWQ (Activation-aware Weight Quantization) en kritik %1 ağırlığı tespit etmek için aktivasyon büyüklüklerini nasıl kullanır?"
-        },
-        {
-            "id": "2101.03697",
-            "title": "RepVGG: Making VGG-style ConvNets Great Again",
-            "authors": "Ding et al. (Tsinghua University)",
-            "domain": "Structural Re-parameterization",
-            "color": "#14b8a6",
-            "desc": "Eğitimde çok kollu artık bağlantılar kullanıp çıkarım anında bunları cebirsel olarak tek bir 3x3 evrişim katmanına kaynaştıran (fuse) mimari.",
-            "prompt": "RepVGG eğitimdeki 1x1 ve identity artık bağlantıları çıkarımda tek bir 3x3 evrişim çekirdeğine cebirsel olarak nasıl indirger?"
-        }
-    ]
+    catalog_path = PROJECT_ROOT / "data" / "corpus_catalog.json"
+    papers_info = json.loads(catalog_path.read_text(encoding="utf-8")) if catalog_path.exists() else []
 
     p_cols = st.columns(2)
     for idx, p in enumerate(papers_info):

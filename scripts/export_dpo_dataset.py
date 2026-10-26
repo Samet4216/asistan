@@ -12,7 +12,10 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 RL_DIR = PROJECT_ROOT / "data" / "rl_preferences"

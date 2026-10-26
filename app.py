@@ -28,6 +28,7 @@ from rich import box
 import config
 import llm
 import lang_guard
+from utils import get_gpu_status
 from retrieval.git_context import get_git_diff
 from ingest.log_parser import LogParser
 from answer.pipeline import pipeline
@@ -37,32 +38,6 @@ from answer.challenge import challenger
 
 
 console = Console()
-
-
-def get_gpu_status() -> Dict[str, Any]:
-    """Queries nvidia-smi for VRAM and thermal stats."""
-    try:
-        cmd = [
-            "nvidia-smi",
-            "--query-gpu=name,memory.total,memory.used,memory.free,temperature.gpu,utilization.gpu",
-            "--format=csv,noheader,nounits"
-        ]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
-        if res.returncode == 0 and res.stdout.strip():
-            parts = [p.strip() for p in res.stdout.strip().split(",")]
-            if len(parts) >= 6:
-                return {
-                    "available": True,
-                    "name": parts[0],
-                    "total_mb": int(parts[1]),
-                    "used_mb": int(parts[2]),
-                    "free_mb": int(parts[3]),
-                    "temp_c": int(parts[4]),
-                    "util_pct": int(parts[5])
-                }
-    except Exception:
-        pass
-    return {"available": False}
 
 
 def print_banner():

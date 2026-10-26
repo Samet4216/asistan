@@ -1,0 +1,191 @@
+[
+  {
+    "id": "1706.03762",
+    "title": "Attention Is All You Need",
+    "authors": "Vaswani et al. (Google Brain)",
+    "domain": "Transformer & Attention",
+    "color": "#38bdf8",
+    "desc": "Transformatör mimarisinin temeli; scaled dot-product ve multi-head attention mekanizması.",
+    "prompt": "Attention Is All You Need makalesindeki scaled dot-product attention formülasyonunu ve tensör dönüşümlerini açıkla."
+  },
+  {
+    "id": "1707.06347",
+    "title": "Proximal Policy Optimization (PPO)",
+    "authors": "Schulman et al. (OpenAI)",
+    "domain": "Reinforcement Learning",
+    "color": "#10b981",
+    "desc": "Clipped surrogate objective ile kararlı, verimli politika gradyanı ve güven bölgesi optimizasyonu.",
+    "prompt": "PPO makalesindeki clipped surrogate objective formülünü ve trust region sezgisini açıkla."
+  },
+  {
+    "id": "2305.18290",
+    "title": "Direct Preference Optimization (DPO)",
+    "authors": "Rafailov et al. (Stanford)",
+    "domain": "RLHF & Alignment",
+    "color": "#a855f7",
+    "desc": "Ayrı bir ödül modeli gerektirmeden insan tercihlerinden doğrudan türetilen kapalı form kayıp fonksiyonu.",
+    "prompt": "DPO matematiksel olarak Bradley-Terry modelini nasıl doğrudan politika kaybına dönüştürür?"
+  },
+  {
+    "id": "2205.14135",
+    "title": "FlashAttention: Fast & Memory-Efficient Attention",
+    "authors": "Dao et al. (Stanford)",
+    "domain": "IO-Aware Optimization",
+    "color": "#f59e0b",
+    "desc": "SRAM tiling ve online softmax ile GPU bellek bant genişliği darboğazını çözen exact attention.",
+    "prompt": "FlashAttention GPU bellek hiyerarşisinde SRAM tiling ve online softmax ile HBM erişimini nasıl azaltır?"
+  },
+  {
+    "id": "2310.11511",
+    "title": "Self-RAG: Learning to Retrieve, Generate & Critique",
+    "authors": "Asai et al. (Univ. of Washington)",
+    "domain": "Adaptive RAG & Reflection",
+    "color": "#ec4899",
+    "desc": "Reflection token'ları ([Retrieve], [IsRel], [IsSup]) ile dinamik arama ve model halüsinasyon kontrolü.",
+    "prompt": "Self-RAG reflection tokenları ile model halüsinasyonunu nasıl kontrol altına alır?"
+  },
+  {
+    "id": "1512.03385",
+    "title": "Deep Residual Learning for Image Recognition (ResNet)",
+    "authors": "He et al. (Microsoft Research)",
+    "domain": "Computer Vision & Gradients",
+    "color": "#38bdf8",
+    "desc": "Residual shortcut bağlantıları (x + F(x)) ile yok olan gradyanları engelleyip 152+ katmanlı ağların eğitimi.",
+    "prompt": "ResNet skip connection matematiksel olarak degrade olan gradyan akışını nasıl çözer?"
+  },
+  {
+    "id": "2010.11929",
+    "title": "An Image is Worth 16x16 Words (ViT)",
+    "authors": "Dosovitskiy et al. (Google Research)",
+    "domain": "Vision Transformer",
+    "color": "#6366f1",
+    "desc": "Görüntüleri 16x16 yamalara bölüp saf Transformer kodlayıcısına besleyen görsel derin öğrenme devrimi.",
+    "prompt": "Vision Transformer (ViT) patch projection ve position embedding aşamalarını adım adım tensörlerle açıkla."
+  },
+  {
+    "id": "2103.14030",
+    "title": "Swin Transformer: Hierarchical Vision Transformer",
+    "authors": "Liu et al. (Microsoft Research)",
+    "domain": "Hierarchical Vision",
+    "color": "#06b6d4",
+    "desc": "Shifted Window mekanizması ile lineer hesaplama karmaşıklığı O(N) ve hiyerarşik piramidal özellikler.",
+    "prompt": "Swin Transformer shifted window mekanizması pencereler arası etkileşimi lineer karmaşıklıkla nasıl sağlar?"
+  },
+  {
+    "id": "2103.02907",
+    "title": "Coordinate Attention for Mobile Networks",
+    "authors": "Hou et al.",
+    "domain": "Lightweight Mobile Attention",
+    "color": "#14b8a6",
+    "desc": "Yatay ve dikey 1D pooling ile kanal dikkatine yön ve konumsal bilgi kazandıran hafif blok.",
+    "prompt": "Coordinate Attention yatay ve dikey 1D pooling ile konumsal bilgiyi nasıl kodlar?"
+  },
+  {
+    "id": "1312.5602",
+    "title": "Playing Atari with Deep RL (DQN)",
+    "authors": "Mnih et al. (DeepMind)",
+    "domain": "Deep Reinforcement Learning",
+    "color": "#8b5cf6",
+    "desc": "Experience Replay ve Target Network ile kararlı derin Q-öğrenme mimarisi.",
+    "prompt": "DQN mimarisinde experience replay buffer ve hedef ağ stabiliteyi nasıl garanti eder?"
+  },
+  {
+    "id": "1412.6980",
+    "title": "Adam: A Method for Stochastic Optimization",
+    "authors": "Kingma & Ba",
+    "domain": "Optimization & Gradients",
+    "color": "#eab308",
+    "desc": "Birinci ve ikinci moment tahminleri ile adaptif öğrenme oranı optimizasyonu.",
+    "prompt": "Adam optimizer birinci ve ikinci moment düzeltmelerini formülleriyle açıkla."
+  },
+  {
+    "id": "2405.14458",
+    "title": "YOLOv10: Real-Time End-to-End Object Detection",
+    "authors": "Wang et al. (Tsinghua University)",
+    "domain": "Real-Time Object Detection",
+    "color": "#f97316",
+    "desc": "NMS-free ikili etiket atama ve hafif sınıflandırma başlıkları ile NMS gecikmesini sıfırlayan uçtan uca YOLO.",
+    "prompt": "YOLOv10 mimarisinde dual label assignment ve NMS-free eğitim yaklaşımı çıkarım süresini nasıl optimize eder?"
+  },
+  {
+    "id": "2207.02696",
+    "title": "YOLOv7: Trainable Bag-of-Freebies",
+    "authors": "Wang, Bochkovskiy & Liao",
+    "domain": "Real-Time Object Detection",
+    "color": "#ef4444",
+    "desc": "E-ELAN (Extended ELAN) ve planlanmış yeniden parametrelendirme (re-parameterization) ile hız ve doğruluk rekoru.",
+    "prompt": "YOLOv7'deki E-ELAN mimarisi gradyan akışını bozmadan modelin öğrenme kapasitesini nasıl artırır?"
+  },
+  {
+    "id": "1708.02002",
+    "title": "Focal Loss for Dense Object Detection (RetinaNet)",
+    "authors": "Lin et al. (FAIR)",
+    "domain": "Object Detection & Loss Functions",
+    "color": "#f43f5e",
+    "desc": "Tek aşamalı dedektörlerde ön plan-arka plan sınıf dengesizliğini çözen dinamik modüle edici kayıp fonksiyonu (1 - pt)^gamma.",
+    "prompt": "Focal Loss formülündeki (1 - pt)^gamma çarpanı kolay negatif örneklerin gradyan baskısını matematiksel olarak nasıl bastırır?"
+  },
+  {
+    "id": "2201.03545",
+    "title": "A ConvNet for the 2020s (ConvNeXt)",
+    "authors": "Liu et al. (FAIR & UC Berkeley)",
+    "domain": "Modern ConvNet Architecture",
+    "color": "#0ea5e9",
+    "desc": "ResNet-50'yi Swin Transformer tasarım ilkeleriyle (7x7 depthwise konvolüsyon, inverted bottleneck, GELU) modernize eden saf CNN.",
+    "prompt": "ConvNeXt mimarisi Vision Transformer tasarım kararlarını saf evrişimli ağlara nasıl entegre eder?"
+  },
+  {
+    "id": "2404.10518",
+    "title": "MobileNetV4: Universal Models for Mobile Ecosystem",
+    "authors": "Qin et al. (Google)",
+    "domain": "Mobile & Edge Architectures",
+    "color": "#10b981",
+    "desc": "Evrensel Ters Şişe Boynu (UIB) ve Mobile MQA ile CPU, DSP ve mobil GPU'larda donanım-farkında Pareto optimizasyonu.",
+    "prompt": "MobileNetV4 Universal Inverted Bottleneck (UIB) bloğu farklı donanım hızlandırıcılarında işlem verimini nasıl maksimize eder?"
+  },
+  {
+    "id": "1905.11946",
+    "title": "EfficientNet: Rethinking Model Scaling",
+    "authors": "Tan & Le (Google Brain)",
+    "domain": "Compound Scaling & CNNs",
+    "color": "#eab308",
+    "desc": "Ağ derinliği, genişliği ve çözünürlüğünü sabit bir bileşik katsayı (alpha * beta^2 * gamma^2 ~= 2) ile dengeli büyüten ölçekleme kuralı.",
+    "prompt": "EfficientNet bileşik ölçekleme (compound scaling) kuralı derinlik, genişlik ve çözünürlüğü hangi matematiksel prensiple dengeler?"
+  },
+  {
+    "id": "1801.01290",
+    "title": "Soft Actor-Critic: Off-Policy Max-Entropy Deep RL",
+    "authors": "Haarnoja et al. (UC Berkeley)",
+    "domain": "Deep Reinforcement Learning & Robotics",
+    "color": "#8b5cf6",
+    "desc": "Beklenen ödül ile birlikte eylem entropisini de maksimize ederek sürekli kontrol ve robotik eylemlerde olağanüstü kararlılık ve keşif.",
+    "prompt": "Soft Actor-Critic (SAC) algoritmasındaki maksimum entropi hedefi politika keşfini ve sağlamlığını nasıl garanti eder?"
+  },
+  {
+    "id": "1509.02971",
+    "title": "Continuous Control with Deep RL (DDPG)",
+    "authors": "Lillicrap et al. (DeepMind)",
+    "domain": "Continuous Control & Policy Gradients",
+    "color": "#6366f1",
+    "desc": "DQN'i sürekli eylem uzayına taşıyan deterministik politika gradyanı ve hedef ağ tabanlı aktör-kritik mimarisi.",
+    "prompt": "DDPG algoritmasında deterministic actor ve critic ağlarının birbirini güncelleme mekanizmasını formüllerle açıkla."
+  },
+  {
+    "id": "2306.00978",
+    "title": "AWQ: Activation-aware Weight Quantization",
+    "authors": "Lin et al. (MIT HAN Lab)",
+    "domain": "Model Quantization & Acceleration",
+    "color": "#d946ef",
+    "desc": "Ağırlık büyüklüğü yerine aktivasyon dağılımlarını koruyarak yeniden eğitime gerek kalmadan LLM'leri 4-bit INT4'e sıkıştıran yöntem.",
+    "prompt": "AWQ (Activation-aware Weight Quantization) en kritik %1 ağırlığı tespit etmek için aktivasyon büyüklüklerini nasıl kullanır?"
+  },
+  {
+    "id": "2101.03697",
+    "title": "RepVGG: Making VGG-style ConvNets Great Again",
+    "authors": "Ding et al. (Tsinghua University)",
+    "domain": "Structural Re-parameterization",
+    "color": "#14b8a6",
+    "desc": "Eğitimde çok kollu artık bağlantılar kullanıp çıkarım anında bunları cebirsel olarak tek bir 3x3 evrişim katmanına kaynaştıran (fuse) mimari.",
+    "prompt": "RepVGG eğitimdeki 1x1 ve identity artık bağlantıları çıkarımda tek bir 3x3 evrişim çekirdeğine cebirsel olarak nasıl indirger?"
+  }
+]

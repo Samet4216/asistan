@@ -3,7 +3,6 @@ type: profile
 tags:
 - profile
 - about-me
-- second-brain
 ---
 
 # Araştırmacı Profili (Benim Hakkımda)
@@ -24,4 +23,5 @@ tags:
 
 ### 🎯 Tercih Edilen Öğrenme & Anlatım Tarzı
   - Standart akademik ve pratik derin öğrenme yaklaşımı
+- Proje Amacı & Zihniyeti: Benim için İHA'da 30 FPS üzerinde gerçek zamanlı çalışması şart, çünkü hızlı manevrada hedefi kaçırm
 
