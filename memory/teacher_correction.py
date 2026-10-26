@@ -164,6 +164,26 @@ tags:
             "learned_axiom": axiom
         }
 
+    def get_all_corrections(self) -> list:
+        """Returns all teacher-taught ground-truth items."""
+        corrections = []
+        if PREFERENCES_FILE.exists():
+            try:
+                with open(PREFERENCES_FILE, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            d = json.loads(line)
+                            if d.get("source") == "teacher_correction":
+                                corrections.append(d)
+            except Exception:
+                pass
+        return corrections
+
+    def count(self) -> int:
+        """Returns the total number of teacher corrections."""
+        return len(self.get_all_corrections())
+
 
 # Global instance
 teacher_engine = TeacherCorrectionEngine()

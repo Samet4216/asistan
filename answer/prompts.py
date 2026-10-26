@@ -60,25 +60,37 @@ CORE OPERATIONAL RULES:
 
 def build_thought_plan_prompt(query: str, packaged_context: str) -> list:
     """Stage 1: Prompts the model to perform extended, unconstrained internal thinking & analysis over the full retrieved evidence."""
-    system_cot = (
-        "You are an expert AI Deep Learning Research Scientist operating in Extended Deep-Thinking Mode (CoT Reasoning Process).\n"
-        "Do not rush to give a final polished response. First, think thoroughly step by step through an internal analytical monologue:\n"
-        "1. NEGATIVE EVIDENCE & FACTUAL VERIFICATION AUDIT (HIGHEST PRIORITY):\n"
-        "   - Does the user query ask if a specific model, ablation, metric, or technique exists or was tested in the paper (e.g. 'did they test Vision Transformer?', 'yapıldı mı?', 'var mı?')?\n"
-        "   - Inspect [S1]..[S5] strictly. If the paper DOES NOT explicitly contain this experiment or model, you MUST conclude:\n"
-        "     'NEGATIVE EVIDENCE: This experiment/model does NOT exist in the paper chunks. I MUST NOT hypothesize, speculate, or construct a modular explanation for a non-existent experiment. I must state firmly in the very first sentence that it is absent from the text.'\n"
-        "2. MODULAR TOPIC DECOMPOSITION (FOR GENUINE TECHNICAL TOPICS):\n"
-        "   - If the topic is genuinely present in the evidence, break it down into 2 to 4 logical parts (e.g. Parça 1: Teorik Problem & Temel Motivasyon, Parça 2: Matematiksel Formülasyon & Tensör Akışı, Parça 3: Mimari Çözüm & Donanım Başarımı).\n"
-        "   - Determine whether the user is initiating a topic or continuing from a previous checkpoint (e.g. if query says 'devam', 'evet', 'sonraki parça').\n"
-        "3. ACTIVE PART DEEP DRILLDOWN PLAN:\n"
-        "   - Do NOT rush through the whole topic superficially! Plan to explain ONLY the active part in meticulous, textbook-grade masterclass depth.\n"
-        "   - What are the exact mathematical equations ($$...$$), symbol definitions, and tensor dimensions [B, C, H, W] for this active part?\n"
-        "4. EVIDENCE AUDIT ([S1]..[S5]):\n"
-        "   - Inspect all retrieved sources [S1]..[S5]. Select exact verbatim quotes in double quotes (\"...\") with tags that prove this part.\n"
-        "5. INTERACTIVE PEDAGOGICAL CHECKPOINT PLAN:\n"
-        "   - Plan the natural closing checkpoint for the user: warmly summarize this part and invite them: 'İstersen sıradaki parçaya (örn. X konusuna) devam edelim mi, yoksa burayı daha detaylandıralım mı?'\n\n"
-        "Write your genuine, rich, step-by-step internal reasoning monologue. Be strictly honest about whether evidence exists."
-    )
+    q_lower = query.lower()
+    is_verification = any(kw in q_lower for kw in ["yapıldı mı", "var mı", "denendi mi", "test edildi mi", "did they test", "is there", "was it tested"])
+
+    if is_verification:
+        system_cot = (
+            "You are an expert AI Deep Learning Research Scientist operating in Extended Deep-Thinking Mode (CoT Reasoning Process).\n"
+            "The user is asking a STRICT VERIFICATION QUESTION about whether a specific experiment, model, or metric exists in the paper.\n"
+            "1. NEGATIVE EVIDENCE & FACTUAL VERIFICATION AUDIT:\n"
+            "   - Inspect [S1]..[S5] strictly. If the paper DOES NOT explicitly contain this experiment or model, you MUST conclude:\n"
+            "     'NEGATIVE EVIDENCE: This experiment/model does NOT exist in the paper chunks. I MUST state firmly that it is absent from the text.'\n"
+            "   - If it genuinely exists, cite the exact source [S1]..[S5] and summarize the result.\n"
+            "Write your internal analytical monologue honestly."
+        )
+    else:
+        system_cot = (
+            "You are an expert AI Deep Learning Research Scientist operating in Extended Deep-Thinking Mode (CoT Reasoning Process).\n"
+            "The user is asking to explain a technical topic or architecture.\n"
+            "1. TOPIC & EVIDENCE AUDIT:\n"
+            "   - Match the user's concepts (including English acronyms like PGI, GELAN, LoRA, Attention, etc.) against [S1]..[S5].\n"
+            "   - Synthesize the core problem and theoretical motivation.\n"
+            "2. DYNAMIC SECTIONING & TOKEN BUDGETING (MANDATORY):\n"
+            "   - Assess the technical complexity of this topic. Dynamically determine the optimal number of parts N (between 2 and 6 parts) needed to provide a true textbook-grade masterclass without rushing.\n"
+            "   - Formulate the exact roadmap of N sections (e.g. Bölüm 1/N: ..., Bölüm 2/N: ..., ..., Bölüm N/N: ...).\n"
+            "   - Identify which section is currently active (e.g. if the user says 'devam', identify which section comes next).\n"
+            "3. ACTIVE SECTION DEEP DRILLDOWN PLAN:\n"
+            "   - Plan the exact mathematical equations ($$...$$), symbol definitions, and tensor dimensions [B, C, H, W] for the active section ONLY.\n"
+            "   - STRICT RULE: Do NOT include unsolicited code blocks unless explicitly requested by the user.\n"
+            "4. INTERACTIVE CHECKPOINT PLAN:\n"
+            "   - Formulate the closing transition to the next section: '🎯 Bölüm X/N ([Mevcut Başlık]) tamamlandı. ➡️ Sıradaki Adım: Bölüm (X+1)/N ([Sıradaki Başlık])'.\n\n"
+            "Write your genuine, rich, step-by-step internal reasoning monologue."
+        )
     user_cot = (
         f"[TARGET QUESTION / TOPIC]:\n{query}\n\n"
         f"[AVAILABLE EVIDENCE CONTEXT ([S1]..[S5])]:\n{packaged_context}\n\n"
@@ -171,25 +183,32 @@ def build_answer_prompt(
             )
         elif is_topic_explanation:
             instructions = (
-                "AKADEMİK MODÜLER PARÇALAMA VE ETKİLEŞİMLİ DERİN ANLATIM PROTOKOLÜ (MANDATORY MASTERCLASS):\n"
-                "Aşağıda sağlanan akademik kanıtları ([S1]..[S5]) temel alarak konuyu açıkla.\n"
-                "Konuyu MANTIKSAL PARÇALARA BÖLÜP (Modül 1, Modül 2, Modül 3) AKTİF PARÇAYI TÜM FORMÜLLERİ VE TENSÖR BOYUTLARIYLA ÇOK DERİN ANLATIP, EN SONUNDA 'İSTERSEN DEVAM EDELİM Mİ?' DİYEREK İLERLE:\n\n"
-                "1. 🗺️ KISA YOL HARİTASI (İLK TURDA EN BAŞTA): Konuyu hangi parçalara böldüğünü 1-2 cümleyle en başta tanıt (örn: 'Bu konuyu 3 temel parçada inceleyeceğiz: 1. ..., 2. ..., 3. ...').\n\n"
-                "2. 🔬 AKTİF PARÇANIN DERİNLEMESİNE AÇIKLANMASI (ANA GÖVDE):\n"
-                "   - Aktif parçayı asla aceleye getirmeden, en ince ayrıntısına kadar pedagojik ve zengin şekilde açıkla.\n"
-                "   - ZORUNLU LATEX FORMÜLLERİ: En az 1-2 adet blok LaTeX formülü ($$...$$) veya satır içi matematik ($X \\in \\mathbb{R}^{B \\times C \\times H \\times W}$) yaz ve sembolleri açıkla.\n"
+                "AKADEMİK DİNAMİK PARÇALAMA VE ETKİLEŞİMLİ DERİN ANLATIM PROTOKOLÜ (DYNAMIC SECTIONING MASTERCLASS):\n"
+                "Aşağıda sağlanan akademik kanıtları ([S1]..[S5]) temel alarak konuyu açıkla.\n\n"
+                "TEMEL PRENSİP: Tek bir cevapta yüzeysel özet geçmek KESİNLİKLE YASAKTIR.\n"
+                "Konunun karmaşıklığına göre toplam bölüm sayısını N (2 ile 6 parça arası) KENDİN BELİRLE.\n"
+                "Aktif bölümü en derin matematiksel formüller ($$...$$), tensör boyutları ([B, C, H, W]) ve ders kitabı titizliğiyle açıkla.\n\n"
+                "1. 🗺️ KISA YOL HARİTASI (İLK TURDA EN BAŞTA):\n"
+                "   Konuyu kendi belirlediğin kaç bölüme ayırdığını ve başlıklarını 1-2 cümleyle en başta tanıt:\n"
+                "   Örn: '🗺️ **Yol Haritası (Toplam 4 Bölüm):** 1/4: ..., 2/4: ..., 3/4: ..., 4/4: ...'\n\n"
+                "2. 🔬 AKTİF BÖLÜMÜN DERİNLEMESİNE AÇIKLANMASI (ANA GÖVDE):\n"
+                "   - Aktif bölümü (örn. Bölüm 1/N veya kullanıcı devam dediyse Bölüm 2/N) asla aceleye getirmeden, en ince ayrıntısına kadar pedagojik ve zengin şekilde açıkla.\n"
+                "   - ZORUNLU LATEX FORMÜLLERİ: En az 1-2 adet blok LaTeX formülü ($$...$$) veya satır içi matematik ($X \\in \\mathbb{R}^{B \\times C \\times H \\times W}$) yaz ve her sembolü açıkla.\n"
                 "   - ZORUNLU KAYNAK ATIFI VE ALINTI: Kanıt metninden en az bir kaynak etiketi ([S1]..[S5]) kullan ve tırnak içinde (\"...\") doğrudan İngilizce alıntı yap.\n"
                 "   - Tensör boyutları ([B, C, H, W]) ve katman akışını adım adım aktar.\n\n"
-                "3. 🤝 ETKİLEŞİMLİ DEVAM CHECKPOINT'İ (SADECE CEVABIN EN ALTINA / SONUNA EKLENİR, ASLA BAŞA YAZMA!):\n"
-                "   - Cevabın en sonunda kullanıcıya sıradaki parçaya geçmek isteyip istemediğini sor:\n"
-                "   '🎯 1. Parçayı tamamladık. İstersen sıradaki parçaya devam edelim mi, yoksa burayı daha detaylandıralım mı?'\n\n"
+                "3. 🎯 STANDART GEÇİŞ KONTROL NOKTASI (SADECE CEVABIN EN ALTINA / SONUNA EKLENİR, ASLA BAŞA YAZMA!):\n"
+                "   - Bu bölüm bittiğinde yanıtın en sonuna ŞU BİREBİR STANDART FORMATTA kontrol noktası koy:\n"
+                "   ---\n"
+                "   🎯 **Bölüm 1/N ([Mevcut Bölüm Başlığı]) tamamlandı.**\n"
+                "   ➡️ **Sıradaki Adım: Bölüm 2/N ([Sıradaki Bölüm Başlığı])**\n"
+                "   *İstersen aşağıdaki butondan sıradaki bölüme geçebilir veya burayı daha da detaylandırabilirsin.*\n\n"
                 "KURALLAR:\n"
                 "- Türkçe konuş, terimleri ve alıntıları orijinal İngilizce tut.\n"
                 "- Her teknik iddiada mutlaka [S1]..[S5] etiketlerini kullan.\n"
                 "- Matematiksel ifadeleri mutlaka KaTeX formatında ($ ... $ veya $$ ... $$) yaz.\n"
                 "- Kullanıcı açıkça 'kod yaz' demedikçe kod verme; mimariyi, formülleri ve tensör boyutlarını detaylı açıkla.\n"
-                "- Kontrol sorusunu ('İstersen devam edelim mi?') KESİNLİKLE yanıtın en altına yerleştir.\n"
-                "- Eğer aranan konu kanıtlarda kesinlikle yoksa dürüstçe 'Makale metninde bu konu yer almamaktadır' de."
+                "- Kontrol sorusunu / geçiş noktasını KESİNLİKLE yanıtın en altına yerleştir.\n"
+                "- Eğer son bölüme (N/N) ulaşıldıysa, '🎯 Tüm bölümler (N/N) tamamlandı' diyerek konuyu nihai sentez ile kapat."
             )
         else:
             instructions = (

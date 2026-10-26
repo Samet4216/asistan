@@ -28,7 +28,8 @@ from utils import (
     get_gpu_status,
     normalize_latex,
     is_academic_or_technical_inquiry,
-    contextualize_query
+    contextualize_query,
+    extract_next_section
 )
 from retrieval.search import searcher
 from retrieval.web_search import web_searcher, is_online
@@ -153,7 +154,8 @@ with st.sidebar:
     with st.expander("👤 Araştırmacı Profili & Pekiştirilmiş Hafıza", expanded=False):
         current_about = profile_manager.get_about_me()
         metrics = rl_engine.get_metrics()
-        st.caption(f"🎯 **Pekiştirilmiş Kural:** {metrics.get('learned_axioms_count', 0)} | ⭐ **Altın Örnek:** {metrics.get('gold_exemplars_count', 0)}")
+        teacher_count = teacher_engine.count()
+        st.caption(f"🎯 **Pekiştirilmiş Kural:** {metrics.get('learned_axioms_count', 0)} | 🎓 **Öğretilen Doğru Bilgi:** {teacher_count} | ⭐ **Altın Örnek:** {metrics.get('gold_exemplars_count', 0)}")
         st.markdown(f"<div style='font-size:0.82rem; color:#cbd5e1; max-height:140px; overflow-y:auto; margin-bottom:8px;'>{current_about}</div>", unsafe_allow_html=True)
         col_prof1, col_prof2 = st.columns(2)
         with col_prof1:
@@ -353,6 +355,20 @@ with tab_chat:
                             tags=["qa-chat", "lab-notes"]
                         )
                         st.toast(f"'{safe_title}' Obsidian taslaklarına kaydedildi!", icon="📝")
+
+                # Interactive Section Continuation Checkpoint (Option B - Single Click Advance)
+                is_latest_assistant = (idx == len(st.session_state.messages) - 1) or all(m["role"] != "assistant" for m in st.session_state.messages[idx+1:])
+                next_part_title = extract_next_section(content) if is_latest_assistant else ""
+
+                if next_part_title:
+                    st.markdown("""<div style="margin-top:8px;"></div>""", unsafe_allow_html=True)
+                    btn_col, _ = st.columns([3.2, 2.8])
+                    with btn_col:
+                        btn_text = f"▶️ Sıradaki Bölüme Geç: {next_part_title[:42]}"
+                        if st.button(btn_text, key=f"btn_step_next_{idx}", type="primary", use_container_width=True):
+                            st.session_state.pending_prompt = f"Devam edelim: {next_part_title}"
+                            st.session_state.switch_to_tab = TAB_CHAT
+                            st.rerun()
 
     # Chat Input Handling
     user_input = st.chat_input("Bir soru sorun, mimari tartışın veya bir konu danışın...")

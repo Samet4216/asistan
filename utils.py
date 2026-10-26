@@ -204,8 +204,9 @@ def contextualize_query(current_query: str, history: List[Dict[str, str]]) -> st
     ]
     continuation_triggers = [
         "devam", "devam et", "devam edelim", "sonraki", "sıradaki", "sonraki parça",
-        "sıradaki parça", "evet devam", "evet", "geçelim", "sonrakine geç",
-        "2. parça", "3. parça", "ikinci parça", "üçüncü parça", "continue", "next", "go on"
+        "sıradaki parça", "evet devam", "evet", "geçelim", "sonrakine geç", "sıradaki bölüme geç",
+        "sıradaki adım", "sonraki bölüm", "bölüm", "2. parça", "3. parça", "ikinci parça", "üçüncü parça",
+        "continue", "next", "go on"
     ]
 
     is_starter = any(lower_q.startswith(s) for s in followup_starters)
@@ -229,3 +230,31 @@ def contextualize_query(current_query: str, history: List[Dict[str, str]]) -> st
             return f"{clean_topic} : {current_query}"
 
     return current_query
+
+
+def extract_next_section(text: str) -> str:
+    """
+    Asistan yanıtındaki bölüm kontrol noktasından sıradaki bölüm başlığını otonom olarak ayıklar.
+    Örn: '➡️ **Sıradaki Adım: Bölüm 2/5 (PGI Mimarisi ve Tensör Akışı)**' -> 'Bölüm 2/5: PGI Mimarisi ve Tensör Akışı'
+    """
+    if not text:
+        return ""
+    
+    patterns = [
+        r'(?:Sıradaki|Sonraki)\s*(?:Adım|Bölüm|Parça)[^:\n]*[:\-]\s*([^\n\r*]+)',
+        r'(?:devam edelim mi|geçelim mi)[^(\n]*\((?:\*\*)?([^)\*]+)(?:\*\*)?\)',
+        r'Bölüm\s*(\d+/\d+[^:\n]*:[^\n\r*]+)',
+        r'🎯\s*(?:Bölüm|Parça)\s*\d+/\d+\s*tamamlandı[^\n]*\n+[^:\n]*:\s*([^\n\r*]+)'
+    ]
+    for p in patterns:
+        m = re.search(p, text, re.IGNORECASE)
+        if m:
+            clean = m.group(1).strip().strip('*').strip()
+            # trailing punctuations
+            clean = re.sub(r'[\?\.!:]+$', '', clean).strip()
+            if clean.count('(') > clean.count(')'):
+                clean += ')'
+            # If length is reasonable
+            if 3 < len(clean) < 80:
+                return clean
+    return ""
