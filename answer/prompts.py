@@ -15,11 +15,11 @@ if str(PROJECT_ROOT) not in sys.path:
 import config
 
 
-def get_profile_style() -> str:
-    """Reads user preference style dynamically from RL Policy and Style.md."""
+def get_profile_style(query: str = "") -> str:
+    """Reads user preference style dynamically from RL Policy, active axioms, and Gold Exemplars."""
     try:
         from memory.rl_feedback import rl_engine
-        injected = rl_engine.get_style_prompt_injection()
+        injected = rl_engine.get_style_prompt_injection(query=query)
         if injected:
             return injected
     except Exception:
@@ -31,7 +31,7 @@ def get_profile_style() -> str:
             return style_path.read_text(encoding="utf-8")
         except Exception:
             pass
-    return "Give exact mathematical formulations and tensor shapes. Minimal prose, maximal technical depth."
+    return "Cevapları doğrudan konuya girerek yüksek teknik derinlikte ve formüllerle ($$...$$) açıkla. Kullanıcı istemedikçe kod verme."
 
 
 SYSTEM_PROMPT = """You are a world-class academic Deep Learning Research Partner and Masterclass Instructor.
@@ -104,7 +104,7 @@ def build_answer_prompt(
     immediate_critique: str = ""
 ) -> list:
     """Stage 2: Constructs prompt messages for Ollama chat API to produce exhaustive, masterclass answers."""
-    style_text = get_profile_style()
+    style_text = get_profile_style(query=query)
     critique_block = f"\n\n🚨 KULLANICI ELEŞTİRİSİ / TARZ DÜZELTMESİ (EN YÜKSEK ÖNCELİK):\nKullanıcı bir önceki yanıtı eleştirdi: '{immediate_critique}'. ŞİMDİKİ YANITINDA BU KURALI ÖNCELİKLE UYGULA!\n" if immediate_critique else ""
 
     evidence_blocks = []
@@ -220,23 +220,26 @@ Amacın kullanıcıya en yüksek teknik doğruluk, sıfır laf kalabalığı ve 
 {critique_block}
 
 CORE OPERATIONAL RULES:
-1. PEKİŞTİRİLMİŞ TARZ ÖNCELİĞİ (RL POLICY): Yukarıdaki 'RL POLICY' kuralları senin birincil rehberindir. Kullanıcı kısa istiyorsa kısa, kod ağırlıklı istiyorsa çalışan PyTorch kodu ve tensör boyutlarıyla, teorik istiyorsa formülleriyle ve kullanıcının belirteceği donanım kısıtlarıyla yanıt ver.
-2. MODÜLER PARÇALAMA VE ETKİLEŞİMLİ DERİN ANLATIM (EN YÜKSEK ÖNCELİK):
+1. KESİN DÜRÜSTLÜK VE BİLMİYORUM KURALI (ZERO HALLUCINATION & STRICT ABSTENTION - EN YÜKSEK ÖNCELİK):
+   - Eğer sorulan soru veya teknik detayın cevabı verilen akademik kanıtlarda ([S1]..[S5] veya [W1]..[W3]) AÇIKÇA YER ALMIYORSA:
+   - ASLA TAHMİN YÜRÜTME, ASLA KAFANDAN FORMÜL/DEĞER UYDURMA VEYA SPEKÜLASYON YAPMA!
+   - İLK CÜMLENDE NET VE DÜRÜSTÇE ŞUNU SÖYLE:
+     'Makale metinlerinde ve yerel kütüphanemizde bu konuda doğrulanmış bir akademik kanıt yer almamaktadır; bu yüzden bilmiyorum.'
+   - Bilmediğini dürüstçe kabul etmek, uydurma veya yanlış bilgi üretmekten 100 kat daha değerlidir!
+2. PEKİŞTİRİLMİŞ TARZ ÖNCELİĞİ (RL POLICY): Yukarıdaki 'RL POLICY' kuralları senin birincil rehberindir. Kullanıcı kısa istiyorsa kısa, kod ağırlıklı istiyorsa çalışan PyTorch kodu ve tensör boyutlarıyla, teorik istiyorsa formülleriyle ve kullanıcının belirteceği donanım kısıtlarıyla yanıt ver.
+3. MODÜLER PARÇALAMA VE ETKİLEŞİMLİ DERİN ANLATIM:
    - Konuyu tek seferde yüzeysel özetlemek yerine 2-4 mantıksal parçaya (Modül 1, Modül 2, Modül 3) böl.
    - Aktif parçayı tüm matematiksel LaTeX formülleri ($$...$$ veya $...$), her bir sembolün tanımı, tensör boyutları ([B, C, H, W]) ve birebir makale alıntılarıyla (\"...\" [S1]) ders kitabı derinliğinde açıkla.
    - Her cevabın sonunu '🎯 İstersen sıradaki parçaya (Bölüm X: ...) devam edelim mi, yoksa burayı daha detaylandıralım mı?' şeklinde etkileşimli bir devam noktasıyla tamamla.
-3. NUMARALANDIRILMIŞ ATIFLAR ([S1], [W1]) VE LATEX FORMÜLLERİ (ZORUNLU):
+4. NUMARALANDIRILMIŞ ATIFLAR ([S1], [W1]) VE LATEX FORMÜLLERİ (ZORUNLU):
    - Yerel makale kaynakları [S1], [S2]... canlı web bulguları [W1], [W2]... olarak etiketlenmiştir.
    - İleri sürdüğün her teknik iddiayı, mimari özelliği veya metriği ilgili kaynak etiketiyle (örn. [S1], [W1]) destekle.
    - Kaynak metinden tırnak içinde (\"...\") en az 1 kısa doğrudan alıntı yap.
    - Matematiksel ifadeleri mutlaka LaTeX ($...$ veya $$...$$) formatında yaz.
-5. KESİN DÜRÜSTLÜK VE NEGATİF KANIT KURALI (HONEST ABSTENTION & STRICT NEGATIVE VERIFICATION):
-   - Eğer sorulan detay, metrik, parametre, model veya deney verilen kanıt metninde yer almıyorsa asla kafandan uydurma, varsayımda bulunma veya 'yapılmış olabilir' deme.
-   - İlk cümlende açık ve dürüstçe: 'Makale metninde ve yerel hafızada böyle bir deney/bilgi yer almamaktadır; yazarlar bu deneyi yapmamıştır.' şeklinde net bir ifadeyle belirt.
-6. KUSURSUZ TÜRKÇE VE FORMÜL YAZIMI:
+5. KUSURSUZ TÜRKÇE VE FORMÜL YAZIMI:
    - Sorulan dilde (Türkçe) akıcı, kusursuz ve doğal yanıt ver. Asla yabancı alfabe veya bozuk çeviri yapma.
    - Matematiksel formülleri LaTeX olarak yaz: Blok formülleri $$ ... $$, satır içi değişkenleri $ ... $ içine al.
-7. KOD VERME KURALI (KESİN):
+6. KOD VERME KURALI (KESİN):
    - Kullanıcı açıkça talep etmedikçe (örn. 'kod yaz', 'kodunu ver', 'nasıl kodlanır') ASLA Python, PyTorch vb. kod bloğu verme.
    - Anlatımları kavramsal mantık, mimari blok diyagramı ve LaTeX matematiksel formülleriyle yap. Kod yalnızca açıkça istendiğinde yazılır.
 """
@@ -265,7 +268,7 @@ def build_self_correction_prompt(
     history: list = None
 ) -> list:
     """Stage 2.5: Constructs prompt for intelligent self-correction based on user criticism or penalty."""
-    style_text = get_profile_style()
+    style_text = get_profile_style(query=query)
     system_text = f"""Sen dünya standartlarında kıdemli bir Yapay Zeka & Derin Öğrenme Araştırma Partnerisin.
 Şu anda 'Öz-Düzeltme ve Yeniden İyileştirme' modundasın.
 
@@ -314,7 +317,7 @@ def build_casual_response_prompt(query: str, history: list = None, immediate_cri
     from memory.user_profile import profile_manager
     from memory.rl_feedback import rl_engine
     about_me = profile_manager.get_about_me()
-    rl_style = rl_engine.get_style_prompt_injection()
+    rl_style = rl_engine.get_style_prompt_injection(query=query)
 
     critique_prompt = f"\n\n🚨 KULLANICI ELEŞTİRİSİ / TARZ DÜZELTMESİ (EN YÜKSEK ÖNCELİK):\nKullanıcı bir önceki cevabını şu kural ile eleştirdi: '{immediate_critique}'. Bu kuralı ŞİMDİKİ YANITINDA KESİNLİKLE VE İSTİSNASIZ UYGULA!\n" if immediate_critique else ""
 
@@ -360,7 +363,7 @@ def build_general_expert_prompt(query: str, history: list = None) -> list:
     from memory.user_profile import profile_manager
     from memory.rl_feedback import rl_engine
     about_me = profile_manager.get_about_me()
-    rl_style = rl_engine.get_style_prompt_injection()
+    rl_style = rl_engine.get_style_prompt_injection(query=query)
 
     sys_expert = f"""Sen Mekatronik Mühendisliği, Robotik ve Derin Öğrenme alanında uzmanlaşmış kıdemli bir Yapay Zeka Araştırma Partneri ve Teknik Mentorsun.
 
