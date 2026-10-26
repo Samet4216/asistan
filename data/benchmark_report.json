@@ -1,0 +1,67 @@
+{
+  "timestamp": "2026-10-27 01:04:19",
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "gpu": {
+    "available": true,
+    "name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+    "total": 6141,
+    "used": 4455,
+    "free": 1467,
+    "temp": 47,
+    "util": 18,
+    "total_mb": 6141,
+    "used_mb": 4455,
+    "free_mb": 1467,
+    "temp_c": 47,
+    "util_pct": 18
+  },
+  "overall_score": 96.0,
+  "results": {
+    "test_1_casual_chat": {
+      "title": "Sohbet Modu & İnsansı Sıcaklık",
+      "score": 100,
+      "max": 100,
+      "latency_sec": 11.27,
+      "issues": [],
+      "sample": "Merhaba! Ben de senin gibi bir dostum, senin projeden biraz yorulduğunu anlamışım. Çalışmaları sık sık bize bu tür hisler getirebilir. Senin durumun normaldir ve ben de senin için biraz huzur bulmanı ..."
+    },
+    "test_2_modular_deep_dive": {
+      "title": "Derin Makale Anlatımı & Modüler Parçalama",
+      "score": 80,
+      "max": 100,
+      "latency_sec": 78.31,
+      "issues": [
+        "Matematiksel KaTeX formülleri eksik."
+      ],
+      "has_latex": false,
+      "has_citations": true,
+      "has_checkpoint": true,
+      "sample": "### Modül 1: Teorik Problem & Temel Motivasyon\n\nBu konuyu 3 temel parçada inceleyeceğiz: 1. Teorik Problem & Temel Motivasyon, 2. GELAN Mimari ve Tasarımı, 3. PGI ve GELAN'ın İlişkisi ve Performans.\n\n#### Teorik Problem & Temel Motivasyon\n\nBirçok der..."
+    },
+    "test_3_multi_turn_continuation": {
+      "title": "Çok Turlu Devam & Bağlam Koruma",
+      "score": 100,
+      "max": 100,
+      "latency_sec": 49.63,
+      "augmented_query": "YOLOv9 makalesindeki Programlanabilir Gradyan Bilg : sıradaki parça ve derinlemesine devamı (evet devam edelim)",
+      "issues": [],
+      "sample": "### Modül 2: GELAN Mimari ve Tasarımı\n\nGELAN (Generalized Efficient Layer Aggregation Network) mimarisini ve PGI'nin nasıl kullanıldığına dair detaylı bir anlatım sunacağız. GELAN, PGI'nin programlana..."
+    },
+    "test_4_honesty_grounding": {
+      "title": "Dürüstlük & Halüsinasyon Kontrolü",
+      "score": 100,
+      "max": 100,
+      "latency_sec": 22.48,
+      "issues": [],
+      "sample": "Makale metninde ve yerel hafızada Coordinate Attention ile Vision Transformer arasında ablation deneyi yer almamaktadır; yazarlar bu deneyi yapmamıştır.\n\nBu durumu net bir şekilde belirtmek için, kull..."
+    },
+    "test_5_direct_fulfillment": {
+      "title": "Doğrudan Yanıtlama & Kaçamak Önleme",
+      "score": 100,
+      "max": 100,
+      "latency_sec": 4.92,
+      "issues": [],
+      "sample": "Fenerbahçe Spor Kulübü, 1907 yılında İstanbul'da kurulmuştur. Kulübe ait temel renkleri sarı ve lacivert olarak kabul edilir...."
+    }
+  }
+}

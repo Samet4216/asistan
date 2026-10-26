@@ -171,10 +171,8 @@ def build_answer_prompt(
             )
         elif is_topic_explanation:
             instructions = (
-                "CRITICAL EVIDENCE & HONESTY RULE: If your analysis indicates that the retrieved evidence does NOT contain "
-                "sufficient information about this topic/mechanism, state honestly: 'Makale metninde ve yerel hafızada bu konu/bölüm hakkında yeterli kanıt yer almıyor, bu yüzden bilmiyorum.'\n\n"
                 "AKADEMİK MODÜLER PARÇALAMA VE ETKİLEŞİMLİ DERİN ANLATIM PROTOKOLÜ (MANDATORY MASTERCLASS):\n"
-                "Kullanıcı konunun tek bir uzun monolog veya yüzeysel özetle geçiştirilmesini KESİNLİKLE İSTEMİYOR.\n"
+                "Aşağıda sağlanan akademik kanıtları ([S1]..[S5]) temel alarak konuyu açıkla.\n"
                 "Konuyu MANTIKSAL PARÇALARA BÖLÜP (Modül 1, Modül 2, Modül 3) AKTİF PARÇAYI TÜM FORMÜLLERİ VE TENSÖR BOYUTLARIYLA ÇOK DERİN ANLATIP, EN SONUNDA 'İSTERSEN DEVAM EDELİM Mİ?' DİYEREK İLERLE:\n\n"
                 "1. 🗺️ KISA YOL HARİTASI (İLK TURDA EN BAŞTA): Konuyu hangi parçalara böldüğünü 1-2 cümleyle en başta tanıt (örn: 'Bu konuyu 3 temel parçada inceleyeceğiz: 1. ..., 2. ..., 3. ...').\n\n"
                 "2. 🔬 AKTİF PARÇANIN DERİNLEMESİNE AÇIKLANMASI (ANA GÖVDE):\n"
@@ -190,7 +188,8 @@ def build_answer_prompt(
                 "- Her teknik iddiada mutlaka [S1]..[S5] etiketlerini kullan.\n"
                 "- Matematiksel ifadeleri mutlaka KaTeX formatında ($ ... $ veya $$ ... $$) yaz.\n"
                 "- Kullanıcı açıkça 'kod yaz' demedikçe kod verme; mimariyi, formülleri ve tensör boyutlarını detaylı açıkla.\n"
-                "- Kontrol sorusunu ('İstersen devam edelim mi?') KESİNLİKLE yanıtın en altına yerleştir."
+                "- Kontrol sorusunu ('İstersen devam edelim mi?') KESİNLİKLE yanıtın en altına yerleştir.\n"
+                "- Eğer aranan konu kanıtlarda kesinlikle yoksa dürüstçe 'Makale metninde bu konu yer almamaktadır' de."
             )
         else:
             instructions = (

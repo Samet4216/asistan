@@ -1,166 +1,202 @@
-/* Global Base Canvas */
+/* Modern Minimalist Glassmorphism Theme for Deep Learning Lab Assistant */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+
+/* Global Canvas */
 .stApp {
-    background: radial-gradient(circle at 10% 10%, #0d1527 0%, #060911 100%) !important;
+    background: #090d16 !important;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
     color: #e2e8f0 !important;
 }
 
-/* Sidebar Glassmorphism */
+/* Sidebar - Clean Dark Surface */
 section[data-testid="stSidebar"] {
-    background: rgba(10, 15, 29, 0.88) !important;
-    backdrop-filter: blur(28px) !important;
-    border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4) !important;
+    background: #0d121f !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+    box-shadow: none !important;
 }
 
-/* Sleek Custom Scrollbars */
+section[data-testid="stSidebar"] > div:first-child {
+    padding-top: 1.5rem !important;
+    padding-bottom: 2rem !important;
+}
+
+/* Clean Sleek Scrollbars */
 ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
 }
 ::-webkit-scrollbar-track {
     background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-    background: rgba(56, 189, 248, 0.28);
+    background: rgba(255, 255, 255, 0.12);
     border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(56, 189, 248, 0.6);
+    background: rgba(56, 189, 248, 0.4);
 }
 
 /* Typography & Line Spacing */
 p, li, span {
-    line-height: 1.72 !important;
+    line-height: 1.7 !important;
 }
 
-/* Modern Chat Bubble Styling */
+/* Chat Message Bubbles - Minimalist & Elegant */
 .stChatMessage {
-    border-radius: 14px !important;
-    padding: 20px 24px !important;
-    margin-bottom: 20px !important;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    background: transparent !important;
+    border: none !important;
+    padding: 14px 18px !important;
+    margin-bottom: 12px !important;
+    border-radius: 12px !important;
 }
 
-/* Assistant Message Glass Card */
+/* Assistant Message Bubble: Subtle deep card */
 .stChatMessage:has([data-testid="chatAvatarIcon-assistant"]) {
-    background: linear-gradient(135deg, rgba(15, 23, 42, 0.75) 0%, rgba(20, 30, 55, 0.45) 100%) !important;
-    border: 1px solid rgba(56, 189, 248, 0.25) !important;
-    border-left: 4px solid #38bdf8 !important;
-    box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+    background: rgba(15, 23, 42, 0.6) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    border-left: 3px solid #38bdf8 !important;
 }
 
-/* User Message Gradient Card */
+/* User Message Bubble: Subtle slate card */
 .stChatMessage:has([data-testid="chatAvatarIcon-user"]) {
-    background: linear-gradient(135deg, rgba(30, 27, 75, 0.55) 0%, rgba(15, 23, 42, 0.65) 100%) !important;
-    border: 1px solid rgba(129, 140, 248, 0.3) !important;
-    border-left: 4px solid #818cf8 !important;
-    box-shadow: 0 6px 24px -2px rgba(0, 0, 0, 0.4) !important;
+    background: rgba(30, 41, 59, 0.45) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    border-left: 3px solid #818cf8 !important;
 }
 
-/* KaTeX Mathematical Formula Styling */
+/* Avatars */
+[data-testid="stChatMessageAvatarUser"],
+[data-testid="stChatMessageAvatarAssistant"] {
+    border-radius: 8px !important;
+}
+
+/* KaTeX Display Equations */
 .katex-display {
-    margin: 1.3em 0 !important;
-    padding: 1.1em 1.4em !important;
-    background: rgba(3, 7, 18, 0.65) !important;
-    border: 1px solid rgba(56, 189, 248, 0.25) !important;
-    border-radius: 10px !important;
-    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5) !important;
+    margin: 1.1em 0 !important;
+    padding: 1em 1.2em !important;
+    background: #040711 !important;
+    border: 1px solid rgba(56, 189, 248, 0.18) !important;
+    border-radius: 8px !important;
     overflow-x: auto;
 }
 
-/* Code Blocks */
-pre, code {
-    font-family: 'Fira Code', 'JetBrains Mono', monospace !important;
-}
-pre {
-    background: #040711 !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-radius: 10px !important;
-    padding: 14px 18px !important;
-}
-
-/* Metric Cards */
-div[data-testid="stMetric"] {
-    background: linear-gradient(180deg, rgba(22, 31, 53, 0.5) 0%, rgba(10, 15, 29, 0.7) 100%) !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 10px !important;
-    padding: 12px 14px !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
-}
-div[data-testid="stMetricValue"] {
-    font-size: 1.35rem !important;
-    font-weight: 700 !important;
+/* Inline and Block Code */
+code {
+    font-family: 'Fira Code', monospace !important;
+    font-size: 0.88em !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
     color: #38bdf8 !important;
 }
 
-/* Sleek Blockquote Styling for Quoted Replies */
-blockquote {
-    border-left: 3px solid #38bdf8 !important;
-    background: rgba(56, 189, 248, 0.07) !important;
-    padding: 10px 18px !important;
-    border-radius: 6px;
-    margin: 10px 0 16px 0 !important;
+pre {
+    background: #040711 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 8px !important;
+    padding: 12px 16px !important;
+}
+
+pre code {
+    background: transparent !important;
+    padding: 0 !important;
+    color: #e2e8f0 !important;
+}
+
+/* Clean Metric Cards */
+div[data-testid="stMetric"] {
+    background: rgba(15, 23, 42, 0.4) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    border-radius: 8px !important;
+    padding: 8px 12px !important;
+}
+div[data-testid="stMetricValue"] {
+    font-size: 1.15rem !important;
+    font-weight: 600 !important;
+    color: #38bdf8 !important;
+}
+
+/* Modern Clean Buttons */
+.stButton > button {
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    font-size: 0.85rem !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    background: rgba(255, 255, 255, 0.03) !important;
     color: #cbd5e1 !important;
-    font-style: italic;
+    transition: all 0.15s ease !important;
 }
 
-/* Status Widgets / Extended Thinking */
-div[data-testid="stStatusWidget"] {
-    background: rgba(13, 19, 35, 0.8) !important;
-    border: 1px solid rgba(168, 85, 247, 0.35) !important;
-    border-radius: 12px !important;
-    box-shadow: 0 4px 20px rgba(168, 85, 247, 0.1) !important;
+.stButton > button:hover {
+    border-color: #38bdf8 !important;
+    color: #38bdf8 !important;
+    background: rgba(56, 189, 248, 0.08) !important;
 }
 
-/* Live Header Status Pill */
-.status-badge-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 22px;
+.stButton > button:active {
+    transform: scale(0.98);
 }
-.status-pill {
-    display: inline-flex;
-    align-items: center;
+
+/* Primary Accent Button */
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-weight: 600 !important;
+}
+.stButton > button[kind="primary"]:hover {
+    box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35) !important;
+}
+
+/* Clean Expanders */
+.streamlit-expanderHeader {
+    background: transparent !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    border-radius: 8px !important;
+    color: #94a3b8 !important;
+    font-size: 0.88rem !important;
+    font-weight: 500 !important;
+}
+
+/* Tabs Styling */
+.stTabs [data-baseweb="tab-list"] {
     gap: 8px;
-    background: rgba(15, 23, 42, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 6px 14px;
-    border-radius: 999px;
-    font-size: 13px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 4px;
+}
+
+.stTabs [data-baseweb="tab"] {
+    height: 38px;
+    padding: 0 16px;
+    background-color: transparent;
+    border-radius: 6px;
     color: #94a3b8;
-}
-.status-dot {
-    width: 8px;
-    height: 8px;
-    background-color: #10b981;
-    border-radius: 50%;
-    box-shadow: 0 0 10px #10b981;
-    animation: pulse 2s infinite;
-}
-@keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.4; transform: scale(0.85); }
+    font-size: 0.88rem;
+    font-weight: 500;
 }
 
-/* Quick Action Cards */
-.quick-card {
-    background: linear-gradient(135deg, rgba(15, 23, 42, 0.6) 0%, rgba(30, 41, 59, 0.35) 100%);
-    border: 1px solid rgba(56, 189, 248, 0.2);
-    border-radius: 12px;
-    padding: 14px 18px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-.quick-card:hover {
-    border-color: #38bdf8;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(56, 189, 248, 0.15);
+.stTabs [aria-selected="true"] {
+    background-color: rgba(56, 189, 248, 0.1) !important;
+    color: #38bdf8 !important;
+    font-weight: 600;
 }
 
-/* Hide Streamlit Debug / Ask ChatGPT buttons */
-[data-testid="stExceptionActionButtons"],
-.stException > div:last-child {
-    display: none !important;
+/* Chat Input Bar - Sleek Floating Style */
+[data-testid="stChatInput"] {
+    border-radius: 12px !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    background: rgba(15, 23, 42, 0.8) !important;
+    backdrop-filter: blur(12px) !important;
 }
+
+[data-testid="stChatInput"]:focus-within {
+    border-color: #38bdf8 !important;
+    box-shadow: 0 0 0 1px #38bdf8, 0 4px 20px rgba(56, 189, 248, 0.12) !important;
+}
+
+/* Hide Streamlit Watermarks & Clutter */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+[data-testid="stDecoration"] {display: none;}
+[data-testid="stStatusWidget"] {border: none !important; background: transparent !important;}
