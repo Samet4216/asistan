@@ -236,6 +236,39 @@ with st.sidebar:
             st.toast("Tarz politikası sıfırlandı.", icon="🔄")
             st.rerun()
 
+    # Self-Training Studio: Kendi Konuşmalarımla Eğit
+    with st.expander("🎓 Kendi Konuşmalarımla Eğit (Fine-Tuning)", expanded=False):
+        all_convs = collector.get_all_interactions()
+        total_dialogs = len(all_convs)
+        st.caption("Konuştuğunuz her diyalog ve verdiğiniz geri bildirimler yerel eğitim veri setinize eklenir. Model bu verilerle sizin tarzınızı öğrenir.")
+        
+        c_col1, c_col2 = st.columns(2)
+        c_col1.metric("Toplam Diyalog", f"{total_dialogs}")
+        positive_samples = len([c for c in all_convs if c.get("reward", 0) > 0])
+        c_col2.metric("Kaliteli Diyalog", f"{positive_samples}")
+        
+        st.markdown("**1. Hızlı Kişisel Model (Ollama Persona):**")
+        st.caption("0-VRAM harcar, konuşmalarınızı ve profilinizi doğrudan `samet-partner` modeline derler.")
+        if st.button("🚀 Özel Modelimi Derle (samet-partner)", key="btn_compile_ollama_persona", use_container_width=True):
+            with st.spinner("Özel 'samet-partner' modeli derleniyor..."):
+                from scripts.create_ollama_persona import create_personal_model
+                success = create_personal_model("samet-partner")
+                if success:
+                    st.success("✅ 'samet-partner' başarıyla derlendi! Ollama'da kullanıma hazır.")
+                    st.toast("Modeliniz başarıyla derlendi!", icon="🚀")
+                else:
+                    st.error("❌ Model derlenirken bir hata oluştu. Ollama servisinin açık olduğundan emin olun.")
+        
+        st.divider()
+        st.markdown("**2. Yerel 4-Bit QLoRA Eğitimi (RTX 4050):**")
+        st.caption("Modelin tüm ağırlıklarını konuşma geçmişinizle eğitir (~3.8 GB VRAM).")
+        if st.button("📁 Eğitim Veri Setini Güncelle", key="btn_build_dataset", use_container_width=True):
+            res_data = collector.build_training_dataset()
+            st.success(f"✅ Veri seti güncellendi! {res_data.get('sample_count', 0)} örnek `data/my_conversations/train_sharegpt.jsonl` dosyasına yazıldı.")
+            st.toast("Eğitim veri seti güncellendi!", icon="📁")
+        
+        st.caption("⚡ Terminalden tam GPU eğitimini başlatmak için:\n`python scripts/train_my_style_qlora.py`")
+
     # Obsidian Pending Drafts
     drafts = approval_manager.list_drafts()
     st.markdown(f"### 📝 Obsidian Taslakları ({len(drafts)})")
@@ -530,6 +563,15 @@ with tab_chat:
                     # Otonom RL Öz-Değerlendirme & Anlık Politika Evrimi
                     self_eval = self_evolving_rl.evaluate_and_evolve(prompt, clean_full, mode="chat")
                     score = self_eval.get("score", 85.0)
+
+                    # Konuşmayı kişisel eğitim veri setine kaydet (saf diyalog olarak)
+                    collector.record_interaction(
+                        user_message=prompt,
+                        assistant_response=clean_full,
+                        reward=self_eval.get("reward", 1.0),
+                        mode="chat"
+                    )
+
                     eval_footer = f"\n\n---\n⚡ **Otonom RL Öz-Değerlendirme:** Kalite: `%{score:.0f}` | Ödül: `{self_eval.get('reward', 0.0):+.2f}` | *{self_eval.get('critique', '')}*"
                     st.markdown(eval_footer)
                     clean_full += eval_footer
@@ -592,7 +634,7 @@ with tab_chat:
                 # Eğer ne yerelde ne webde hiçbir şey bulunamadıysa genel uzman modunda yanıt ver
                 if not has_sufficient_evidence:
                     expert_msgs = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
-                    stream = llm.stream_generate(expert_msgs, max_tokens=3000, temperature=0.6, model=config.MODEL_ACADEMIC)
+                    stream = llm.stream_generate(expert_msgs, max_tokens=3000, temperature=0.1, model=config.MODEL_ACADEMIC)
                     full_response = st.write_stream(stream)
                     clean_full = normalize_latex(full_response)
                     st.session_state.messages.append({"role": "assistant", "content": clean_full})
@@ -670,6 +712,15 @@ with tab_chat:
                 # Step 6: Otonom RL Öz-Değerlendirme & Anlık Politika Evrimi
                 self_eval = self_evolving_rl.evaluate_and_evolve(clean_q, clean_full, retrieved_context=retrieved_context, mode="research")
                 score = self_eval.get("score", 85.0)
+
+                # Konuşmayı kişisel eğitim veri setine kaydet
+                collector.record_interaction(
+                    user_message=clean_q,
+                    assistant_response=clean_full,
+                    reward=self_eval.get("reward", 1.0),
+                    mode="research"
+                )
+
                 eval_footer = f"\n\n---\n⚡ **Otonom RL Öz-Değerlendirme:** Kalite: `%{score:.0f}` | Ödül: `{self_eval.get('reward', 0.0):+.2f}` | *{self_eval.get('critique', '')}*"
                 st.markdown(eval_footer)
                 clean_full = clean_full + eval_footer

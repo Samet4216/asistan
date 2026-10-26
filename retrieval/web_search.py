@@ -208,7 +208,7 @@ class AcademicWebSearcher:
 
         # 3. DuckDuckGo / Open Web if insufficient
         if len(results) < max_results:
-            ddg_res = self.search_duckduckgo_lite(f"{query} deep learning", max_results=max_results - len(results))
+            ddg_res = self.search_duckduckgo_lite(query, max_results=max_results - len(results))
             results.extend(ddg_res)
 
         return results[:max_results]

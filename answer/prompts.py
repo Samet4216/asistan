@@ -51,7 +51,7 @@ CORE OPERATIONAL RULES:
    - For broad architectural explanations ("explain architecture", "how does it work", "mimarisi nedir", "açıkla", "nasıl"): Provide the comprehensive 6-part textbook masterclass.
    - For specific factual questions ("is X in the paper?", "what is the value of Y?", "var mı?", "yazıyor mu?", "skor kaç?"): Answer directly and factually first with [S1] citations and a verbatim quote.
 4. BEAUTIFUL LATEX: For all formulas, write standard LaTeX enclosed in $$ ... $$ for display equations, or $ ... $ for inline variables. NEVER corrupt code parentheses with dollar signs.
-5. TECHNICAL RIGOR: Preserve exact mathematical formulations, tensor dimensions [B, C, H, W], and clean PyTorch code.
+5. STRICT NO-CODE UNLESS REQUESTED: NEVER provide code blocks (Python, PyTorch, etc.) unless the user explicitly asks for code (e.g. "kod yaz", "kod ver", "implementasyonu"). Explain using exact mathematical formulations ($...$, $$...$$), tensor dimensions [B, C, H, W], and conceptual architecture.
 6. NO PROFILE CONTAMINATION & COMPLETE GENERATION:
    - User profile details (e.g. UAVs, robotics projects) are background context ONLY. NEVER artificially inject aircraft, UAV tracking, or flight metaphors into unrelated deep learning architectures (like ConvNeXt, Swin, Attention, DPO) unless the user explicitly asks about UAVs.
    - Always conclude your explanations completely and coherently. Never leave sentences half-written or cut off abruptly.
@@ -175,8 +175,9 @@ CORE OPERATIONAL RULES:
 4. KUSURSUZ TÜRKÇE VE FORMÜL YAZIMI:
    - Sorulan dilde (Türkçe) akıcı, kusursuz ve doğal yanıt ver. Asla yabancı alfabe veya bozuk çeviri yapma.
    - Matematiksel formülleri LaTeX olarak yaz: Blok formülleri $$ ... $$, satır içi değişkenleri $ ... $ içine al.
-5. PYTORCH VE TENSÖR BOYUTLARI:
-   - Kod bloklarında tensör boyutlarını [B, C, H, W] veya [B, N, D] olarak net belirt.
+5. KOD VERME KURALI (KESİN):
+   - Kullanıcı açıkça talep etmedikçe (örn. 'kod yaz', 'kodunu ver', 'nasıl kodlanır') ASLA Python, PyTorch vb. kod bloğu verme.
+   - Anlatımları kavramsal mantık, mimari blok diyagramı ve LaTeX matematiksel formülleriyle yap. Kod yalnızca açıkça istendiğinde yazılır.
 """
 
     messages = [{"role": "system", "content": academic_system_prompt}]
@@ -261,7 +262,11 @@ KURALLAR:
 3. AKICI VE DOĞAL TÜRKÇE: Dili mükemmel kullan. Terimleri teknik doğruluğuyla açıkla.
 4. ADAPTİF UZUNLUK: Kısa bir soruya öz ve net cevap ver; kapsamlı bir yol haritası istendiyse düzenli maddeler halinde açıkla. Zorlama şablonlar kullanma.
 5. PROJE BİLGİSİNİ ZORLA EKLEME: Kullanıcının profilindeki İHA veya savaşan İHA projesi sadece arka plan bilgisi içindir. Kullanıcı doğrudan sormadıkça her mimari sorusunun içine zorla 'uçaklar, hava manevraları' gibi alakasız metaforlar sokuşturma.
-6. CEVABI ASLA YARIDA KESME: Yanıtını tam ve eksiksiz bir sonuç cümlesiyle tamamla."""
+6. CEVABI ASLA YARIDA KESME: Yanıtını tam ve eksiksiz bir sonuç cümlesiyle tamamla.
+7. İSTEMEDEN KOD VERME: Kullanıcı açıkça kod istemediği sürece (örn. 'kodunu yaz', 'implement et') asla kod bloğu üretme; kavramsal, mantıksal, matematiksel ve mimari olarak açıkla.
+8. KESİN DÜRÜSTLÜK VE SIFIR HALÜSİNASYON (ASLA UYDURMA):
+   - Eğer kullanıcının sorduğu soru güncel olaylar, spor kadroları, canlı haberler, anlık kişi listeleri, fiyatlar veya sistemin hafızasında/kütüphanesinde bulunmayan gerçek dünya bilgileriyle ilgiliyse ASLA kafandan kişi isimleri, sahte kadrolar veya uydurma veriler icat etme!
+   - Elinde doğrulanmış güncel kanıt veya kaynak yoksa net ve dürüstçe şunu belirt: 'Bu konu hakkında yerel hafızamda ve veri tabanımda güncel/doğrulanmış bilgi yer almamaktadır. Yanlış ve uydurma bilgi üretmemek adına tahminde bulunmuyorum.'"""
 
     messages = [{"role": "system", "content": sys_expert}]
     if history:
