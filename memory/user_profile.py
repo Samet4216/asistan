@@ -19,11 +19,42 @@ from vault import vault
 STYLE_FILE = config.VAULT_DIR / "00_Profile" / "Style.md"
 KNOWLEDGE_FILE = config.VAULT_DIR / "00_Profile" / "Knowledge_State.md"
 ABOUT_FILE = config.VAULT_DIR / "00_Profile" / "About_Me.md"
+PERSONA_FILE = config.VAULT_DIR / "00_Profile" / "Conversation_Persona.md"
 
 
 class ProfileManager:
     def __init__(self):
         vault.ensure_layout()
+
+    def get_persona(self) -> str:
+        """Reads conversational persona and mirroring preferences from Vault/00_Profile/Conversation_Persona.md."""
+        if PERSONA_FILE.exists():
+            try:
+                content = PERSONA_FILE.read_text(encoding="utf-8")
+                if content.startswith("---"):
+                    parts = content.split("---", 2)
+                    if len(parts) >= 3:
+                        return parts[2].strip()
+                return content.strip()
+            except Exception:
+                pass
+        return (
+            "Kullanıcı samimi, rahat ve yaşayan bir Türkçe konuşur. "
+            "'Aynen', 'falan', 'şöyle yapalım' gibi doğal ifadeleri benimser. "
+            "Aşırı resmiyetten ve robotik yapay zeka kalıplarından kesinlikle kaçın; "
+            "yerinde ve tatlı emojiler (😊, ☕, 🚀, 🔥, 👀) kullanarak onun sıcak enerjisini aynala."
+        )
+
+    def append_persona(self, trait: str):
+        """Appends a new conversational trait or vocabulary habit to Conversation_Persona.md."""
+        current = self.get_persona()
+        new_content = current.strip() + f"\n- {trait}\n"
+        frontmatter = {
+            "type": "profile",
+            "tags": ["profile", "conversation-persona", "style-mirroring"]
+        }
+        vault.write_note("00_Profile", "Conversation_Persona.md", frontmatter, new_content)
+        vault.git_commit(f"profile: added persona trait '{trait[:30]}'")
 
     def get_about_me(self) -> str:
         """Reads personal researcher profile from Vault/00_Profile/About_Me.md."""

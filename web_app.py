@@ -156,7 +156,10 @@ with st.sidebar:
         metrics = rl_engine.get_metrics()
         teacher_count = teacher_engine.count()
         st.caption(f"🎯 **Pekiştirilmiş Kural:** {metrics.get('learned_axioms_count', 0)} | 🎓 **Öğretilen Doğru Bilgi:** {teacher_count} | ⭐ **Altın Örnek:** {metrics.get('gold_exemplars_count', 0)}")
-        st.markdown(f"<div style='font-size:0.82rem; color:#cbd5e1; max-height:140px; overflow-y:auto; margin-bottom:8px;'>{current_about}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='font-size:0.82rem; color:#cbd5e1; max-height:120px; overflow-y:auto; margin-bottom:6px;'>{current_about}</div>", unsafe_allow_html=True)
+        persona_curr = profile_manager.get_persona()
+        st.caption("🗣️ **Sohbet & Konuşma Aynalama:**")
+        st.markdown(f"<div style='font-size:0.78rem; color:#94a3b8; max-height:80px; overflow-y:auto; border-left:2px solid #38bdf8; padding-left:8px; margin-bottom:8px;'>{persona_curr}</div>", unsafe_allow_html=True)
         col_prof1, col_prof2 = st.columns(2)
         with col_prof1:
             if st.button("🔄 Hafızayı Senkronize Et", key="btn_sync_self_train", use_container_width=True, help="Öğrenilen kuralları, DPO eğitim çiftlerini ve Modelfile'ı günceller"):
@@ -392,12 +395,13 @@ with tab_chat:
             if critique_res and critique_res.get("learned_axiom"):
                 st.toast(f"Tarzınız algılandı: {critique_res['learned_axiom']}", icon="🎯")
 
-        # Auto-memory cues
-        if auto_memory.has_personal_cues(prompt_to_process):
-            try:
+        # Auto-memory cues & persona mirroring
+        try:
+            auto_memory.analyze_and_mirror_persona(prompt_to_process)
+            if auto_memory.has_personal_cues(prompt_to_process):
                 auto_memory.extract_and_update(prompt_to_process)
-            except Exception:
-                pass
+        except Exception:
+            pass
 
         # Append and render user message
         st.session_state.messages.append({"role": "user", "content": prompt_to_process})

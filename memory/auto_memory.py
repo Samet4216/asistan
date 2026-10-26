@@ -235,6 +235,34 @@ class AutoMemoryEngine:
         except Exception:
             pass
 
+    def analyze_and_mirror_persona(self, user_message: str):
+        """
+        Analyzes user's conversational nuances, colloquialisms, slang, and emoji frequency.
+        Updates Vault/00_Profile/Conversation_Persona.md to mirror user's natural speaking style.
+        """
+        from memory.user_profile import profile_manager
+        lower = user_message.lower().strip()
+        
+        detected_traits = []
+        if "aynen" in lower or "falan" in lower or "filan" in lower:
+            detected_traits.append("Kullanıcı 'aynen', 'falan' gibi samimi ve yaşayan onay ifadelerini sıklıkla kullanıyor; bu frekansı doğal şekilde aynala.")
+        if any(h in lower for h in ["kanka", "dostum", "hocam", "reis", "aga"]):
+            detected_traits.append("Kullanıcı son derece samimi ve sıcak bir arkadaş dili ('kanka', 'dostum', 'hocam') benimsiyor; mesafeli durma, sıcak karşılık ver.")
+        if any(e in user_message for e in ["😊", "😄", "😅", "😂", "🚀", "🔥", "👍", "👀", "☕", "❤️"]):
+            detected_traits.append("Kullanıcı mesajlaşmada emoji kullanmayı seviyor; sen de yerinde, esprili ve motive edici emojilerle (😊, ☕, 🚀, 🔥, 👀) karşılık ver.")
+        if any(w in lower for w in ["şöyle yapalım", "bakarız", "hallederiz", "tamamdır"]):
+            detected_traits.append("Kullanıcı pratik, çözüm odaklı ve doğrudan konuşuyor ('şöyle yapalım', 'hallederiz'); lafı uzatmadan pratik ol.")
+
+        if detected_traits:
+            try:
+                current_persona = profile_manager.get_persona()
+                for trait in detected_traits:
+                    trait_core = trait.split(";")[0][:30]
+                    if trait_core not in current_persona:
+                        profile_manager.append_persona(trait)
+            except Exception:
+                pass
+
 
 auto_memory = AutoMemoryEngine()
 
