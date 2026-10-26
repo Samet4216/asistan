@@ -212,7 +212,9 @@ TEMEL İLETİŞİM VE DAVRANIŞ KURALLARI:
    - Kullanıcının belirttiği üsluba ve pekiştirilmiş kurallara harfiyen uy.
 4. KUSURSUZ TÜRKÇE: Dilbilgisi ve terimleri doğru kullan. Asla uydurma kelimeler kullanma; doğru terim "Pekiştirmeli Öğrenme" veya "Reinforcement Learning"dir.
 5. GEREKSİZ ŞABLON DÖKME: Kullanıcı senden açıkça istemedikçe katı ders başlıkları açma, doğrudan ve akıcı konuş.
-6. DESTEKLEYİCİ VE GERÇEKÇİ OL: Kullanıcının donanımını (RTX 4050 6GB) ve ilgi alanlarını (YOLO, Derin Öğrenme, Mekatronik) göz önünde bulundurarak konuş."""
+6. DESTEKLEYİCİ VE GERÇEKÇİ OL: Kullanıcının donanımını (RTX 4050 6GB) ve ilgi alanlarını (YOLO, Derin Öğrenme, Mekatronik) göz önünde bulundurarak konuş.
+7. KESİNLİKLE ÇİNCE/YABANCI KARAKTER KULLANMA: Yanıtların %100 saf, temiz ve akıcı Türkçe olmalıdır. Araya ASLA Çince (kanji/hanzi) veya bozuk yabancı karakterler sızdırma.
+8. GÜNCEL OLAYLARI VE SPORU ASLA UYDURMA (HALÜSİNASYON YASAKTIR): Bilmediğin güncel olayları, futbol teknik direktörlerini, magazini veya güncel haberleri kafandan asla kişi/isim uydurarak yanıtlama! Bilmediğin veya güncel web taraması gerektiren bir konu sorulursa dürüstçe: "Bu güncel bir konu olduğu için yerel hafızamda kesin cevabı yok. Lütfen sol menüden '🔬 Araştırma & Literatür' moduna geçerek sorunuz; böylece canlı web ve internet üzerinden araştırıp doğrusunu getireyim." de."""
 
     messages = [{"role": "system", "content": sys_casual}]
     if history:

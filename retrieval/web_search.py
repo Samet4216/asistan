@@ -113,40 +113,49 @@ class AcademicWebSearcher:
             return []
 
     def search_wikipedia(self, query: str, max_results: int = 2) -> List[Dict[str, Any]]:
-        """Queries Wikipedia API for formal foundational concepts, theory, and mathematical definitions."""
-        try:
-            params = {
-                "action": "query",
-                "list": "search",
-                "srsearch": query,
-                "utf8": "1",
-                "format": "json",
-                "srlimit": max_results
-            }
-            resp = requests.get(WIKIPEDIA_API_URL, params=params, headers=HEADERS, timeout=self.timeout)
-            if resp.status_code != 200:
-                return []
+        """Queries Wikipedia API (Turkish and English) for formal foundational concepts, theory, and definitions."""
+        results = []
+        endpoints = [
+            ("https://tr.wikipedia.org/w/api.php", "https://tr.wikipedia.org/wiki/"),
+            ("https://en.wikipedia.org/w/api.php", "https://en.wikipedia.org/wiki/")
+        ]
+        
+        for api_url, base_url in endpoints:
+            if len(results) >= max_results:
+                break
+            try:
+                params = {
+                    "action": "query",
+                    "list": "search",
+                    "srsearch": query,
+                    "utf8": "1",
+                    "format": "json",
+                    "srlimit": max_results
+                }
+                resp = requests.get(api_url, params=params, headers=HEADERS, timeout=self.timeout)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    items = data.get("query", {}).get("search", [])
+                    for item in items:
+                        title = item.get("title", "")
+                        raw_snippet = item.get("snippet", "")
+                        clean_snippet = re.sub(r'<[^>]+>', '', raw_snippet).strip()
+                        page_url = f"{base_url}{urllib.parse.quote(title.replace(' ', '_'))}"
 
-            data = resp.json()
-            items = data.get("query", {}).get("search", [])
-            results = []
-            for item in items:
-                title = item.get("title", "")
-                raw_snippet = item.get("snippet", "")
-                clean_snippet = re.sub(r'<[^>]+>', '', raw_snippet).strip()
-                page_url = f"https://en.wikipedia.org/wiki/{urllib.parse.quote(title.replace(' ', '_'))}"
+                        results.append({
+                            "title": f"Wikipedia: {title}",
+                            "authors": "Wikipedia Contributors",
+                            "summary": clean_snippet,
+                            "url": page_url,
+                            "published": datetime.now().strftime("%Y-%m"),
+                            "source": "Wikipedia"
+                        })
+                        if len(results) >= max_results:
+                            break
+            except Exception:
+                continue
 
-                results.append({
-                    "title": f"Wikipedia: {title}",
-                    "authors": "Wikipedia Contributors",
-                    "summary": clean_snippet,
-                    "url": page_url,
-                    "published": datetime.now().strftime("%Y-%m"),
-                    "source": "Wikipedia Academic"
-                })
-            return results
-        except Exception:
-            return []
+        return results[:max_results]
 
     def search_duckduckgo_lite(self, query: str, max_results: int = 2) -> List[Dict[str, Any]]:
         """Lightweight search for technical implementations, benchmarks, and GitHub repositories."""

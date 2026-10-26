@@ -149,7 +149,7 @@ with st.sidebar:
 
     # Mod Bilgi Rozeti
     if is_chat_mode:
-        st.info("💬 **Sohbet & Kişisel Adaptasyon**\n\n- Model: `DeepSeek-R1 (7B CoT)`\n- Özellik: Bilişsel muhakeme, tarz öğrenme ve pekiştirmeli adaptasyon.")
+        st.info("💬 **Sohbet & Kişisel Adaptasyon**\n\n- Model: `Qwen 2.5 (7B Instruct)`\n- Özellik: Akıcı Türkçe, kişisel hafıza, tarz öğrenme ve pekiştirmeli adaptasyon.")
     else:
         net_status = "🟢 Canlı Web & arXiv Aktif" if is_online() else "⚪ Çevrimdışı (Yerel Hafıza)"
         st.success(f"🔬 **Araştırma & Literatür**\n\n- Model: `Qwen 2.5 (7B Instruct)`\n- Öncelik: Önce Yerel 21 Makale & Obsidian, yoksa Canlı Web.\n- Bağlantı: {net_status}")
@@ -288,7 +288,7 @@ with tab_chat:
     # Top Chat Action Toolbar
     tool_col1, tool_col2, tool_col3 = st.columns([2.5, 0.9, 0.9])
     with tool_col1:
-        mode_tag = "💬 **Sohbet & Kişisel Adaptasyon** (DeepSeek-R1)" if is_chat_mode else "🔬 **Araştırma & Literatür** (Qwen 2.5)"
+        mode_tag = "💬 **Sohbet & Kişisel Adaptasyon** (Qwen 2.5)" if is_chat_mode else "🔬 **Araştırma & Literatür** (Qwen 2.5)"
         st.caption(f"🧠 Aktif Mod: {mode_tag} • {len(st.session_state.get('messages', []))} mesaj")
     with tool_col2:
         if st.button("🧹 Temizle", key="clear_chat_toolbar", help="Sohbet geçmişini sıfırlar"):
@@ -311,8 +311,8 @@ with tab_chat:
     # Initialize session messages
     if "messages" not in st.session_state:
         init_content = (
-            "Merhaba! **Sohbet & Kişisel Adaptasyon** modundayız (DeepSeek-R1). "
-            "Bana kendinizden, projelerinizden ve tarzınızdan bahsedebilirsiniz. "
+            "Merhaba! **Sohbet & Kişisel Adaptasyon** modundayız (Qwen 2.5). "
+            "Bana kendinizden, projelerinizden, hedeflerinizden ve tarzınızdan bahsedebilirsiniz. "
             "Verdiğiniz bilgiler ve 👍/👎 butonlarıyla üslubunuza ve tercihlerinize pekiştirmeli olarak adapte olurum."
             if is_chat_mode else
             "Merhaba! **Araştırma & Literatür** modundayız (Qwen 2.5). "
@@ -471,15 +471,30 @@ with tab_chat:
         with st.chat_message("assistant"):
             if is_chat_mode:
                 # ==========================================
-                # MOD 1: 💬 SOHBET & KİŞİSEL ADAPTASYON (DeepSeek-R1)
+                # MOD 1: 💬 SOHBET & KİŞİSEL ADAPTASYON (Qwen 2.5)
                 # ==========================================
-                with st.spinner("💭 DeepSeek-R1 akıl yürütüyor ve tarzınıza adapte oluyor..."):
-                    casual_msgs = build_casual_response_prompt(prompt, history=st.session_state.messages[:-1])
+                clean_p_lower = prompt.lower().strip()
+                factual_triggers = [
+                    "kimdir", "nedir", "nerede", "ne zaman", "kaç", "hangi",
+                    "who is", "what is", "where is", "when did", "teknik direktör", "tarihi", "?"
+                ]
+                has_factual_intent = any(t in clean_p_lower for t in factual_triggers)
+
+                web_fact_context = ""
+                if has_factual_intent and is_online():
+                    # Hızlı Wikipedia olgusal doğrulaması
+                    wiki_briefs = web_searcher.search_wikipedia(prompt.strip(), max_results=1)
+                    if wiki_briefs:
+                        web_fact_context = f"\n\n[GÜNCEL REFERANS]:\n{wiki_briefs[0]['title']}: {wiki_briefs[0]['summary']}"
+
+                with st.spinner("💭 Qwen 2.5 düşünüyor ve tarzınıza göre yanıt hazırlıyor..."):
+                    augmented_user_prompt = prompt + web_fact_context if web_fact_context else prompt
+                    casual_msgs = build_casual_response_prompt(augmented_user_prompt, history=st.session_state.messages[:-1])
                     stream = llm.stream_generate(
                         casual_msgs,
                         max_tokens=3000,
-                        temperature=0.6,
-                        model=config.MODEL_REASONING
+                        temperature=0.4,
+                        model=config.MODEL_CHAT
                     )
                     full_response = st.write_stream(stream)
                     st.session_state.messages.append({"role": "assistant", "content": full_response})
