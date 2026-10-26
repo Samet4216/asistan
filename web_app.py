@@ -778,9 +778,11 @@ with tab_radar:
     db_col5.metric("🐛 Çözülen Hatalar", f"{err_cnt} Hata")
 
     st.markdown("#### 🤖 Çift Motorlu Yerel Çıkarım Mimarisi (Dual-Engine)")
+    m_acad = getattr(config, "MODEL_ACADEMIC", getattr(config, "MODEL", "qwen2.5:7b-instruct-q4_K_M"))
+    m_reas = getattr(config, "MODEL_REASONING", "deepseek-r1:7b")
     st.markdown(f"""
-    - **📚 Akademik Literatür & Formül Motoru:** `{config.MODEL_ACADEMIC}` (Bağlam doğrulaması, LaTeX ve [S1] alıntıları)
-    - **🧠 Derin Akıl Yürütme & Planlama Motoru:** `{config.MODEL_REASONING}` (&lt;think&gt; zinciriyle mühendislik planlaması ve problem çözme)
+    - **📚 Akademik Literatür & Formül Motoru:** `{m_acad}` (Bağlam doğrulaması, LaTeX ve [S1] alıntıları)
+    - **🧠 Derin Akıl Yürütme & Planlama Motoru:** `{m_reas}` (&lt;think&gt; zinciriyle mühendislik planlaması ve problem çözme)
     - **Vektör Gömme Modeli (Embedding):** `{config.EMBED_MODEL}` (CPU üzerinde 768 boyutlu yoğun vektörler)
     - **Yeniden Sıralama (Cross-Encoder):** `{config.RERANK_MODEL}`
     - **Kişisel Hafıza & İkinci Beyin:** Obsidian Markdown Vault (`Vault/00_Profile/About_Me.md`)

@@ -17,6 +17,8 @@ CHROMA_DIR = DATA_DIR / "chroma_db"
 # LLM Configuration (Ollama HTTP Backend)
 OLLAMA_BASE_URL = "http://localhost:11434"
 MODEL = "qwen2.5:7b-instruct-q4_K_M"
+MODEL_ACADEMIC = "qwen2.5:7b-instruct-q4_K_M"
+MODEL_REASONING = "deepseek-r1:7b"
 NUM_CTX = 8192
 TEMPERATURE = 0.2
 KEEP_ALIVE = "10m"
