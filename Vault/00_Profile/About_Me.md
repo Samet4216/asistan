@@ -24,4 +24,5 @@ tags:
 ### 🎯 Tercih Edilen Öğrenme & Anlatım Tarzı
   - Standart akademik ve pratik derin öğrenme yaklaşımı
 - Proje Amacı & Zihniyeti: Benim için İHA'da 30 FPS üzerinde gerçek zamanlı çalışması şart, çünkü hızlı manevrada hedefi kaçırm
+- Proje Amacı & Zihniyeti: İHA projelerinde derin öğrenme uygulamaları geliştirmek, termal kamera kullanarak daha hassas ve etkili sonuçlar elde etmek için.
 
