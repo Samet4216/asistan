@@ -113,45 +113,56 @@ class AcademicWebSearcher:
             return []
 
     def search_wikipedia(self, query: str, max_results: int = 2) -> List[Dict[str, Any]]:
-        """Queries Wikipedia API (Turkish and English) for formal foundational concepts, theory, and definitions."""
+        """
+        Queries Wikipedia (Turkish first, then English) using OpenSearch + REST Page Summary API.
+        Retrieves real, comprehensive, verified paragraph extracts rather than tiny 10-word snippets.
+        """
         results = []
-        endpoints = [
-            ("https://tr.wikipedia.org/w/api.php", "https://tr.wikipedia.org/wiki/"),
-            ("https://en.wikipedia.org/w/api.php", "https://en.wikipedia.org/wiki/")
-        ]
-        
-        for api_url, base_url in endpoints:
+        clean_q = re.sub(r'[^a-zA-Z0-9çğıöşüÇĞİÖŞÜ\s_-]', ' ', query).strip()
+        if not clean_q:
+            return []
+
+        for lang in ["tr", "en"]:
             if len(results) >= max_results:
                 break
             try:
+                opensearch_url = f"https://{lang}.wikipedia.org/w/api.php"
                 params = {
-                    "action": "query",
-                    "list": "search",
-                    "srsearch": query,
-                    "utf8": "1",
-                    "format": "json",
-                    "srlimit": max_results
+                    "action": "opensearch",
+                    "search": clean_q,
+                    "limit": 3,
+                    "namespace": 0,
+                    "format": "json"
                 }
-                resp = requests.get(api_url, params=params, headers=HEADERS, timeout=self.timeout)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    items = data.get("query", {}).get("search", [])
-                    for item in items:
-                        title = item.get("title", "")
-                        raw_snippet = item.get("snippet", "")
-                        clean_snippet = re.sub(r'<[^>]+>', '', raw_snippet).strip()
-                        page_url = f"{base_url}{urllib.parse.quote(title.replace(' ', '_'))}"
+                resp = requests.get(opensearch_url, params=params, headers=HEADERS, timeout=self.timeout)
+                if resp.status_code != 200:
+                    continue
 
-                        results.append({
-                            "title": f"Wikipedia: {title}",
-                            "authors": "Wikipedia Contributors",
-                            "summary": clean_snippet,
-                            "url": page_url,
-                            "published": datetime.now().strftime("%Y-%m"),
-                            "source": "Wikipedia"
-                        })
-                        if len(results) >= max_results:
-                            break
+                data = resp.json()
+                titles = data[1] if len(data) > 1 else []
+                urls = data[3] if len(data) > 3 else []
+
+                for i, title in enumerate(titles[:2]):
+                    try:
+                        sum_url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(title)}"
+                        sresp = requests.get(sum_url, headers=HEADERS, timeout=self.timeout)
+                        if sresp.status_code == 200:
+                            sdata = sresp.json()
+                            extract = sdata.get("extract", "").strip()
+                            if extract and len(extract) > 30:
+                                page_url = urls[i] if i < len(urls) else sdata.get("content_urls", {}).get("desktop", {}).get("page", "")
+                                results.append({
+                                    "title": f"Vikipedi ({lang.upper()}): {sdata.get('title', title)}",
+                                    "authors": "Vikipedi Katkıda Bulunanları",
+                                    "summary": extract,
+                                    "url": page_url,
+                                    "published": datetime.now().strftime("%Y-%m"),
+                                    "source": f"Vikipedi ({lang.upper()})"
+                                })
+                                if len(results) >= max_results:
+                                    break
+                    except Exception:
+                        continue
             except Exception:
                 continue
 
@@ -196,17 +207,20 @@ class AcademicWebSearcher:
             return []
 
     def search_academic_web(self, query: str, max_results: int = 4) -> List[Dict[str, Any]]:
-        """Orchestrates multi-source academic retrieval across arXiv, Wikipedia, and the open web."""
+        """Orchestrates multi-source factual retrieval across Wikipedia, arXiv, and open web."""
         results = []
-        # 1. arXiv Preprints
-        arxiv_res = self.search_arxiv(query, max_results=2)
-        results.extend(arxiv_res)
-
-        # 2. Wikipedia Concept Definition
+        # 1. Wikipedia Definition & Factual Extract (Primary authority for general and factual concepts)
         wiki_res = self.search_wikipedia(query, max_results=2)
         results.extend(wiki_res)
 
-        # 3. DuckDuckGo / Open Web if insufficient
+        # 2. arXiv Preprints (for academic research, ML models, and scientific algorithms)
+        academic_keywords = ["deep", "learning", "model", "network", "attention", "transformer", "yolo", "marl", "ppo", "paper", "algorithm", "derin", "öğrenme", "yapay zeka", "uav", "iha", "robot", "slam", "mpc"]
+        clean_lower = query.lower()
+        if any(k in clean_lower for k in academic_keywords) or not results:
+            arxiv_res = self.search_arxiv(query, max_results=2)
+            results.extend(arxiv_res)
+
+        # 3. DuckDuckGo / Open Web if still insufficient
         if len(results) < max_results:
             ddg_res = self.search_duckduckgo_lite(query, max_results=max_results - len(results))
             results.extend(ddg_res)

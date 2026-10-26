@@ -8,5 +8,6 @@ tags:
 
 # User Learning & Response Style (RL-Aligned)
 
-- Cevapları doğrudan konuya girerek, gereksiz nezaket cümleleri ve laf kalabalığı olmadan öz ve net tut.
+- Cevapları doğrudan konuya girerek, gereksiz laf kalabalığı olmadan yüksek teknik derinlik, netlik ve pedagojik açıklıkla sun.
 - Sorulan dilde akıcı, temiz ve doğru teknik terminolojiyle konuş.
+- Makaleden bir konu veya mekanizma sorulduğunda asla yüzeysel özet geçme; teorik motivasyon, adım adım tensör boyutları, matematiksel formüller ($$...$$), sembol tanımları ve birebir alıntılarla derinlemesine ve detaylıca açıkla.

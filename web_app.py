@@ -152,9 +152,11 @@ with st.sidebar:
     # Mod Bilgi Rozeti
     if is_chat_mode:
         st.info("💬 **Sohbet & Kişisel Adaptasyon**\n\n- Model: `Qwen 2.5 (7B Instruct)`\n- Özellik: Akıcı Türkçe, kişisel hafıza, tarz öğrenme ve pekiştirmeli adaptasyon.")
+        use_cot = False
     else:
         net_status = "🟢 Canlı Web & arXiv Aktif" if is_online() else "⚪ Çevrimdışı (Yerel Hafıza)"
         st.success(f"🔬 **Araştırma & Literatür**\n\n- Model: `Qwen 2.5 (7B Instruct)`\n- Öncelik: Önce Yerel 21 Makale & Obsidian, yoksa Canlı Web.\n- Bağlantı: {net_status}")
+        use_cot = st.toggle("🧠 Derin Akıl Yürütme Planı (CoT)", value=False, help="Makale konularını açıklarken önce kaynaklar üzerinde derin bir akıl yürütme planı çıkarır, ardından ders düzeyinde detaylı yanıtı üretir.")
 
     use_web_search = True
     use_decomp = True
@@ -537,8 +539,19 @@ with tab_chat:
                 ]
                 has_factual_intent = not is_greeting and any(t in clean_p_lower for t in factual_triggers)
 
+                paper_triggers = [
+                    "makale", "paper", "arxiv", "coordinate attention", "yolo", "vit",
+                    "vision transformer", "swin", "convnext", "flashattention", "loss fonksiyonu",
+                    "attention mekanizması", "backbone", "neck", "head", "soft actor-critic", "dpo", "ppo"
+                ]
+                has_paper_intent = not is_greeting and any(pt in clean_p_lower for pt in paper_triggers)
+
                 web_fact_context = ""
-                if has_factual_intent and is_online():
+                if has_paper_intent:
+                    paper_search = searcher.search(prompt.strip(), top_k=3)
+                    if paper_search.get("has_sufficient_evidence") and paper_search.get("packed_context"):
+                        web_fact_context = f"\n\n[İLGİLİ MAKALE KAYNAĞI ([S1]..[S3])]:\n{paper_search['packed_context']}\n(Talimat: Bu makale konusunu Samet'e samimi, akıcı ama teknik olarak son derece zengin, tensör boyutları ve formülleriyle detaylıca açıkla.)"
+                elif has_factual_intent and is_online():
                     # Hızlı Wikipedia olgusal doğrulaması
                     wiki_briefs = web_searcher.search_wikipedia(prompt.strip(), max_results=1)
                     if wiki_briefs:
@@ -659,6 +672,16 @@ with tab_chat:
                         for ws in web_res["sources"]:
                             st.markdown(f"- **`[{ws['tag']}]`** 🔗 [{ws['title']}]({ws['url']})\n  *{ws['summary'][:250]}...*")
 
+                # Step 2.5: İsteğe Bağlı CoT Akıl Yürütme Planı
+                thought_plan = ""
+                if use_cot:
+                    with st.status("🧠 Makale kaynakları üzerinde derin akıl yürütme ve planlama yapılıyor...", expanded=False) as cot_status:
+                        cot_msgs = build_thought_plan_prompt(clean_q, safe_packed.get("paper_chunks", ""))
+                        thought_stream = llm.stream_generate(cot_msgs, max_tokens=700, temperature=0.1, model=config.MODEL_REASONING)
+                        thought_plan = "".join(list(thought_stream))
+                        st.markdown(thought_plan)
+                        cot_status.update(label="✅ Derin akıl yürütme planı hazırlandı.", state="complete")
+
                 # Step 3: Akademik Yanıt Sentezi
                 messages = build_answer_prompt(
                     query=clean_q,
@@ -666,7 +689,7 @@ with tab_chat:
                     telemetry_context="",
                     git_diff="",
                     error_context=safe_packed.get("error_history", ""),
-                    thought_plan="",
+                    thought_plan=thought_plan,
                     deep_dive=True,
                     history=st.session_state.messages[:-1],
                     immediate_critique=critique_learned
