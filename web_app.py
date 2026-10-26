@@ -35,11 +35,13 @@ from utils import (
 )
 from retrieval.search import searcher
 from retrieval.web_search import web_searcher, online_searcher, is_online
+from retrieval.graph_rag import graph_rag_engine
 from answer.prompts import (
     build_answer_prompt,
     build_thought_plan_prompt,
     build_casual_response_prompt,
-    build_general_expert_prompt
+    build_general_expert_prompt,
+    build_self_correction_prompt
 )
 from answer.verify import audit_markdown_response
 from memory.approval import approval_manager
@@ -489,7 +491,21 @@ with tab_chat:
                         content_to_show = thought_html + parsed["response"]
             clean_display_content = re.sub(r'\n*---\n*⚡ \*\*Otonom RL Öz-Değerlendirme:\*\*.*$', '', content_to_show, flags=re.DOTALL)
             st.markdown(normalize_latex(clean_display_content), unsafe_allow_html=True)
-            
+
+            # Proactive Research Follow-ups (1-Click Socratic Pills)
+            if msg["role"] == "assistant":
+                proactive_items = re.findall(r'-\s*🔹\s*(.+)', content_to_show)
+                if proactive_items:
+                    st.markdown("<p style='font-size:0.85rem; color:#38bdf8; font-weight:600; margin:10px 0 4px 0;'>💡 Proaktif Araştırma & Sıradaki Adımlar (Tek Tıkla Sor):</p>", unsafe_allow_html=True)
+                    p_cols = st.columns(len(proactive_items[:3]))
+                    for p_idx, p_text in enumerate(proactive_items[:3]):
+                        with p_cols[p_idx]:
+                            btn_label = p_text.strip()
+                            short_label = (btn_label[:42] + "...") if len(btn_label) > 42 else btn_label
+                            if st.button(f"🔹 {short_label}", key=f"proact_btn_{i}_{p_idx}", help=btn_label, use_container_width=True):
+                                st.session_state.pending_prompt = btn_label
+                                st.rerun()
+
             # If assistant message (and not the initial welcome message), provide RL Feedback & Save toolbar
             if msg["role"] == "assistant" and i > 0:
                 user_q = ""
@@ -497,7 +513,7 @@ with tab_chat:
                     if prev_msg["role"] == "user":
                         user_q = prev_msg["content"]
                         break
-                
+
                 # Dynamic RL Quality Badge
                 s_eval = msg.get("self_eval")
                 if s_eval:
@@ -506,8 +522,8 @@ with tab_chat:
                     icon = "🟢" if score >= 75 else ("🟡" if score >= 50 else "🔴")
                     st.caption(f"{icon} **Otonom RL Kalitesi:** `%{score:.0f}` (Ödül: `{s_eval.get('reward', 0.0):+.2f}`) • *{critique}*")
 
-                # Sleek RL Feedback & Regeneration Toolbar
-                rl_col1, rl_col2, rl_col3, rl_col4, rl_col5, rl_col6 = st.columns([0.6, 0.6, 2.2, 1.4, 1.3, 1.0])
+                # Sleek Proactive RL Feedback & Self-Correction Toolbar
+                rl_col1, rl_col2, rl_col3, rl_col4, rl_col5, rl_col6, rl_col7 = st.columns([0.6, 0.6, 2.0, 1.3, 1.3, 1.2, 0.9])
                 with rl_col1:
                     if st.button("👍", key=f"rl_up_{i}", help="Mükemmel yanıt! Bu tarzı ve yaklaşımı pekiştir (+1.0 Ödül)"):
                         rl_engine.record_feedback(user_q, msg["content"], reward=1.0, style_tag="perfect")
@@ -539,17 +555,39 @@ with tab_chat:
                 with rl_col4:
                     with st.popover("✍️ Tarzımı Öğret", help="Modele özel bir üslup kuralı öğret"):
                         custom_critique = st.text_input("Nasıl anlatmalıydı?", placeholder="Örn: Daha çok pratik kod ver...", key=f"critique_input_{i}")
-                        if st.button("Pekiştir", key=f"btn_critique_{i}") and custom_critique:
-                            res = rl_engine.record_feedback(user_q, msg["content"], reward=0.5, style_tag="custom", user_comment=custom_critique)
-                            st.toast(f"🎯 Yeni tarz kuralı hafızaya alındı!", icon="🧠")
-                            st.rerun()
+                        pop_c1, pop_c2 = st.columns(2)
+                        with pop_c1:
+                            if st.button("Pekiştir", key=f"btn_critique_{i}") and custom_critique:
+                                res = rl_engine.record_feedback(user_q, msg["content"], reward=0.5, style_tag="custom", user_comment=custom_critique)
+                                st.toast("🎯 Yeni tarz kuralı hafızaya alındı!", icon="🧠")
+                                st.rerun()
+                        with pop_c2:
+                            if st.button("⚡ Düzelt", key=f"btn_critique_fix_{i}") and custom_critique:
+                                rl_engine.record_feedback(user_q, msg["content"], reward=-0.5, style_tag="custom", user_comment=custom_critique)
+                                st.session_state.self_correction_target = {
+                                    "idx": i,
+                                    "user_q": user_q,
+                                    "flawed_ans": msg["content"],
+                                    "critique": custom_critique
+                                }
+                                st.toast("⚡ Öz-Düzeltme başlatılıyor...", icon="⚡")
+                                st.rerun()
                 with rl_col5:
-                    if st.button("🔄 Yeniden Yanıtla", key=f"regen_{i}", help="Bu soruyu yeni öğrenilen pekiştirilmiş tarzınızla baştan yanıtlar"):
+                    if st.button("⚡ Öz-Düzelt", key=f"self_correct_{i}", help="Model bu cevaptaki eksikleri analiz edip kendi kendini düzelterek üstün bir versiyon üretir"):
+                        st.session_state.self_correction_target = {
+                            "idx": i,
+                            "user_q": user_q,
+                            "flawed_ans": msg["content"],
+                            "critique": "Önceki yanıttaki matematiksel formülleri, tensör boyutlarını ve literatür atıflarını eksiksiz tamamlayarak ders kitabı masterclass derinliğinde baştan inşa et."
+                        }
+                        st.rerun()
+                with rl_col6:
+                    if st.button("🔄 Yeniden", key=f"regen_{i}", help="Bu soruyu yeni öğrenilen pekiştirilmiş tarzınızla baştan yanıtlar"):
                         st.session_state.messages = st.session_state.messages[:i]
                         st.session_state.pending_prompt = user_q
                         st.rerun()
-                with rl_col6:
-                    if st.button("💾 Obsidian", key=f"save_draft_{i}", help="Bu cevabı Obsidian Vault/Drafts/ klasörüne taslak olarak kaydeder."):
+                with rl_col7:
+                    if st.button("💾 Kaydet", key=f"save_draft_{i}", help="Bu cevabı Obsidian Vault/Drafts/ klasörüne taslak olarak kaydeder."):
                         safe_title = re.sub(r'[^A-Za-z0-9]+', '_', user_q[:35]).strip('_') or "Note"
                         draft_path = approval_manager.create_draft(
                             title=safe_title,
@@ -559,6 +597,47 @@ with tab_chat:
                         )
                         st.toast(f"✅ '{safe_title}' Obsidian Vault/Drafts/ klasörüne kaydedildi!", icon="📝")
                         st.rerun()
+
+    # Autonomous Self-Correction Flow (Triggered by ⚡ Öz-Düzelt button)
+    if "self_correction_target" in st.session_state and st.session_state.self_correction_target:
+        sc_target = st.session_state.self_correction_target
+        st.session_state.self_correction_target = None
+        sc_q = sc_target.get("user_q", "")
+        sc_flawed = sc_target.get("flawed_ans", "")
+        sc_critique = sc_target.get("critique", "Matematiksel formülleri, tensör boyutlarını ve literatür atıflarını eksiksiz tamamlayarak düzelt.")
+
+        with st.chat_message("assistant"):
+            with st.status("⚡ Öz-Düzeltme Devrede: Önceki yanıt taranıyor, eksik formüller ve kavramlar GraphRAG ile tamamlanıyor...", expanded=True) as sc_status:
+                search_res = searcher.search(sc_q, top_k=config.RETRIEVAL_TOP_K)
+                retrieved_context = search_res.get("packed_context", "")
+
+                # GraphRAG Synaptic Context
+                graph_seeds = graph_rag_engine.extract_seed_nodes(sc_q, search_res.get("results", []))
+                subgraph = graph_rag_engine.traverse_subgraph(graph_seeds)
+                graph_context = graph_rag_engine.format_graph_context(subgraph)
+
+                sc_msgs = build_self_correction_prompt(
+                    query=sc_q,
+                    flawed_response=sc_flawed,
+                    critique=sc_critique,
+                    packaged_context=retrieved_context,
+                    graph_context=graph_context,
+                    history=st.session_state.messages[:-1]
+                )
+                sc_status.update(label="✅ Eksik noktalar teşhis edildi, düzeltilmiş masterclass yanıt üretiliyor...", state="complete")
+
+            stream = llm.stream_generate(sc_msgs, max_tokens=3500, model=config.MODEL_ACADEMIC)
+            full_response = st.write_stream(stream)
+            clean_full = normalize_latex(full_response)
+
+            self_eval = self_evolving_rl.evaluate_and_evolve(sc_q, clean_full, mode="research")
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": f"🛠️ **[Öz-Düzeltilmiş Masterclass Yanıt]:**\n\n{clean_full}",
+                "self_eval": self_eval
+            })
+            st.toast("⚡ Yanıt kendi kendini düzeltti!", icon="✅")
+            st.rerun()
 
     if prompt:
         # Check conversational critique / implicit feedback
@@ -616,7 +695,8 @@ with tab_chat:
 
                 factual_triggers = [
                     "kimdir", "kaç yılında", "nerede doğdu", "tarihi nedir",
-                    "who is", "when did", "teknik direktörü kim"
+                    "who is", "when did", "teknik direktörü kim",
+                    "kuruluş", "renkleri", "kulübü", "ne zaman kuruldu"
                 ]
                 has_factual_intent = not is_greeting and any(t in clean_p_lower for t in factual_triggers)
 
@@ -753,6 +833,20 @@ with tab_chat:
                         for ws in web_res["sources"]:
                             st.markdown(f"- **`[{ws['tag']}]`** 🔗 [{ws['title']}]({ws['url']})\n  *{ws['summary'][:250]}...*")
 
+                # GraphRAG: Sinaptik Kavram Grafiği Taraması (Obsidian Vault 2. Beyin)
+                graph_seeds = graph_rag_engine.extract_seed_nodes(augmented_search_query, search_res.get("results", []))
+                subgraph = graph_rag_engine.traverse_subgraph(graph_seeds)
+                graph_context = graph_rag_engine.format_graph_context(subgraph)
+
+                if subgraph.get("active_nodes"):
+                    with st.expander(f"🕸️ Obsidian Sinaptik Bilgi Grafiği ({len(subgraph['active_nodes'])} Bağlantılı Düğüm — GraphRAG)", expanded=False):
+                        for n in subgraph["active_nodes"][:5]:
+                            st.markdown(f"- **[[{n['title']}]]** (`{n['id']}`) — *{n.get('folder', '')}*")
+                        if subgraph.get("connections"):
+                            st.markdown("**🔗 Aktif Çapraz Sinapslar:**")
+                            for c in subgraph["connections"][:5]:
+                                st.markdown(f"- `[[{c['source_title']}]]` $\\rightarrow$ `[[{c['target_title']}]]`")
+
                 # Step 2.5: Derin CoT Akıl Yürütme ve Konu Parçalama Planı
                 thought_plan = ""
                 if use_cot:
@@ -763,10 +857,11 @@ with tab_chat:
                         st.markdown(thought_plan)
                         cot_status.update(label="✅ Derin akıl yürütme ve konu parçalama planı hazırlandı.", state="complete")
 
-                # Step 3: Akademik Yanıt Sentezi
+                # Step 3: Akademik Yanıt Sentezi (RAG + GraphRAG)
                 messages = build_answer_prompt(
                     query=clean_q,
                     packaged_context=safe_packed.get("paper_chunks", ""),
+                    graph_context=graph_context,
                     telemetry_context="",
                     git_diff="",
                     error_context=safe_packed.get("error_history", ""),

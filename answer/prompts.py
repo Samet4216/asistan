@@ -63,15 +63,19 @@ def build_thought_plan_prompt(query: str, packaged_context: str) -> list:
     system_cot = (
         "You are an expert AI Deep Learning Research Scientist operating in Extended Deep-Thinking Mode (CoT Reasoning Process).\n"
         "Do not rush to give a final polished response. First, think thoroughly step by step through an internal analytical monologue:\n"
-        "1. MODULAR TOPIC DECOMPOSITION (MANDATORY):\n"
-        "   - Break this technical question or paper topic down into 2 to 4 logical, sequential parts (e.g. Parça 1: Teorik Problem & Temel Motivasyon, Parça 2: Matematiksel Formülasyon & Tensör Akışı, Parça 3: Mimari Çözüm & Donanım Başarımı).\n"
+        "1. NEGATIVE EVIDENCE & FACTUAL VERIFICATION AUDIT (HIGHEST PRIORITY):\n"
+        "   - Does the user query ask if a specific model, ablation, metric, or technique exists or was tested in the paper (e.g. 'did they test Vision Transformer?', 'yapıldı mı?', 'var mı?')?\n"
+        "   - Inspect [S1]..[S5] strictly. If the paper DOES NOT explicitly contain this experiment or model, you MUST conclude:\n"
+        "     'NEGATIVE EVIDENCE: This experiment/model does NOT exist in the paper chunks. I MUST NOT hypothesize, speculate, or construct a modular explanation for a non-existent experiment. I must state firmly in the very first sentence that it is absent from the text.'\n"
+        "2. MODULAR TOPIC DECOMPOSITION (FOR GENUINE TECHNICAL TOPICS):\n"
+        "   - If the topic is genuinely present in the evidence, break it down into 2 to 4 logical parts (e.g. Parça 1: Teorik Problem & Temel Motivasyon, Parça 2: Matematiksel Formülasyon & Tensör Akışı, Parça 3: Mimari Çözüm & Donanım Başarımı).\n"
         "   - Determine whether the user is initiating a topic or continuing from a previous checkpoint (e.g. if query says 'devam', 'evet', 'sonraki parça').\n"
-        "2. ACTIVE PART DEEP DRILLDOWN PLAN:\n"
+        "3. ACTIVE PART DEEP DRILLDOWN PLAN:\n"
         "   - Do NOT rush through the whole topic superficially! Plan to explain ONLY the active part in meticulous, textbook-grade masterclass depth.\n"
         "   - What are the exact mathematical equations ($$...$$), symbol definitions, and tensor dimensions [B, C, H, W] for this active part?\n"
-        "3. EVIDENCE AUDIT ([S1]..[S5]):\n"
+        "4. EVIDENCE AUDIT ([S1]..[S5]):\n"
         "   - Inspect all retrieved sources [S1]..[S5]. Select exact verbatim quotes in double quotes (\"...\") with tags that prove this part.\n"
-        "4. INTERACTIVE PEDAGOGICAL CHECKPOINT PLAN:\n"
+        "5. INTERACTIVE PEDAGOGICAL CHECKPOINT PLAN:\n"
         "   - Plan the natural closing checkpoint for the user: warmly summarize this part and invite them: 'İstersen sıradaki parçaya (örn. X konusuna) devam edelim mi, yoksa burayı daha detaylandıralım mı?'\n\n"
         "Write your genuine, rich, step-by-step internal reasoning monologue. Be strictly honest about whether evidence exists."
     )
@@ -89,6 +93,7 @@ def build_thought_plan_prompt(query: str, packaged_context: str) -> list:
 def build_answer_prompt(
     query: str,
     packaged_context: str,
+    graph_context: str = "",
     telemetry_context: str = "",
     git_diff: str = "",
     error_context: str = "",
@@ -105,6 +110,8 @@ def build_answer_prompt(
     evidence_blocks = []
     if thought_plan:
         evidence_blocks.append(f"### [INTERNAL CHAIN-OF-THOUGHT BLUEPRINT]:\n{thought_plan}")
+    if graph_context:
+        evidence_blocks.append(f"{graph_context}")
     if error_context:
         evidence_blocks.append(f"### [RELEVANT PAST ERRORS & VERIFIED FIXES]:\n{error_context}")
     if telemetry_context:
@@ -122,8 +129,16 @@ def build_answer_prompt(
             "thoroughly grounded in those quotes."
         )
     else:
-        # Check if user asks a specific targeted question vs broad comprehensive tutorial or topic explanation
+        # Check verification intent vs general explanation vs specific inquiry
         q_lower = query.lower()
+        verification_keywords = [
+            "yapıldı mı", "yapılmış mı", "var mı", "yazıyor mu", "geçiyor mu",
+            "denendi mi", "test edildi mi", "kullanıldı mı", "kullanılmış mı",
+            "mevcut mu", "yer alıyor mu", "incelendi mi", "is there", "does it",
+            "did they", "was it", "yapılmış mıdır", "yapıldı mıdır"
+        ]
+        is_verification = any(kw in q_lower for kw in verification_keywords)
+
         topic_explain_keywords = [
             "anlat", "açıkla", "nedir", "konusu", "bölümü", "kısmı", "mekanizması",
             "nasıl çalışır", "işleyişi", "detaylandır", "incele", "mimari", "yapısı",
@@ -132,9 +147,21 @@ def build_answer_prompt(
             "comprehensive", "karşılaştır", "explain", "detail", "mechanism", "formula"
         ]
         is_topic_explanation = any(kw in q_lower for kw in topic_explain_keywords)
-        is_specific_inquiry = any(w in q_lower for w in ["var mı", "yazıyor mu", "geçiyor mu", "kaç", "değeri", "kim", "hangi", "kullanılmış mı", "is there", "does it", "what is the value", "did they"])
+        is_specific_inquiry = any(w in q_lower for w in ["kaç", "değeri", "kim", "hangi", "what is the value", "who is", "which"])
 
-        if is_specific_inquiry and not is_topic_explanation:
+        if is_verification:
+            instructions = (
+                "DOĞRULAMA VE DÜRÜSTLÜK PROTOKOLÜ (STRICT HONESTY & FACTUAL VERIFICATION - EN YÜKSEK ÖNCELİK):\n"
+                "Kullanıcı makalede belirli bir modelin, yöntemin veya ablation deneyinin (örn. Vision Transformer, ekstra bir kıyaslama vb.) yer alıp almadığını sorgulamaktadır.\n\n"
+                "- KESİN NEGATİF KANIT VE DÜRÜSTLÜK KURALI (SIFIR VARSAYIM / SIFIR HALÜSİNASYON):\n"
+                "  Eğer sağlanan kanıtlarda ([S1]..[S5]) kullanıcının sorduğu deney/model AÇIKÇA YER ALMIYORSA:\n"
+                "  İLK CÜMLENDE NET VE KESİN BİR ŞEKİLDE ŞUNU BELİRT:\n"
+                "  'Makale metninde ve yerel hafızada böyle bir deney yer almamaktadır; yazarlar bu deneyi yapmamıştır (veya bahsedilmemiştir).'\n"
+                "  Asla 'deney yapılmış olup...', 'varsayımsal olarak...', 'muhtemelen...' gibi spekülatif veya uydurma tablolar/açıklamalar ÜRETME!\n"
+                "- Eğer bilgi makalede MEVCUTSA: Doğrudan olgusal ve net şekilde açıkla, ilgili kaynağı [S1]..[S5] olarak etiketle ve tırnak içinde (\"...\") doğrudan alıntı yap.\n"
+                "- Olmayan bir deney için ASLA modüler parçalama veya masterclass yol haritası çıkarma; soruya doğrudan ve dürüstçe yanıt ver."
+            )
+        elif is_specific_inquiry and not is_topic_explanation:
             instructions = (
                 "Answer the user's specific question directly, factually, and concisely based on the retrieved evidence [S1]..[S5].\n"
                 "- ABSOLUTE HONESTY RULE: If the retrieved evidence does NOT contain the answer, or if the paper does not mention it, "
@@ -142,30 +169,34 @@ def build_answer_prompt(
                 "- Do NOT invent, assume, or extrapolate facts or numbers that are not in the context.\n"
                 "- Cite [S1], [S2], etc. inline and include at least one exact verbatim quote in double quotes (\"...\") from the source text."
             )
-        else:
+        elif is_topic_explanation:
             instructions = (
                 "CRITICAL EVIDENCE & HONESTY RULE: If your analysis indicates that the retrieved evidence does NOT contain "
                 "sufficient information about this topic/mechanism, state honestly: 'Makale metninde ve yerel hafızada bu konu/bölüm hakkında yeterli kanıt yer almıyor, bu yüzden bilmiyorum.'\n\n"
                 "AKADEMİK MODÜLER PARÇALAMA VE ETKİLEŞİMLİ DERİN ANLATIM PROTOKOLÜ (MANDATORY MASTERCLASS):\n"
                 "Kullanıcı konunun tek bir uzun monolog veya yüzeysel özetle geçiştirilmesini KESİNLİKLE İSTEMİYOR.\n"
-                "Konuyu MANTIKSAL PARÇALARA BÖLÜP (Modül 1, Modül 2, Modül 3) AKTİF PARÇAYI TÜM FORMÜLLERİ VE TENSÖR BOYUTLARIYLA ÇOK DERİN ANLATIP, BÖLÜM SONUNDA 'İSTERSEN DEVAM EDELİM Mİ?' DİYEREK İLERLE:\n\n"
-                "1. 🗺️ KISA YOL HARİTASI (İLK TURDA): Konuyu hangi parçalara böldüğünü 1-2 cümleyle tanıt (örn: 'Bu mimariyi/konuyu 3 temel parçada derinlemesine inceleyeceğiz: 1. ..., 2. ..., 3. ...').\n\n"
+                "Konuyu MANTIKSAL PARÇALARA BÖLÜP (Modül 1, Modül 2, Modül 3) AKTİF PARÇAYI TÜM FORMÜLLERİ VE TENSÖR BOYUTLARIYLA ÇOK DERİN ANLATIP, EN SONUNDA 'İSTERSEN DEVAM EDELİM Mİ?' DİYEREK İLERLE:\n\n"
+                "1. 🗺️ KISA YOL HARİTASI (İLK TURDA EN BAŞTA): Konuyu hangi parçalara böldüğünü 1-2 cümleyle en başta tanıt (örn: 'Bu konuyu 3 temel parçada inceleyeceğiz: 1. ..., 2. ..., 3. ...').\n\n"
                 "2. 🔬 AKTİF PARÇANIN DERİNLEMESİNE AÇIKLANMASI (ANA GÖVDE):\n"
-                "   - Aktif parçayı (örn. 1. Parça veya kullanıcı 'devam' dediyse 2. Parça) asla aceleye getirmeden, en ince ayrıntısına kadar pedagojik ve zengin şekilde açıkla.\n"
-                "   - Teorik motivasyonu, neden geliştirildiği, çözdüğü matematiksel/donanımsal darboğaz.\n"
-                "   - Tensör boyutları ([B, C, H, W] veya [B, N, D]) ve adım adım katman akışı.\n"
-                "   - Blok LaTeX formülleri ($$...$$) ve formüldeki HER BİR sembolün açık Türkçe dökümü.\n"
-                "   - Makaleden en az 1-2 doğrudan İngilizce alıntı (\"...\" [S1]).\n"
-                "   - Donanımsal/mühendislik çıkarımları (karmaşıklık $O(\\dots)$, FPS, VRAM etkisi).\n\n"
-                "3. 🤝 ETKİLEŞİMLİ DEVAM CHECKPOINT'İ (EN SONDA ZORUNLU):\n"
-                "   - Bu parçayı bitirdikten sonra yanıtın en sonuna kullanıcıyı sıradaki parçaya davet eden samimi ve motive edici bir kontrol noktası koy:\n"
-                "   Örnek: '🎯 1. Parçayı (Teorik Problem ve Temel Mantık) detaylandırdık. İstersen bir sonraki parçaya (**2. Bölüm: PGI Mimarisi ve Tensör Akışı**) devam edelim mi, yoksa burayı daha da netleştirelim mi?'\n\n"
+                "   - Aktif parçayı asla aceleye getirmeden, en ince ayrıntısına kadar pedagojik ve zengin şekilde açıkla.\n"
+                "   - ZORUNLU LATEX FORMÜLLERİ: En az 1-2 adet blok LaTeX formülü ($$...$$) veya satır içi matematik ($X \\in \\mathbb{R}^{B \\times C \\times H \\times W}$) yaz ve sembolleri açıkla.\n"
+                "   - ZORUNLU KAYNAK ATIFI VE ALINTI: Kanıt metninden en az bir kaynak etiketi ([S1]..[S5]) kullan ve tırnak içinde (\"...\") doğrudan İngilizce alıntı yap.\n"
+                "   - Tensör boyutları ([B, C, H, W]) ve katman akışını adım adım aktar.\n\n"
+                "3. 🤝 ETKİLEŞİMLİ DEVAM CHECKPOINT'İ (SADECE CEVABIN EN ALTINA / SONUNA EKLENİR, ASLA BAŞA YAZMA!):\n"
+                "   - Cevabın en sonunda kullanıcıya sıradaki parçaya geçmek isteyip istemediğini sor:\n"
+                "   '🎯 1. Parçayı tamamladık. İstersen sıradaki parçaya devam edelim mi, yoksa burayı daha detaylandıralım mı?'\n\n"
                 "KURALLAR:\n"
-                "- Kullanıcı 'devam et', 'sonraki' veya 'evet' dedikçe bir sonraki parçayı aynı derinlik ve formüllerle aktar.\n"
                 "- Türkçe konuş, terimleri ve alıntıları orijinal İngilizce tut.\n"
-                "- Her iddiada [S1]..[S5] veya [W1]..[W3] etiketlerini kullan.\n"
+                "- Her teknik iddiada mutlaka [S1]..[S5] etiketlerini kullan.\n"
+                "- Matematiksel ifadeleri mutlaka KaTeX formatında ($ ... $ veya $$ ... $$) yaz.\n"
                 "- Kullanıcı açıkça 'kod yaz' demedikçe kod verme; mimariyi, formülleri ve tensör boyutlarını detaylı açıkla.\n"
-                "- Yanıtı asla yarıda kesme, eksiksiz tamamla."
+                "- Kontrol sorusunu ('İstersen devam edelim mi?') KESİNLİKLE yanıtın en altına yerleştir."
+            )
+        else:
+            instructions = (
+                "Answer the user's inquiry comprehensively and factually based on the retrieved evidence [S1]..[S5].\n"
+                "- Cite [S1], [S2], etc. for all claims and use KaTeX ($...$, $$...$$) for any formulas.\n"
+                "- If the evidence does not contain the answer, state honestly: 'Makale metninde bu bilgi yer almamaktadır.'"
             )
 
     quote_guidance = ""
@@ -193,18 +224,20 @@ CORE OPERATIONAL RULES:
 1. PEKİŞTİRİLMİŞ TARZ ÖNCELİĞİ (RL POLICY): Yukarıdaki 'RL POLICY' kuralları senin birincil rehberindir. Kullanıcı kısa istiyorsa kısa, kod ağırlıklı istiyorsa çalışan PyTorch kodu ve tensör boyutlarıyla, teorik istiyorsa formülleriyle ve kullanıcının belirteceği donanım kısıtlarıyla yanıt ver.
 2. MODÜLER PARÇALAMA VE ETKİLEŞİMLİ DERİN ANLATIM (EN YÜKSEK ÖNCELİK):
    - Konuyu tek seferde yüzeysel özetlemek yerine 2-4 mantıksal parçaya (Modül 1, Modül 2, Modül 3) böl.
-   - Aktif parçayı (1. Parça veya kullanıcı 'devam' dediyse 2. Parça) tüm matematiksel formülleri ($$...$$), her bir sembolün tanımı, tensör boyutları ([B, C, H, W]) ve birebir makale alıntılarıyla (\"...\" [S1]) ders kitabı derinliğinde açıkla.
-   - Her cevabın sonunu 'İstersen sıradaki parçaya (Bölüm X: ...) devam edelim mi, yoksa burayı daha detaylandıralım mı?' şeklinde etkileşimli bir devam noktasıyla tamamla.
-3. NUMARALANDIRILMIŞ ATIFLAR ([S1], [W1]):
+   - Aktif parçayı tüm matematiksel LaTeX formülleri ($$...$$ veya $...$), her bir sembolün tanımı, tensör boyutları ([B, C, H, W]) ve birebir makale alıntılarıyla (\"...\" [S1]) ders kitabı derinliğinde açıkla.
+   - Her cevabın sonunu '🎯 İstersen sıradaki parçaya (Bölüm X: ...) devam edelim mi, yoksa burayı daha detaylandıralım mı?' şeklinde etkileşimli bir devam noktasıyla tamamla.
+3. NUMARALANDIRILMIŞ ATIFLAR ([S1], [W1]) VE LATEX FORMÜLLERİ (ZORUNLU):
    - Yerel makale kaynakları [S1], [S2]... canlı web bulguları [W1], [W2]... olarak etiketlenmiştir.
    - İleri sürdüğün her teknik iddiayı, mimari özelliği veya metriği ilgili kaynak etiketiyle (örn. [S1], [W1]) destekle.
    - Kaynak metinden tırnak içinde (\"...\") en az 1 kısa doğrudan alıntı yap.
-4. KESİN DÜRÜSTLÜK KURALI (HONEST ABSTENTION):
-   - Eğer sorulan detay, metrik, parametre veya konu verilen kanıt metninde yer almıyorsa asla kafandan sayı veya iddia uydurma. 'Bu bilgi kaynak metinlerde yer almamaktadır' de.
-5. KUSURSUZ TÜRKÇE VE FORMÜL YAZIMI:
+   - Matematiksel ifadeleri mutlaka LaTeX ($...$ veya $$...$$) formatında yaz.
+5. KESİN DÜRÜSTLÜK VE NEGATİF KANIT KURALI (HONEST ABSTENTION & STRICT NEGATIVE VERIFICATION):
+   - Eğer sorulan detay, metrik, parametre, model veya deney verilen kanıt metninde yer almıyorsa asla kafandan uydurma, varsayımda bulunma veya 'yapılmış olabilir' deme.
+   - İlk cümlende açık ve dürüstçe: 'Makale metninde ve yerel hafızada böyle bir deney/bilgi yer almamaktadır; yazarlar bu deneyi yapmamıştır.' şeklinde net bir ifadeyle belirt.
+6. KUSURSUZ TÜRKÇE VE FORMÜL YAZIMI:
    - Sorulan dilde (Türkçe) akıcı, kusursuz ve doğal yanıt ver. Asla yabancı alfabe veya bozuk çeviri yapma.
    - Matematiksel formülleri LaTeX olarak yaz: Blok formülleri $$ ... $$, satır içi değişkenleri $ ... $ içine al.
-6. KOD VERME KURALI (KESİN):
+7. KOD VERME KURALI (KESİN):
    - Kullanıcı açıkça talep etmedikçe (örn. 'kod yaz', 'kodunu ver', 'nasıl kodlanır') ASLA Python, PyTorch vb. kod bloğu verme.
    - Anlatımları kavramsal mantık, mimari blok diyagramı ve LaTeX matematiksel formülleriyle yap. Kod yalnızca açıkça istendiğinde yazılır.
 """
@@ -222,6 +255,56 @@ CORE OPERATIONAL RULES:
 
     messages.append({"role": "user", "content": user_message})
     return messages
+
+
+def build_self_correction_prompt(
+    query: str,
+    flawed_response: str,
+    critique: str,
+    packaged_context: str = "",
+    graph_context: str = "",
+    history: list = None
+) -> list:
+    """Stage 2.5: Constructs prompt for intelligent self-correction based on user criticism or penalty."""
+    style_text = get_profile_style()
+    system_text = f"""Sen dünya standartlarında kıdemli bir Yapay Zeka & Derin Öğrenme Araştırma Partnerisin.
+Şu anda 'Öz-Düzeltme ve Yeniden İyileştirme' modundasın.
+
+GÖREVİN:
+Bir önceki yanıtını incelemek, kullanıcının belirttiği eleştiriyi veya eksikliği analiz etmek ve
+önceki cevabın tüm hatalarını/eksiklerini gideren, matematiksel formülleri ($$...$$), tensör boyutlarını [B, C, H, W]
+ve literatür atıflarını eksiksiz içeren radikal olarak daha üstün bir ders kitabı masterclass yanıtı üretmektir.
+
+KURALLAR:
+1. Önce 1 cümle ile eksikliğin nerede olduğunu dürüstçe teşhis et (örn: 'Önceki yanıtta formül türetimi ve tensör akışı yüzeysel bırakılmıştı; şimdi adım adım detaylandırıyorum:').
+2. Konuyu tam bir matematiksel kesinlikle, blok formüller ($$...$$), sembol tanımları ve [S1] alıntılarıyla baştan inşa et.
+3. Asla kaçamak veya genel geçer özet yapma; doğrudan teknik çekirdeğe in.
+4. En sonda tam 3 adet proaktif devam sorusu ekle.
+
+{style_text}
+"""
+    evidence_parts = []
+    if graph_context:
+        evidence_parts.append(f"### [SİNAPTİK BİLGİ GRAFİĞİ BAĞLANTILARI (GraphRAG)]:\n{graph_context}")
+    if packaged_context:
+        evidence_parts.append(f"### [DOĞRULANMIŞ LİTERATÜR KANITI]:\n{packaged_context}")
+
+    full_evidence = "\n\n".join(evidence_parts) if evidence_parts else "Yerel makale kanıtları mevcut."
+
+    user_text = (
+        f"[KULLANICININ ORİJİNAL SORUSU]:\n{query}\n\n"
+        f"[ELEŞTİRİLEN / EKSİK BULUNAN ÖNCEKİ YANIT]:\n{flawed_response}\n\n"
+        f"[KULLANICI ELEŞTİRİSİ / DÜZELTİLECEK NOKTA]:\n{critique}\n\n"
+        f"[MEVCUT AKADEMİK KANITLAR]:\n{full_evidence}\n\n"
+        "Şimdi yukarıdaki kurallara tam uyarak düzeltilmiş, eksiksiz ve derinlemesine yanıtını üret:"
+    )
+
+    msgs = [{"role": "system", "content": system_text}]
+    if history:
+        for m in history[-2:]:
+            msgs.append({"role": m["role"], "content": m["content"][:400]})
+    msgs.append({"role": "user", "content": user_text})
+    return msgs
 
 
 def build_casual_response_prompt(query: str, history: list = None, immediate_critique: str = "") -> list:
@@ -252,8 +335,10 @@ SOHBET VE ADAPTASYON TEMEL KURALLARI:
    - Hal hatır sor: Kullanıcı selam verdiğinde veya 'naber', 'nasılsın' dediğinde mutlaka içtenlikle karşılık ver; gününün nasıl geçtiğini sor.
 3. KUSURSUZ TÜRKÇE:
    - Dili günlük, akıcı ve temiz kullan. Asla yabancı veya bozuk karakterler kullanma.
-4. GÜNCEL BİLGİ DÜRÜSTLÜĞÜ:
-   - Bilmediğin güncel olayları veya kişileri asla kafandan uydurma."""
+4. GENEL KÜLTÜR VE OLGUSAL DOĞRULUK KURALI (SIFIR KAÇAMAK, KESİN VE DOĞRU BİLGİ):
+   - Kullanıcı genel kültür, tarih, spor kulüpleri (örneğin Fenerbahçe: 1907 yılında kurulmuştur, renkleri sarı ve laciverttir), coğrafya veya temel olgular sorduğunda soruyu ASLA geçiştirme, karşı soru sorma ('hangi yıl kastettiniz', 'belirtir misiniz' gibi kaçamaklar yapma).
+   - Temel olguları (kuruluş yılı, renkler, şehirler vb.) doğrudan, eksiksiz ve %100 doğru olarak aktar.
+   - Bilmediğin spekülatif veya anlık konuları uydurma, ancak bilinen genel olguları kesin doğrulukla ve netlikle söyle."""
 
     messages = [{"role": "system", "content": sys_casual}]
     if history:
