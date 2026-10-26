@@ -64,6 +64,11 @@ from answer.prompts import (
     build_casual_response_prompt,
     build_general_expert_prompt
 )
+import memory.user_profile as up_mod
+import memory.teacher_correction as tc_mod
+importlib.reload(up_mod)
+importlib.reload(tc_mod)
+
 from memory.approval import approval_manager
 from memory.user_profile import profile_manager
 from memory.auto_memory import auto_memory
@@ -179,10 +184,10 @@ with st.sidebar:
     with st.expander("👤 Araştırmacı Profili & Pekiştirilmiş Hafıza", expanded=False):
         current_about = profile_manager.get_about_me()
         metrics = rl_engine.get_metrics()
-        teacher_count = teacher_engine.count()
+        teacher_count = getattr(teacher_engine, "count", lambda: len(getattr(teacher_engine, "get_all_corrections", lambda: [])()))()
         st.caption(f"🎯 **Pekiştirilmiş Kural:** {metrics.get('learned_axioms_count', 0)} | 🎓 **Öğretilen Doğru Bilgi:** {teacher_count} | ⭐ **Altın Örnek:** {metrics.get('gold_exemplars_count', 0)}")
         st.markdown(f"<div style='font-size:0.82rem; color:#cbd5e1; max-height:120px; overflow-y:auto; margin-bottom:6px;'>{current_about}</div>", unsafe_allow_html=True)
-        persona_curr = profile_manager.get_persona()
+        persona_curr = getattr(profile_manager, "get_persona", lambda: "Kullanıcı samimi ve yaşayan bir Türkçe konuşur.")()
         st.caption("🗣️ **Sohbet & Konuşma Aynalama:**")
         st.markdown(f"<div style='font-size:0.78rem; color:#94a3b8; max-height:80px; overflow-y:auto; border-left:2px solid #38bdf8; padding-left:8px; margin-bottom:8px;'>{persona_curr}</div>", unsafe_allow_html=True)
         col_prof1, col_prof2 = st.columns(2)
