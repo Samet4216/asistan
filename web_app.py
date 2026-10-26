@@ -44,6 +44,7 @@ from memory.auto_memory import auto_memory
 from memory.rl_feedback import rl_engine
 from memory.self_evolving_rl import self_evolving_rl
 from memory.conversation_collector import collector
+from memory.teacher_correction import teacher_engine
 from ingest.single_ingest import ingest_arxiv_paper
 from ingest.local_file_ingest import ingest_uploaded_file
 
@@ -149,13 +150,22 @@ with st.sidebar:
                             st.error(f"Hata: {res.get('error')}")
 
     # 4. User Profile & Preferences (Clean Collapsible Expander)
-    with st.expander("👤 Araştırmacı Profili", expanded=False):
+    with st.expander("👤 Araştırmacı Profili & Pekiştirilmiş Hafıza", expanded=False):
         current_about = profile_manager.get_about_me()
-        st.caption("Asistan seni bu bilgilerle tanır ve tercihlerine uyum sağlar:")
-        st.markdown(f"<div style='font-size:0.82rem; color:#cbd5e1; max-height:160px; overflow-y:auto;'>{current_about}</div>", unsafe_allow_html=True)
-        if st.button("Tarz Kurallarını Sıfırla", key="btn_reset_style", use_container_width=True):
-            rl_engine.add_style_axiom("Cevapları doğrudan konuya girerek, gereksiz nezaket cümleleri olmadan öz ve net tut.")
-            st.toast("Tarz politikası sıfırlandı.", icon="🔄")
+        metrics = rl_engine.get_metrics()
+        st.caption(f"🎯 **Pekiştirilmiş Kural:** {metrics.get('learned_axioms_count', 0)} | ⭐ **Altın Örnek:** {metrics.get('gold_exemplars_count', 0)}")
+        st.markdown(f"<div style='font-size:0.82rem; color:#cbd5e1; max-height:140px; overflow-y:auto; margin-bottom:8px;'>{current_about}</div>", unsafe_allow_html=True)
+        col_prof1, col_prof2 = st.columns(2)
+        with col_prof1:
+            if st.button("🔄 Hafızayı Senkronize Et", key="btn_sync_self_train", use_container_width=True, help="Öğrenilen kuralları, DPO eğitim çiftlerini ve Modelfile'ı günceller"):
+                s_res = collector.sync_self_training()
+                st.toast(f"✅ Model hafızası senkronize edildi! ({s_res.get('sharegpt_dialogs', 0)} diyalog)", icon="🧠")
+                st.rerun()
+        with col_prof2:
+            if st.button("Tarzı Sıfırla", key="btn_reset_style", use_container_width=True):
+                rl_engine.add_style_axiom("Cevapları doğrudan konuya girerek, gereksiz nezaket cümleleri olmadan öz ve net tut.")
+                st.toast("Tarz politikası sıfırlandı.", icon="🔄")
+                st.rerun()
 
     # 5. Obsidian Drafts (Only shown if pending drafts exist)
     drafts = approval_manager.list_drafts()
@@ -173,14 +183,18 @@ with st.sidebar:
 # MAIN WORKSPACE — Sleek Header & 2 Simple Views
 # ==============================================================================
 
+# Load Corpus Catalog
+catalog_path = PROJECT_ROOT / "data" / "corpus_catalog.json"
+papers_info = json.loads(catalog_path.read_text(encoding="utf-8")) if catalog_path.exists() else []
+
 # Top Minimalist Header Bar
-st.markdown("""
+st.markdown(f"""
 <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0 16px 0; border-bottom:1px solid rgba(255,255,255,0.06); margin-bottom:18px;">
     <div style="display:flex; align-items:center; gap:10px;">
         <span style="font-size:1.5rem;">🔬</span>
         <div>
             <div style="font-weight:600; font-size:1.15rem; color:#f8fafc; letter-spacing:-0.02em;">Yapay Zeka Laboratuvar Asistanı</div>
-            <div style="font-size:0.78rem; color:#64748b;">Qwen 2.5 (7B) • RTX 4050 • Yerel Hibrit Hafıza (57 Makale)</div>
+            <div style="font-size:0.78rem; color:#64748b;">Qwen 2.5 (7B) • RTX 4050 • Yerel Hibrit Hafıza ({len(papers_info)} Makale)</div>
         </div>
     </div>
     <div style="display:flex; align-items:center; gap:8px;">
@@ -192,7 +206,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 2 Simple Tabs: Asistan Chat & Makale Kütüphanesi
-tab_chat, tab_library = st.tabs(["💬 Sohbet & Asistan", "📚 Makale Kütüphanesi (57)"])
+TAB_CHAT = "💬 Sohbet & Asistan"
+TAB_LIB = f"📚 Makale Kütüphanesi ({len(papers_info)})"
+
+if "switch_to_tab" in st.session_state and st.session_state.switch_to_tab:
+    st.session_state.active_main_tab = st.session_state.switch_to_tab
+    st.session_state.switch_to_tab = None
+
+if "active_main_tab" not in st.session_state:
+    st.session_state.active_main_tab = TAB_CHAT
+
+tab_chat, tab_library = st.tabs([TAB_CHAT, TAB_LIB], key="active_main_tab", on_change="rerun")
 
 # ------------------------------------------------------------------------------
 # TAB 1: SOHBET & ASİSTAN
@@ -221,11 +245,11 @@ with tab_chat:
 
     # Empty State: Clean Welcome & Minimalist Prompt Chips
     if not st.session_state.messages:
-        st.markdown("""
+        st.markdown(f"""
         <div style="text-align:center; padding:36px 16px 24px 16px;">
             <h2 style="font-weight:600; font-size:1.45rem; color:#f8fafc; margin-bottom:8px;">Nasıl yardımcı olabilirim?</h2>
             <p style="font-size:0.9rem; color:#94a3b8; max-width:560px; margin:0 auto 24px auto;">
-                Sinir ağı mimarileri, matematiksel formüller, hiperparametreler veya yerel kütüphanedeki 57 makale hakkında sorular sorabilirsiniz.
+                Sinir ağı mimarileri, matematiksel formüller, hiperparametreler veya yerel kütüphanedeki {len(papers_info)} makale hakkında sorular sorabilirsiniz.
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -233,15 +257,18 @@ with tab_chat:
         col_q1, col_q2, col_q3 = st.columns(3)
         with col_q1:
             if st.button("⚡ LoRA ile İnce Ayar Mantığı", use_container_width=True):
-                st.session_state.pending_prompt = "LoRA düşük dereceli adaptasyon matrislerini ($W = W_0 + B \cdot A$) nasıl kurgular ve VRAM tasarrufunu matematiksel olarak nasıl sağlar?"
+                st.session_state.pending_prompt = "LoRA düşük dereceli adaptasyon matrislerini ($W = W_0 + B \\cdot A$) nasıl kurgular ve VRAM tasarrufunu matematiksel olarak nasıl sağlar?"
+                st.session_state.switch_to_tab = TAB_CHAT
                 st.rerun()
         with col_q2:
             if st.button("🔍 Grad-CAM ile Karar Haritalama", use_container_width=True):
                 st.session_state.pending_prompt = "Grad-CAM konvolüsyon katmanlarındaki gradyanları kullanarak modelin odaklandığı bölgeleri nasıl haritalandırır?"
+                st.session_state.switch_to_tab = TAB_CHAT
                 st.rerun()
         with col_q3:
             if st.button("📐 Kaiming / He İlklendirme", use_container_width=True):
                 st.session_state.pending_prompt = "Kaiming He ilklendirmesi ReLU aktivasyonunda varyansı ($Var(w) = 2/n$) nasıl korur ve vanishing gradient problemini nasıl çözer?"
+                st.session_state.switch_to_tab = TAB_CHAT
                 st.rerun()
         st.write("")
 
@@ -262,7 +289,7 @@ with tab_chat:
                         score = s.get("rerank_score", 0.0)
                         st.markdown(f"- **`[{tag}]`** 📄 {title} *(Skor: {score:.2f})*")
 
-            # Sleek, subtle 3-button action row under assistant messages
+            # Sleek action row under assistant messages
             if msg["role"] == "assistant":
                 user_query_for_msg = ""
                 for prev in reversed(st.session_state.messages[:idx]):
@@ -270,16 +297,45 @@ with tab_chat:
                         user_query_for_msg = prev["content"]
                         break
 
-                act_col1, act_col2, act_col3, _ = st.columns([0.45, 0.45, 0.8, 6.0])
+                act_col1, act_col2, act_col3, act_col4, _ = st.columns([0.45, 0.45, 1.4, 0.8, 4.5])
                 with act_col1:
                     if st.button("👍", key=f"btn_up_{idx}", help="Bu tarzı ve yaklaşımı pekiştir"):
                         rl_engine.record_feedback(user_query_for_msg, content, reward=1.0, style_tag="positive")
-                        st.toast("Tercih pekiştirildi (+1.0)", icon="👍")
+                        collector.sync_self_training()
+                        st.toast("🎯 Yanıt altın örnek olarak mühürlendi ve model güncellendi! (+1.0)", icon="👍")
+                        st.rerun()
                 with act_col2:
-                    if st.button("👎", key=f"btn_down_{idx}", help="Bu cevabı beğenmedim"):
+                    if st.button("👎", key=f"btn_down_{idx}", help="Bu cevabı beğenmedim / hatalı buldum"):
                         rl_engine.record_feedback(user_query_for_msg, content, reward=-1.0, style_tag="negative")
-                        st.toast("Geri bildirim kaydedildi (-1.0)", icon="👎")
+                        collector.sync_self_training()
+                        st.toast("Geri bildirim kaydedildi (-1.0). İstersen '✏️ Doğrusunu Öğret' ile doğrusunu mühürleyebilirsin.", icon="👎")
+                        st.rerun()
                 with act_col3:
+                    with st.popover("✏️ Doğrusunu Öğret", help="Cevap yanlışsa doğrusunu yazın; model bunu kalıcı hafızaya alsın ve bir daha yanlış yapmasın"):
+                        st.markdown("**🎓 Öğretmen Düzeltmesi (Ground Truth)**")
+                        st.caption("Verdiğiniz doğru cevap Obsidian'a ve ChromaDB vektör tabanına 'Doğrulanmış Bilgi' olarak kaydedilir; DPO eğitim çifti oluşturulur.")
+                        teacher_ans = st.text_area("Doğru cevap nedir?", placeholder="Örn: Bu modelde X kullanılır, formülü şudur...", key=f"teacher_input_{idx}", height=120)
+                        teacher_critique = st.text_input("Neyi yanlış bildi? (Opsiyonel)", placeholder="Örn: Formülü uydurmuş...", key=f"teacher_crit_{idx}")
+                        if st.button("💾 Doğru Cevabı Mühürle & Eğit", key=f"btn_seal_truth_{idx}", use_container_width=True):
+                            if teacher_ans.strip():
+                                res = teacher_engine.record_correction(
+                                    query=user_query_for_msg,
+                                    wrong_response=content,
+                                    ground_truth=teacher_ans.strip(),
+                                    critique=teacher_critique.strip()
+                                )
+                                if res.get("success"):
+                                    collector.sync_self_training()
+                                    st.session_state.messages[idx]["content"] = (
+                                        content + f"\n\n---\n✅ **[Doğrulanmış Öğretmen Yanıtı (Ground Truth)]:**\n\n{teacher_ans.strip()}"
+                                    )
+                                    st.toast("🎯 Doğru cevap hafızaya mühürlendi ve modele öğretildi!", icon="🎓")
+                                    st.rerun()
+                                else:
+                                    st.error(res.get("error", "Kayıt başarısız."))
+                            else:
+                                st.warning("Lütfen doğru cevabı girin.")
+                with act_col4:
                     if st.button("💾 Kaydet", key=f"btn_save_{idx}", help="Obsidian Vault'a not olarak kaydet"):
                         safe_title = re.sub(r'[^A-Za-z0-9]+', '_', user_query_for_msg[:30]).strip('_') or "Not"
                         approval_manager.create_draft(
@@ -351,29 +407,41 @@ with tab_chat:
                             retrieved_context = (retrieved_context + "\n\n" + web_res["packed_context"]).strip()
                             has_sufficient = True
 
-                    if has_sufficient:
-                        # GraphRAG Context
-                        graph_seeds = graph_rag_engine.extract_seed_nodes(augmented_query, search_res.get("results", []))
-                        subgraph = graph_rag_engine.traverse_subgraph(graph_seeds)
-                        graph_context = graph_rag_engine.format_graph_context(subgraph)
-
-                        budget_parts = {"paper_chunks": retrieved_context}
-                        packed_report = budget.pack_context(budget_parts)
-                        safe_packed = packed_report["packed"]
-
-                        messages = build_answer_prompt(
-                            query=clean_q,
-                            packaged_context=safe_packed.get("paper_chunks", ""),
-                            graph_context=graph_context,
-                            telemetry_context="",
-                            git_diff="",
-                            error_context="",
-                            thought_plan="",
-                            deep_dive=True,
-                            history=st.session_state.messages[:-1]
+                    if not has_sufficient:
+                        # DÜRÜST BİLMİYORUM PROTOKOLÜ (ZERO HALLUCINATION & STRICT ABSTENTION)
+                        abstain_response = (
+                            "⚠️ **Doğrulanmış Kanıt Bulunamadı / Bilmiyorum:**\n\n"
+                            "Bu soru hakkında yerel makale arşivimizde ve canlı akademik web taramasında doğrulanmış bir kanıt bulunamadı. "
+                            "Yanlış, uydurma veya yanıltıcı bilgi üretmemek adına spekülasyon yapmıyorum; bu konunun gerçek cevabını **bilmiyorum**.\n\n"
+                            "💡 *Eğer bu bilginin doğrusunu biliyorsanız, aşağıdaki **'✏️ Doğrusunu Öğret'** butonuna tıklayarak doğru cevabı sisteme mühürleyebilir ve modeli eğitebilirsiniz.*"
                         )
-                    else:
-                        messages = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
+                        st.markdown(abstain_response)
+                        st.session_state.messages.append({
+                            "role": "assistant",
+                            "content": abstain_response
+                        })
+                        st.rerun()
+
+                    # GraphRAG Context
+                    graph_seeds = graph_rag_engine.extract_seed_nodes(augmented_query, search_res.get("results", []))
+                    subgraph = graph_rag_engine.traverse_subgraph(graph_seeds)
+                    graph_context = graph_rag_engine.format_graph_context(subgraph)
+
+                    budget_parts = {"paper_chunks": retrieved_context}
+                    packed_report = budget.pack_context(budget_parts)
+                    safe_packed = packed_report["packed"]
+
+                    messages = build_answer_prompt(
+                        query=clean_q,
+                        packaged_context=safe_packed.get("paper_chunks", ""),
+                        graph_context=graph_context,
+                        telemetry_context="",
+                        git_diff="",
+                        error_context="",
+                        thought_plan="",
+                        deep_dive=True,
+                        history=st.session_state.messages[:-1]
+                    )
 
                     stream = llm.stream_generate(messages, max_tokens=3500, temperature=0.1, model=config.MODEL_ACADEMIC)
                     full_response = st.write_stream(stream)
@@ -420,12 +488,9 @@ with tab_chat:
 
 
 # ------------------------------------------------------------------------------
-# TAB 2: MAKALE KÜTÜPHANESİ (57)
+# TAB 2: MAKALE KÜTÜPHANESİ
 # ------------------------------------------------------------------------------
 with tab_library:
-    catalog_path = PROJECT_ROOT / "data" / "corpus_catalog.json"
-    papers_info = json.loads(catalog_path.read_text(encoding="utf-8")) if catalog_path.exists() else []
-
     st.markdown(f"### 📚 İndekslenmiş Makale Kütüphanesi ({len(papers_info)} Makale)")
     st.caption("Yerel ChromaDB vektör tabanına ve hibrit aramaya (BM25 + BGE Embeddings) tam metin ve formülleriyle eklenmiş öncü makaleler.")
 
@@ -465,5 +530,8 @@ with tab_library:
                 </div>
                 """, unsafe_allow_html=True)
                 if st.button("⚡ Bu Makaleyi Sor", key=f"btn_ask_lib_{p.get('id')}", use_container_width=True):
-                    st.session_state.pending_prompt = p.get("prompt", f"{p.get('title')} makalesinin mimari yapısını, temel formüllerini ve avantajlarını açıkla.")
+                    paper_prompt = p.get("prompt", f"{p.get('title')} makalesinin mimari yapısını, temel formüllerini ve avantajlarını açıkla.")
+                    st.session_state.pending_prompt = paper_prompt
+                    st.session_state.switch_to_tab = TAB_CHAT
+                    st.toast(f"'{p.get('title')[:32]}...' analizi başlatılıyor, sohbete yönlendiriliyorsunuz.", icon="🚀")
                     st.rerun()
