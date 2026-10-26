@@ -8,7 +8,7 @@ import sys
 import os
 import subprocess
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 PROJECT_ROOT = Path(__file__).parent.resolve()
 if str(PROJECT_ROOT) not in sys.path:
@@ -23,7 +23,6 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.markdown import Markdown
-from rich.text import Text
 from rich import box
 
 import config
@@ -32,9 +31,7 @@ import lang_guard
 from retrieval.git_context import get_git_diff
 from ingest.log_parser import LogParser
 from answer.pipeline import pipeline
-from memory.errors import error_manager
 from memory.approval import approval_manager
-from memory.user_profile import profile_manager
 from answer.shape_check import dry_run_module
 from answer.challenge import challenger
 
@@ -152,6 +149,13 @@ def run_repl():
                 t.add_row("VRAM Total", f"{gpu['total_mb']} MiB")
                 t.add_row("Temperature", f"{gpu['temp_c']} °C")
                 t.add_row("Core Utilization", f"{gpu['util_pct']} %")
+                idle = llm.get_idle_status()
+                if idle.get("is_loaded"):
+                    rem_m = idle["remaining_seconds"] // 60
+                    rem_s = idle["remaining_seconds"] % 60
+                    t.add_row("Auto-Unload Timer", f"Active ({rem_m}m {rem_s}s remaining / {idle['timeout_seconds']//60}m idle limit)")
+                else:
+                    t.add_row("Auto-Unload Timer", f"Idle / Model unloaded (10m watchdog active)")
                 console.print(t)
             else:
                 console.print("[red][!] Unable to query nvidia-smi.[/red]")

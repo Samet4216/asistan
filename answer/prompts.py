@@ -16,7 +16,15 @@ import config
 
 
 def get_profile_style() -> str:
-    """Reads user preference style from Vault/00_Profile/Style.md."""
+    """Reads user preference style dynamically from RL Policy and Style.md."""
+    try:
+        from memory.rl_feedback import rl_engine
+        injected = rl_engine.get_style_prompt_injection()
+        if injected:
+            return injected
+    except Exception:
+        pass
+
     style_path = config.VAULT_DIR / "00_Profile" / "Style.md"
     if style_path.exists():
         try:
@@ -184,11 +192,15 @@ def build_casual_response_prompt(query: str, history: list = None) -> list:
     İlgilenir, dinler ve sohbeti devam ettirecek zekice sorular sorar.
     """
     from memory.user_profile import profile_manager
+    from memory.rl_feedback import rl_engine
     about_me = profile_manager.get_about_me()
+    rl_style = rl_engine.get_style_prompt_injection()
 
     sys_casual = f"""Sen kullanıcının yerel yapay zeka laboratuvarındaki en yakın araştırma partneri ve asistanısın.
 Kullanıcıyı profilinden tanıyorsun:
 {about_me}
+
+{rl_style}
 
 TEMEL İLETİŞİM VE DAVRANIŞ KURALLARI:
 1. DOĞAL VE İNSANİ SOHBET: Tıpkı zeki, samimi bir araştırma arkadaşı gibi konuş. Robotik, kitabi veya aşırı resmi olma.
@@ -218,12 +230,16 @@ def build_general_expert_prompt(query: str, history: list = None) -> list:
     akıcı, doğrudan ve yüksek değerli Türkçe danışmanlık istemi.
     """
     from memory.user_profile import profile_manager
+    from memory.rl_feedback import rl_engine
     about_me = profile_manager.get_about_me()
+    rl_style = rl_engine.get_style_prompt_injection()
 
     sys_expert = f"""Sen Mekatronik Mühendisliği, Robotik ve Derin Öğrenme alanında uzmanlaşmış kıdemli bir Yapay Zeka Araştırma Partneri ve Teknik Mentorsun.
 
 KULLANICI BİLGİSİ:
 {about_me}
+
+{rl_style}
 
 KURALLAR:
 1. DOĞRUDAN SORUYA ODAKLAN: Kullanıcı ne sorduysa doğrudan ona cevap ver. Alakasız akademik makalelere veya bambaşka algoritmalara konuyu saptırma.

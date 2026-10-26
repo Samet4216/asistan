@@ -27,7 +27,6 @@ import config
 import llm
 import budget
 from retrieval.search import searcher
-from retrieval.git_context import get_git_diff
 from answer.prompts import (
     build_answer_prompt,
     build_thought_plan_prompt,
@@ -40,10 +39,10 @@ from memory.approval import approval_manager
 from memory.errors import error_manager
 from memory.user_profile import profile_manager
 from memory.auto_memory import auto_memory
+from memory.rl_feedback import rl_engine
 from memory.graph_visualizer import get_vault_graph_data, generate_graph_html
 from ingest.single_ingest import ingest_arxiv_paper
 from ingest.local_file_ingest import ingest_uploaded_file
-import lang_guard
 
 
 # Page configuration
@@ -398,6 +397,20 @@ def is_casual_or_personal(text: str) -> bool:
     return False
 
 
+def is_challenge_request(text: str) -> bool:
+    """Detects whether prompt is requesting a Devil's Advocate or hypothesis stress-test."""
+    p = text.strip().lower()
+    if p.startswith("/challenge") or p.startswith("/test-hypo"):
+        return True
+    triggers = [
+        "hipotezimi test et", "hipotezimi sına", "bu fikrimi çürüt",
+        "fikrimi eleştir", "fikrimi sına", "şeytanın avukatı",
+        "devil's advocate", "failure mode analizi", "hipotezi test et",
+        "hipotezimi değerlendir", "fikrimi değerlendir"
+    ]
+    return any(trig in p for trig in triggers)
+
+
 def contextualize_query(current_query: str, history: list) -> str:
     """
     Augments genuine follow-up questions or quoted replies with conversation context.
@@ -490,6 +503,15 @@ with st.sidebar:
     else:
         st.info("GPU Telemetrisi Beklemede")
 
+    # Otomatik VRAM Boşaltma & Idle Watchdog Göstergesi
+    idle_info = llm.get_idle_status()
+    if idle_info.get("is_loaded"):
+        rem_min = idle_info["remaining_seconds"] // 60
+        rem_sec = idle_info["remaining_seconds"] % 60
+        st.caption(f"⏱️ **Oto-VRAM Boşaltma:** ~{rem_min} dk {rem_sec:02d} sn sonra (Boşta: {idle_info['idle_seconds']} sn)")
+    else:
+        st.caption("❄️ **Model Durumu:** Boşta / VRAM Serin (Oto-Boşaltma Devrede)")
+
     # CPU & RAM Monitor
     cpu_percent = psutil.cpu_percent(interval=None)
     ram = psutil.virtual_memory()
@@ -519,17 +541,8 @@ with st.sidebar:
 
     st.divider()
 
-    st.markdown("### ⚙️ Akıl Yürütme Modu")
-    mode = st.radio(
-        "Araştırma & Yanıt Modu:",
-        [
-            "🎓 İki Aşamalı Derin Akıl Yürütme (Two-Stage CoT)",
-            "⚡ Hızlı Akademik Soru-Cevap",
-            "🤖 Mekatronik & Robotik Mentoru",
-            "🎯 Devil's Advocate (/challenge)"
-        ],
-        index=0
-    )
+    st.markdown("### 🧠 Sistem Modu")
+    st.info("🎯 **Tek Bütünleşik Akıllı Mod (Unified)**\n\nSistem; akademik araştırma, derin akıl yürütme (CoT), mekatronik & robotik ve hipotez testlerini tek akışta otonom olarak yürütür.")
 
     st.divider()
 
@@ -583,6 +596,28 @@ with st.sidebar:
         current_about = profile_manager.get_about_me()
         st.caption("Asistan sizi bu bilgilerle tanır. Sohbette kendinizi, projelerinizi veya tercihlerinizi anlattıkça burası otomatik güncellenir.")
         st.markdown(current_about)
+
+    # Dynamic Reinforcement Learning & Style Policy Panel
+    with st.expander("🎯 Pekiştirmeli Öğrenme & Kişisel Tarz", expanded=False):
+        rl_metrics = rl_engine.get_metrics()
+        st.caption("Asistan ile konuştukça ve geri bildirim verdikçe (👍/👎, tarz butonları, örtük eleştiriler) model sizin tarzınızı burada otonom olarak pekiştirir.")
+        
+        m_col1, m_col2 = st.columns(2)
+        m_col1.metric("Geri Bildirim", f"{rl_metrics.get('total_feedbacks', 0)}")
+        m_col2.metric("Kümülatif Ödül", f"{rl_metrics.get('cumulative_reward', 0.0)}")
+        
+        axioms = rl_engine.get_active_axioms()
+        st.markdown("**📌 Öğrenilen Aktif Tarz Kuralları:**")
+        if axioms:
+            for ax in axioms:
+                st.markdown(f"- *{ax}*")
+        else:
+            st.caption("Henüz özel kural eklenmedi. Sohbetteki 👍/👎 butonlarıyla tarzınızı öğretebilirsiniz.")
+        
+        if st.button("🔄 Tarz Kurallarını Sıfırla", key="btn_reset_rl_style", help="Öğrenilen tarz kurallarını varsayılana döndürür"):
+            rl_engine.add_style_axiom("Cevapları doğrudan konuya girerek, gereksiz nezaket cümleleri olmadan öz ve net tut.")
+            st.toast("Tarz politikası sıfırlandı.", icon="🔄")
+            st.rerun()
 
     # Obsidian Pending Drafts
     drafts = approval_manager.list_drafts()
@@ -698,18 +733,54 @@ with tab_chat:
         with st.chat_message(msg["role"]):
             st.markdown(normalize_latex(msg["content"]))
             
-            # If assistant message (and not the initial welcome message), provide Save button
+            # If assistant message (and not the initial welcome message), provide RL Feedback & Save toolbar
             if msg["role"] == "assistant" and i > 0:
-                btn_col1, _ = st.columns([1, 4])
-                with btn_col1:
-                    if st.button("💾 Obsidian'a Kaydet", key=f"save_draft_{i}", help="Bu cevabı Obsidian Vault/Drafts/ klasörüne taslak olarak kaydeder."):
-                        user_q = "Theory_Note"
-                        for prev_msg in reversed(st.session_state.messages[:i]):
-                            if prev_msg["role"] == "user":
-                                user_q = prev_msg["content"]
-                                break
+                user_q = ""
+                for prev_msg in reversed(st.session_state.messages[:i]):
+                    if prev_msg["role"] == "user":
+                        user_q = prev_msg["content"]
+                        break
+                
+                # Sleek, compact RL Feedback Toolbar
+                rl_col1, rl_col2, rl_col3, rl_col4, rl_col5 = st.columns([0.7, 0.7, 2.3, 1.8, 1.4])
+                with rl_col1:
+                    if st.button("👍", key=f"rl_up_{i}", help="Mükemmel yanıt! Bu tarzı ve yaklaşımı pekiştir (+1.0 Ödül)"):
+                        rl_engine.record_feedback(user_q, msg["content"], reward=1.0, style_tag="perfect")
+                        st.toast("🎯 Tarzınız pekiştirildi! Model hafızasına işlendi (+1.0 Ödül).", icon="👍")
+                        st.rerun()
+                with rl_col2:
+                    if st.button("👎", key=f"rl_down_{i}", help="Bu cevabı beğenmedim / tarzıma uymadı (-1.0 Ceza)"):
+                        rl_engine.record_feedback(user_q, msg["content"], reward=-1.0, style_tag="general")
+                        st.toast("⚠️ Tercihiniz kaydedildi (-1.0 Ceza).", icon="👎")
+                        st.rerun()
+                with rl_col3:
+                    quick_style = st.selectbox(
+                        "Tarzı Yönlendir:",
+                        ["Tarzı Yönlendir...", "⚡ Daha Kısa & Öz", "💻 Kod & Tensör Odaklı", "📐 Teori & Matematik", "🤖 Mekatronik & Donanım"],
+                        key=f"rl_quick_{i}",
+                        label_visibility="collapsed"
+                    )
+                    if quick_style != "Tarzı Yönlendir...":
+                        tag_map = {
+                            "⚡ Daha Kısa & Öz": "concise",
+                            "💻 Kod & Tensör Odaklı": "code_heavy",
+                            "📐 Teori & Matematik": "math_depth",
+                            "🤖 Mekatronik & Donanım": "robotics"
+                        }
+                        tag = tag_map.get(quick_style, "general")
+                        res = rl_engine.record_feedback(user_q, msg["content"], reward=0.5, style_tag=tag)
+                        st.toast(f"🎯 Yeni tarz kuralı pekiştirildi: {res.get('learned_axiom')}", icon="🎯")
+                        st.rerun()
+                with rl_col4:
+                    with st.popover("✍️ Tarzımı Öğret", help="Modele özel bir üslup kuralı öğret"):
+                        custom_critique = st.text_input("Nasıl anlatmalıydı?", placeholder="Örn: Daha çok pratik kod ver...", key=f"critique_input_{i}")
+                        if st.button("Pekiştir", key=f"btn_critique_{i}") and custom_critique:
+                            res = rl_engine.record_feedback(user_q, msg["content"], reward=0.5, style_tag="custom", user_comment=custom_critique)
+                            st.toast(f"🎯 Yeni tarz kuralı hafızaya alındı!", icon="🧠")
+                            st.rerun()
+                with rl_col5:
+                    if st.button("💾 Obsidian", key=f"save_draft_{i}", help="Bu cevabı Obsidian Vault/Drafts/ klasörüne taslak olarak kaydeder."):
                         safe_title = re.sub(r'[^A-Za-z0-9]+', '_', user_q[:35]).strip('_') or "Note"
-                        
                         draft_path = approval_manager.create_draft(
                             title=safe_title,
                             content=msg["content"],
@@ -720,6 +791,20 @@ with tab_chat:
                         st.rerun()
 
     if prompt:
+        # Check conversational critique / implicit feedback
+        if len(st.session_state.messages) > 1:
+            last_assistant = None
+            last_user = None
+            for prev_m in reversed(st.session_state.messages):
+                if prev_m["role"] == "assistant" and not last_assistant:
+                    last_assistant = prev_m["content"]
+                elif prev_m["role"] == "user" and not last_user:
+                    last_user = prev_m["content"]
+            
+            critique_res = rl_engine.detect_conversational_critique(prompt, last_user, last_assistant)
+            if critique_res and critique_res.get("learned_axiom"):
+                st.toast(f"🎯 Tarzınız algılandı ve pekiştirildi: {critique_res['learned_axiom']}", icon="🎯")
+
         # Autonomous Memory Extraction: check if user shares personal facts, projects, or preferences
         if auto_memory.has_personal_cues(prompt):
             try:
@@ -738,17 +823,25 @@ with tab_chat:
         with st.chat_message("assistant"):
             # 1. Check if Casual Chat or Personal Profile Statement
             if is_casual_or_personal(prompt):
-                # Stream warm, natural casual response
                 casual_msgs = build_casual_response_prompt(prompt, history=st.session_state.messages[:-1])
-                stream = llm.stream_generate(casual_msgs, max_tokens=1000, temperature=0.6)
+                stream = llm.stream_generate(casual_msgs, max_tokens=1500, temperature=0.6)
                 full_response = st.write_stream(stream)
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 st.rerun()
 
-            # 2. Check Devil's Advocate Mode
-            elif "Devil's Advocate" in mode or prompt.startswith("/challenge"):
+            # 2. Check Devil's Advocate / Hypothesis Stress Test
+            elif is_challenge_request(prompt):
                 with st.spinner("Hipotez literatürle ve RTX 4050 donanım sınırlarıyla test ediliyor..."):
-                    clean_q = prompt.replace("/challenge", "").strip()
+                    clean_q = re.sub(r"^/challenge\s*", "", prompt, flags=re.I).strip()
+                    for trig in [
+                        "hipotezimi test et:", "hipotezimi test et",
+                        "hipotezimi sına:", "hipotezimi sına",
+                        "fikrimi eleştir:", "fikrimi eleştir",
+                        "şeytanın avukatı:", "şeytanın avukatı",
+                        "devil's advocate:", "devil's advocate"
+                    ]:
+                        clean_q = re.sub(r"^" + re.escape(trig) + r"\s*", "", clean_q, flags=re.I).strip()
+
                     res = challenger.challenge_hypothesis(clean_q)
                     
                     verdict = res.get("verdict", "HIGH_RISK")
@@ -766,23 +859,21 @@ with tab_chat:
                     st.markdown(clean_output)
                     st.session_state.messages.append({"role": "assistant", "content": clean_output})
 
-            # 3. Check Mekatronik & Robotik Mentoru Mode
-            elif "Mekatronik & Robotik Mentoru" in mode:
+            # 3. Explicit Mentor / General Engineering Directive
+            elif prompt.startswith("/mentor"):
                 with st.spinner("🤖 Mekatronik ve Yapay Zeka mühendislik perspektifiyle analiz ediliyor..."):
-                    clean_q = prompt.replace("/mentor", "").strip()
-                    disclaimer = "> ⚠️ **Genel Mühendislik Bilgisi:** Bu mod yerel makale kütüphanesinden kanıt aramadan genel mühendislik bilgisiyle yanıt üretir.\n\n"
-                    st.markdown(disclaimer)
+                    clean_q = re.sub(r"^/mentor\s*", "", prompt, flags=re.I).strip()
                     mentor_msgs = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
                     stream = llm.stream_generate(mentor_msgs, max_tokens=3000)
                     full_response = st.write_stream(stream)
-                    clean_full = disclaimer + normalize_latex(full_response)
+                    clean_full = normalize_latex(full_response)
                     st.session_state.messages.append({"role": "assistant", "content": clean_full})
                     st.rerun()
 
-            # 4. Technical Deep Learning Question
+            # 4. Unified Technical & Research Pipeline
             else:
-                is_deep_cot = "Two-Stage CoT" in mode or prompt.startswith("/explain")
-                clean_q = prompt.replace("/explain", "").strip()
+                clean_q = re.sub(r"^/explain\s*", "", prompt, flags=re.I).strip()
+                is_deep_cot = True
 
                 # Multi-turn context resolution: augment search query with prior conversational topic or quote
                 augmented_search_query = contextualize_query(clean_q, st.session_state.messages[:-1])
@@ -1177,19 +1268,45 @@ with tab_radar:
     st.divider()
 
     st.markdown("#### 🗄️ ChromaDB Yerel Vektör Veritabanı Koleksiyonları")
-    db_col1, db_col2, db_col3, db_col4, db_col5 = st.columns(5)
-    db_col1.metric("📄 Makale Parçaları", "606 Chunks")
-    db_col2.metric("📑 Makale Kartları", "11 Kart")
-    db_col3.metric("📐 Teori Notları", "12 Not")
-    db_col4.metric("💻 Kod Snippetleri", "33 Kod")
-    db_col5.metric("🐛 Çözülen Hatalar", "5 Hata")
+    try:
+        col_stats = searcher.indexer.get_collection_stats()
+        p_chunks_cnt = col_stats.get("paper_chunks", 1208)
+        p_cards_cnt = col_stats.get("paper_cards", 21)
+        code_cnt = col_stats.get("code", 33)
+        err_cnt = col_stats.get("errors", 5)
+        exp_cnt = col_stats.get("experiments", 1)
+    except Exception:
+        p_chunks_cnt, p_cards_cnt, code_cnt, err_cnt, exp_cnt = 1208, 21, 33, 5, 1
 
-    st.markdown("#### 🤖 Yerel LLM & Çıkarım Mimarisi")
-    st.markdown("""
-    - **Aktif Model:** `qwen2.5:7b-instruct` (Ollama Yerel API - `http://localhost:11434`)
-    - **Vektör Gömme Modeli (Embedding):** `BAAI/bge-base-en-v1.5` (CPU üzerinde 768 boyutlu yoğun vektörler)
-    - **Yeniden Sıralama (Cross-Encoder):** `cross-encoder/ms-marco-MiniLM-L-6-v2`
+    db_col1, db_col2, db_col3, db_col4, db_col5 = st.columns(5)
+    db_col1.metric("📄 Makale Parçaları", f"{p_chunks_cnt} Chunks")
+    db_col2.metric("📑 Makale Kartları", f"{p_cards_cnt} Kart")
+    db_col3.metric("📐 Deney & Teori", f"{exp_cnt} Not")
+    db_col4.metric("💻 Kod Snippetleri", f"{code_cnt} Kod")
+    db_col5.metric("🐛 Çözülen Hatalar", f"{err_cnt} Hata")
+
+    st.markdown("#### 🤖 Çift Motorlu Yerel Çıkarım Mimarisi (Dual-Engine)")
+    st.markdown(f"""
+    - **📚 Akademik Literatür & Formül Motoru:** `{config.MODEL_ACADEMIC}` (Bağlam doğrulaması, LaTeX ve [S1] alıntıları)
+    - **🧠 Derin Akıl Yürütme & Planlama Motoru:** `{config.MODEL_REASONING}` (&lt;think&gt; zinciriyle mühendislik planlaması ve problem çözme)
+    - **Vektör Gömme Modeli (Embedding):** `{config.EMBED_MODEL}` (CPU üzerinde 768 boyutlu yoğun vektörler)
+    - **Yeniden Sıralama (Cross-Encoder):** `{config.RERANK_MODEL}`
     - **Kişisel Hafıza & İkinci Beyin:** Obsidian Markdown Vault (`Vault/00_Profile/About_Me.md`)
-    - **Gizlilik Durumu:** 🟢 **%100 Çevrimdışı ve Yerel** (Harici API bağlantısı veya telemetri yok)
+    - **Gizlilik Durumu:** 🟢 **%100 Çevrimdışı ve Yerel** (Harici bulut API bağlantısı yok)
+    """)
+
+    st.divider()
+    st.markdown("#### 🎯 Pekiştirmeli Öğrenme & Tercih Havuzu (RL Preference Alignment)")
+    rl_met = rl_engine.get_metrics()
+    c_r1, c_r2, c_r3, c_r4 = st.columns(4)
+    c_r1.metric("Toplam Tercih Sinyali", f"{rl_met.get('total_feedbacks', 0)}")
+    c_r2.metric("Pozitif Geri Bildirim 👍", f"{rl_met.get('positive_count', 0)}")
+    c_r3.metric("Negatif Düzeltme 👎", f"{rl_met.get('negative_count', 0)}")
+    c_r4.metric("Kümülatif Ödül Skoru", f"{rl_met.get('cumulative_reward', 0.0)}")
+
+    st.markdown(f"""
+    - **Tercih Veri Seti Konumu:** `data/rl_preferences/preferences.jsonl` (Direct Preference Optimization - DPO uyumlu)
+    - **Aktif Tarz Politikası:** `Vault/00_Profile/Reinforcement_Policy.md` ve `Vault/00_Profile/Style.md`
+    - **Çevrimdışı İnce Ayar:** Toplanan tercihlerle model ağırlıklarını kalıcı olarak eğitmek için `scripts/export_dpo_dataset.py` kullanılabilir.
     """)
 

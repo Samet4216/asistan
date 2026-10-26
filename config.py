@@ -19,7 +19,8 @@ OLLAMA_BASE_URL = "http://localhost:11434"
 MODEL = "qwen2.5:7b-instruct-q4_K_M"
 NUM_CTX = 8192
 TEMPERATURE = 0.2
-KEEP_ALIVE = "5m"
+KEEP_ALIVE = "10m"
+IDLE_UNLOAD_TIMEOUT_SECONDS = 600  # 10 dakika boşta kalınca VRAM otomatik boşaltılır (idle timer)
 
 # Token Budget Allocations (Total <= NUM_CTX = 8192)
 TOKEN_BUDGET = {
