@@ -13,7 +13,6 @@ Bu belge, Samet ile yapılan sohbetler ve verilen geri bildirimler (👍/👎, t
 
 ## 📌 Aktif Pekiştirilmiş Tarz Kuralları (Learned Axioms)
 
-- Minimize fluff and pleasantries; prioritize technical depth.
 - Highlight trade-offs (e.g. VRAM footprint vs accuracy gains).
 - Write mathematical equations and tensor shapes in clean, readable typography (e.g. C × H × W, z_c^h, σ(...)); avoid raw broken LaTeX macros in console.
 - kod ağırlıklı
@@ -21,8 +20,9 @@ Bu belge, Samet ile yapılan sohbetler ve verilen geri bildirimler (👍/👎, t
 - Zihniyet İlkesi: Samet'in Karar İlkesi: Benim için İHA'da 30 FPS üzerinde gerçek zamanlı çalışması şart, çünkü hızlı man.
 - [LLM STREAM ERROR]: HTTPConnectionPool(host='localhost', port=11434): Max retries exceeded with url: /api/chat (Caused by NewConnectionError("HTTPConnection(host='localhost', port=11434): Failed to establish a new connection: [WinError 10013] Erişim izinlerince izin verilmeyen bir şekilde bir yuvaya erişilmeye çalışıldı")).
 - Zihniyet İlkesi: Kendine hedef belirlemek ve kısıtların ne olduğunu anlayarak bunu aşmak.
+- Kendi hedeflerini belirle ve kısıtların ne olduğunu anlayıp onları aş.
 
 ---
-*Son Güncelleme:* `2026-10-26 11:30:09`
-*Toplam Geri Bildirim Sinyali:* `2`
+*Son Güncelleme:* `2026-10-26 11:30:16`
+*Toplam Geri Bildirim Sinyali:* `3`
 
