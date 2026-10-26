@@ -44,14 +44,16 @@ class ConversationCollector:
 
     def record_interaction(
         self,
-        user_text: str,
-        assistant_text: str,
+        user_text: str = "",
+        assistant_text: str = "",
         reward: float = 1.0,
-        mode: str = "chat"
+        mode: str = "chat",
+        user_message: str = "",
+        assistant_response: str = ""
     ):
         """Saves a conversation turn to local dataset."""
-        user_clean = user_text.strip()
-        asst_clean = assistant_text.strip()
+        user_clean = (user_message or user_text or "").strip()
+        asst_clean = (assistant_response or assistant_text or "").strip()
         
         if len(user_clean) < 2 or len(asst_clean) < 5:
             return

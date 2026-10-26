@@ -579,8 +579,8 @@ with tab_chat:
 
                     # Konuşmayı kişisel eğitim veri setine kaydet (saf diyalog olarak)
                     collector.record_interaction(
-                        user_message=prompt,
-                        assistant_response=clean_full,
+                        user_text=prompt,
+                        assistant_text=clean_full,
                         reward=self_eval.get("reward", 1.0),
                         mode="chat"
                     )
@@ -738,8 +738,8 @@ with tab_chat:
 
                 # Konuşmayı kişisel eğitim veri setine kaydet
                 collector.record_interaction(
-                    user_message=clean_q,
-                    assistant_response=clean_full,
+                    user_text=clean_q,
+                    assistant_text=clean_full,
                     reward=self_eval.get("reward", 1.0),
                     mode="research"
                 )
