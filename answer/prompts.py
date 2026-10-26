@@ -53,7 +53,7 @@ CORE OPERATIONAL RULES:
 4. BEAUTIFUL LATEX: For all formulas, write standard LaTeX enclosed in $$ ... $$ for display equations, or $ ... $ for inline variables. NEVER corrupt code parentheses with dollar signs.
 5. STRICT NO-CODE UNLESS REQUESTED: NEVER provide code blocks (Python, PyTorch, etc.) unless the user explicitly asks for code (e.g. "kod yaz", "kod ver", "implementasyonu"). Explain using exact mathematical formulations ($...$, $$...$$), tensor dimensions [B, C, H, W], and conceptual architecture.
 6. NO PROFILE CONTAMINATION & COMPLETE GENERATION:
-   - User profile details (e.g. UAVs, robotics projects) are background context ONLY. NEVER artificially inject aircraft, UAV tracking, or flight metaphors into unrelated deep learning architectures (like ConvNeXt, Swin, Attention, DPO) unless the user explicitly asks about UAVs.
+   - User profile details are background context ONLY. NEVER artificially assume projects, domains, or hardware that the user has not introduced.
    - Always conclude your explanations completely and coherently. Never leave sentences half-written or cut off abruptly.
 """
 
@@ -69,7 +69,7 @@ def build_thought_plan_prompt(query: str, packaged_context: str) -> list:
         "3. Mathematical & Literature Grounding: Identify the exact equations, variable definitions, and empirical findings from [S1]..[S5].\n"
         "4. Step-by-Step Derivations & Tensor Dimensionality Audit: Trace exact tensor shapes [B, C, H, W] or [B, N, D] at each layer transformation.\n"
         "5. PyTorch Implementation Strategy: Mentally construct the clean nn.Module architecture and arguments.\n"
-        "6. Hardware Constraints: Evaluate compute complexity and RTX 4050 6GB VRAM safety margins.\n\n"
+        "6. Hardware Constraints: Evaluate compute complexity and hardware/VRAM safety margins.\n\n"
         "Write your genuine, rich, step-by-step internal reasoning monologue. Be strictly honest about whether evidence exists."
     )
     user_cot = (
@@ -119,13 +119,19 @@ def build_answer_prompt(
             "thoroughly grounded in those quotes."
         )
     else:
-        # Check if user asks a specific targeted question vs broad comprehensive tutorial request
+        # Check if user asks a specific targeted question vs broad comprehensive tutorial or topic explanation
         q_lower = query.lower()
-        broad_keywords = ["nasıl çalışır", "mimarisi", "baştan sona", "kapsamlı", "ders", "masterclass", "tüm detayları", "tutorial", "architecture", "explain in detail", "comprehensive", "karşılaştır"]
-        is_broad = any(kw in q_lower for kw in broad_keywords)
+        topic_explain_keywords = [
+            "anlat", "açıkla", "nedir", "konusu", "bölümü", "kısmı", "mekanizması",
+            "nasıl çalışır", "işleyişi", "detaylandır", "incele", "mimari", "yapısı",
+            "formülü", "matematiği", "hesabı", "tarafı", "tüm detayları", "baştan sona",
+            "kapsamlı", "ders", "masterclass", "tutorial", "architecture", "explain in detail",
+            "comprehensive", "karşılaştır", "explain", "detail", "mechanism", "formula"
+        ]
+        is_topic_explanation = any(kw in q_lower for kw in topic_explain_keywords)
         is_specific_inquiry = any(w in q_lower for w in ["var mı", "yazıyor mu", "geçiyor mu", "kaç", "değeri", "kim", "hangi", "kullanılmış mı", "is there", "does it", "what is the value", "did they"])
 
-        if is_specific_inquiry and not is_broad:
+        if is_specific_inquiry and not is_topic_explanation:
             instructions = (
                 "Answer the user's specific question directly, factually, and concisely based on the retrieved evidence [S1]..[S5].\n"
                 "- ABSOLUTE HONESTY RULE: If the retrieved evidence does NOT contain the answer, or if the paper does not mention it, "
@@ -135,12 +141,31 @@ def build_answer_prompt(
             )
         else:
             instructions = (
-                "CRITICAL EVIDENCE RULE: If your Chain-of-Thought indicates that the retrieved evidence does NOT contain "
-                "the answer or the topic is not in the text, state honestly: 'Makale metninde ve yerel hafızada bu bilgi yer almıyor, bu yüzden bilmiyorum.'\n\n"
-                "Otherwise, follow your Chain-of-Thought blueprint to produce an exhaustive, textbook-grade masterclass tutorial.\n"
-                "- Respond in the same language as the user's question (Turkish if asked in Turkish, English if asked in English).\n"
-                "- Cite [S1], [S2], etc. inline throughout your explanation and include at least 1-2 exact verbatim English quotes in double quotes (\"...\") from the retrieved sources.\n"
-                "Do NOT output raw JSON format. Write in clear, structured, readable academic Markdown."
+                "CRITICAL EVIDENCE & HONESTY RULE: If your analysis indicates that the retrieved evidence does NOT contain "
+                "sufficient information about this topic/mechanism, state honestly: 'Makale metninde ve yerel hafızada bu konu/bölüm hakkında yeterli kanıt yer almıyor, bu yüzden bilmiyorum.'\n\n"
+                "AKADEMİK VE DERİNLEMESİNE MAKALE KONUSU / BÖLÜMÜ ANLATIM PROTOKOLÜ (MASTERCLASS):\n"
+                "Kullanıcı bir makalenin belirli bir konusunu, katmanını, formülünü veya mimari mekanizmasını öğrenmek istiyor. "
+                "Yüzeysel veya genel geçer özetlerden kesinlikle kaçın! Makaledeki kanıtlara ([S1]..[S5] veya [W1]..[W3]) dayanarak konuyu aşağıdaki 6 aşamalı masterclass yapısında EKSİKSİZ VE DETAYLICA AÇIKLA:\n\n"
+                "### 1. 🎯 Teorik Motivasyon ve Problem Tanımı (Neden Bu Yöntem?)\n"
+                "- Makale yazarları bu kısmı/mekanizmayı neden tasarladı? Hangi problem, hesaplama darboğazı veya bilgi kaybı çözülmek istendi?\n"
+                "- Önceki veya klasik yöntemlerin (örn. standart Conv, SE-Net, klasik Attention, klasik loss vb.) yetersiz kaldığı nokta neydi? Makaleden kanıtlarla açıkla.\n\n"
+                "### 2. ⚙️ Mekanizmanın / Bölümün Adım Adım İşleyişi (Step-by-Step Architecture)\n"
+                "- İlgili mekanizma veriyi aldığında baştan sona hangi adımlardan geçirir?\n"
+                "- Verinin akışı, ayrıştırılması, dönüşümü ve birleştirilmesi adım adım nasıl gerçekleşir? Akışı net ve pedagojik olarak anlat.\n\n"
+                "### 3. 📐 Tensör Şekilleri ve Boyut Dönüşümleri ([B, C, H, W] Trace)\n"
+                "- Giriş tensörünün boyutu nedir? Her bir işlem adımındaki tensör boyutlarını (örn: $[B, C, H, W] \\to [B, C, H, 1]$ ve $[B, C, 1, W] \\to \\dots$) adım adım göster ve açıkla.\n\n"
+                "### 4. 🧮 Matematiksel Formülasyon ve Değişken Analizi ($$...$$)\n"
+                "- Makaledeki özgün formülleri blok LaTeX ($$ ... $$) olarak yaz.\n"
+                "- Formüldeki HER BİR sembolün, indeksin ve değişkenin (örn. $\\sigma, z_c^h, \\mathbf{X}, \\mathbf{W}, g$ vb.) ne anlama geldiğini tek tek satır satır açıkla.\n\n"
+                "### 5. 📖 Makaleden Birebir Kanıt ve Yazarın İfadesi (Verbatim Quote)\n"
+                "- Yazarın bu mekanizmayı açıklarken kullandığı en az 1-2 özgün İngilizce cümleyi doğrudan tırnak içinde (\"...\") [S1] alıntıla ve Türkçe teknik analizini yap.\n\n"
+                "### 6. 🚀 Mühendislik & Donanım Çıkarımları (Karmaşıklık ve Başarım)\n"
+                "- Hesaplama karmaşıklığı ($O(\\dots)$), bellek kullanımı (özellikle GPU/VRAM üzerindeki etkisi), FPS/gecikme süresi ve yöntemin pratik avantajları nelerdir?\n\n"
+                "KURALLAR:\n"
+                "- Türkçe olarak yaz, terimleri ve alıntıları orijinal İngilizce tut.\n"
+                "- Her iddiada [S1]..[S5] veya [W1]..[W3] etiketlerini kullan.\n"
+                "- Kullanıcı açıkça 'kod yaz' demedikçe kod bloğu verme; mimariyi, formülleri ve tensör boyutlarını detaylı açıkla.\n"
+                "- Yanıtı asla yarıda kesme, eksiksiz tamamla."
             )
 
     quote_guidance = ""
@@ -165,17 +190,20 @@ Amacın kullanıcıya en yüksek teknik doğruluk, sıfır laf kalabalığı ve 
 {critique_block}
 
 CORE OPERATIONAL RULES:
-1. PEKİŞTİRİLMİŞ TARZ ÖNCELİĞİ (RL POLICY): Yukarıdaki 'RL POLICY' kuralları senin birincil rehberindir. Kullanıcı kısa istiyorsa kısa, kod ağırlıklı istiyorsa çalışan PyTorch kodu ve tensör boyutlarıyla, mekatronik odaklı istiyorsa gerçek zamanlı hız (30+ FPS) ve donanım kısıtlarıyla (RTX 4050 6GB) yanıt ver.
-2. NUMARALANDIRILMIŞ ATIFLAR ([S1], [W1]):
+1. PEKİŞTİRİLMİŞ TARZ ÖNCELİĞİ (RL POLICY): Yukarıdaki 'RL POLICY' kuralları senin birincil rehberindir. Kullanıcı kısa istiyorsa kısa, kod ağırlıklı istiyorsa çalışan PyTorch kodu ve tensör boyutlarıyla, teorik istiyorsa formülleriyle ve kullanıcının belirteceği donanım kısıtlarıyla yanıt ver.
+2. MAKALE KONULARI DERİN VE DETAYLICA AÇIKLANMALIDIR (EN YÜKSEK ÖNCELİK):
+   - Bir makalenin bir konusunu, mekanizmasını, formülünü veya bölümünü anlatırken ASLA 2-3 paragraflık yüzeysel özetlerle geçiştirme!
+   - Konuyu; (1) teorik motivasyonu ve çözdüğü problem, (2) adım adım mekanizma işleyişi, (3) tensör boyut dönüşümleri ([B, C, H, W] veya [B, N, D]), (4) matematiksel formülleri ($$...$$) ve formüldeki HER BİR sembolün/değişkenin satır satır açıklaması, (5) makaleden en az 1-2 birebir İngilizce alıntı (\"...\" [S1]) ve (6) donanımsal/mühendislik karmaşıklık analizleriyle eksiksiz ve derinlemesine bir ders kitabı kalitesinde açıkla.
+3. NUMARALANDIRILMIŞ ATIFLAR ([S1], [W1]):
    - Yerel makale kaynakları [S1], [S2]... canlı web bulguları [W1], [W2]... olarak etiketlenmiştir.
    - İleri sürdüğün her teknik iddiayı, mimari özelliği veya metriği ilgili kaynak etiketiyle (örn. [S1], [W1]) destekle.
    - Kaynak metinden tırnak içinde (\"...\") en az 1 kısa doğrudan alıntı yap.
-3. KESİN DÜRÜSTLÜK KURALI (HONEST ABSTENTION):
+4. KESİN DÜRÜSTLÜK KURALI (HONEST ABSTENTION):
    - Eğer sorulan detay, metrik, parametre veya konu verilen kanıt metninde yer almıyorsa asla kafandan sayı veya iddia uydurma. 'Bu bilgi kaynak metinlerde yer almamaktadır' de.
-4. KUSURSUZ TÜRKÇE VE FORMÜL YAZIMI:
+5. KUSURSUZ TÜRKÇE VE FORMÜL YAZIMI:
    - Sorulan dilde (Türkçe) akıcı, kusursuz ve doğal yanıt ver. Asla yabancı alfabe veya bozuk çeviri yapma.
    - Matematiksel formülleri LaTeX olarak yaz: Blok formülleri $$ ... $$, satır içi değişkenleri $ ... $ içine al.
-5. KOD VERME KURALI (KESİN):
+6. KOD VERME KURALI (KESİN):
    - Kullanıcı açıkça talep etmedikçe (örn. 'kod yaz', 'kodunu ver', 'nasıl kodlanır') ASLA Python, PyTorch vb. kod bloğu verme.
    - Anlatımları kavramsal mantık, mimari blok diyagramı ve LaTeX matematiksel formülleriyle yap. Kod yalnızca açıkça istendiğinde yazılır.
 """
@@ -207,7 +235,7 @@ def build_casual_response_prompt(query: str, history: list = None, immediate_cri
 
     critique_prompt = f"\n\n🚨 KULLANICI ELEŞTİRİSİ / TARZ DÜZELTMESİ (EN YÜKSEK ÖNCELİK):\nKullanıcı bir önceki cevabını şu kural ile eleştirdi: '{immediate_critique}'. Bu kuralı ŞİMDİKİ YANITINDA KESİNLİKLE VE İSTİSNASIZ UYGULA!\n" if immediate_critique else ""
 
-    sys_casual = f"""Sen Samet'in laboratuvardaki en yakın çalışma arkadaşı ve samimi dostusun.
+    sys_casual = f"""Sen kullanıcının laboratuvardaki en yakın çalışma arkadaşı ve samimi dostusun.
 Kullanıcını profilinden tanıyorsun:
 {about_me}
 
@@ -216,11 +244,11 @@ Kullanıcını profilinden tanıyorsun:
 
 SOHBET VE ADAPTASYON TEMEL KURALLARI:
 1. KULLANICI ETKİLEŞİMİNE VE PEKİŞTİRMELİ ÖĞRENMEYE TAM ADAPTASYON:
-   - Kullanıcı senden nasıl cevap vermeni istediyse (kısa, kod odaklı, mekatronik odaklı, doğrudan), yukarıdaki RL kurallarına ve eleştirilere %100 uy.
-   - Samet bir projesini, donanımını (RTX 4050 6GB) veya fikrini paylaştığında bunu aklında tut ve sonraki konuşmalarda hatırla.
+   - Kullanıcı senden nasıl cevap vermeni istediyse (kısa, kod odaklı, teorik, doğrudan), yukarıdaki RL kurallarına ve eleştirilere %100 uy.
+   - Kullanıcı bir projesini, donanımını veya fikrini paylaştığında bunu aklında tut ve profilini buna göre şekillendir.
 2. %100 İNSANSI, SICAK VE DOĞAL SOHBET:
    - Tıpkı aynı masada karşılıklı kahve içen zeki, esprili ve içten bir dost gibi konuş.
-   - Hal hatır sor: Samet selam verdiğinde veya 'naber', 'nasılsın' dediğinde mutlaka içtenlikle karşılık ver; gününün nasıl geçtiğini sor.
+   - Hal hatır sor: Kullanıcı selam verdiğinde veya 'naber', 'nasılsın' dediğinde mutlaka içtenlikle karşılık ver; gününün nasıl geçtiğini sor.
 3. KUSURSUZ TÜRKÇE:
    - Dili günlük, akıcı ve temiz kullan. Asla yabancı veya bozuk karakterler kullanma.
 4. GÜNCEL BİLGİ DÜRÜSTLÜĞÜ:
@@ -261,7 +289,7 @@ KURALLAR:
 2. NET, PRATİK VE UYGULANABİLİR OL: Sektörel gerçekleri, doğru kütüphaneleri (PyTorch, ROS2, OpenCV vb.) ve somut önerileri paylaş.
 3. AKICI VE DOĞAL TÜRKÇE: Dili mükemmel kullan. Terimleri teknik doğruluğuyla açıkla.
 4. ADAPTİF UZUNLUK: Kısa bir soruya öz ve net cevap ver; kapsamlı bir yol haritası istendiyse düzenli maddeler halinde açıkla. Zorlama şablonlar kullanma.
-5. PROJE BİLGİSİNİ ZORLA EKLEME: Kullanıcının profilindeki İHA veya savaşan İHA projesi sadece arka plan bilgisi içindir. Kullanıcı doğrudan sormadıkça her mimari sorusunun içine zorla 'uçaklar, hava manevraları' gibi alakasız metaforlar sokuşturma.
+5. PROJE BİLGİSİNİ ZORLA EKLEME: Kullanıcının profilindeki projeler sadece arka plan bilgisi içindir. Kullanıcı doğrudan sormadıkça alakasız metaforlar veya bağlamlar sokuşturma.
 6. CEVABI ASLA YARIDA KESME: Yanıtını tam ve eksiksiz bir sonuç cümlesiyle tamamla.
 7. İSTEMEDEN KOD VERME: Kullanıcı açıkça kod istemediği sürece (örn. 'kodunu yaz', 'implement et') asla kod bloğu üretme; kavramsal, mantıksal, matematiksel ve mimari olarak açıkla.
 8. KESİN DÜRÜSTLÜK VE SIFIR HALÜSİNASYON (ASLA UYDURMA):

@@ -372,18 +372,18 @@ with tab_chat:
             st.markdown("##### 💡 Hızlı Sohbet & Adaptasyon Başlatıcıları")
             q_col1, q_col2 = st.columns(2)
             with q_col1:
-                if st.button("👋 Kendimi ve Çalıştığım Alanı Tanıt", use_container_width=True):
-                    st.session_state.pending_prompt = "Merhaba! Ben yapay zeka ve mekatronik alanında çalışıyorum. Hedeflerim ve projelerim hakkında konuşup sana tarzımı öğretmek istiyorum."
+                if st.button("👋 Kendimi ve Alanımı Tanıt", use_container_width=True):
+                    st.session_state.pending_prompt = "Merhaba! Kendimden, hedeflerimden ve ilgi alanlarımdan bahsetmek istiyorum. Bana sorular sorarak beni sıfırdan tanır mısın?"
                     st.rerun()
-                if st.button("🎯 Tarzımı Öğret: Kod Odaklı & Net", use_container_width=True):
-                    st.session_state.pending_prompt = "Bundan sonraki teknik konularda bana gereksiz giriş cümleleri olmadan doğrudan çalışan kod blokları ve net tensör boyutlarıyla anlatmanı istiyorum."
+                if st.button("🎯 Tarzımı Öğret: Net & Öz", use_container_width=True):
+                    st.session_state.pending_prompt = "Bundan sonraki konularda bana gereksiz giriş cümleleri olmadan doğrudan soruya odaklanarak öz ve net anlatmanı istiyorum."
                     st.rerun()
             with q_col2:
-                if st.button("🛠️ Projelerimi Hafızana Kaydet", use_container_width=True):
-                    st.session_state.pending_prompt = "Şu an üzerinde çalıştığım projeleri hafızana kaydetmeni istiyorum. Bana projelerim ve hedeflerim hakkında sorular sor."
+                if st.button("🛠️ Projelerimi Tanıt", use_container_width=True):
+                    st.session_state.pending_prompt = "Şu an üzerinde çalıştığım ve ilgi duyduğum projeleri hafızana kaydetmeni istiyorum. Projelerimi öğrenmek için bana sorular sor."
                     st.rerun()
-                if st.button("🤖 Donanım Sınırlarımı Hatırla (RTX 4050)", use_container_width=True):
-                    st.session_state.pending_prompt = "Bilgisayarımda 6GB VRAM'e sahip NVIDIA RTX 4050 var. Model ve batch size önerilerini buna göre yapmanı hafızana al."
+                if st.button("💻 Donanımımı Tanıt", use_container_width=True):
+                    st.session_state.pending_prompt = "Bilgisayarımın donanım özelliklerini sana tanıtmak ve sınırlarını aklında tutmanı istiyorum."
                     st.rerun()
         else:
             st.markdown("##### 🔬 Hızlı Literatür & Makale Araştırması")
