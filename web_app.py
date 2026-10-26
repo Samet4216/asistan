@@ -46,6 +46,8 @@ from memory.errors import error_manager
 from memory.user_profile import profile_manager
 from memory.auto_memory import auto_memory
 from memory.rl_feedback import rl_engine
+from memory.self_evolving_rl import self_evolving_rl
+from memory.conversation_collector import collector
 from memory.graph_visualizer import get_vault_graph_data, generate_graph_html
 from ingest.single_ingest import ingest_arxiv_paper
 from ingest.local_file_ingest import ingest_uploaded_file
@@ -208,10 +210,17 @@ with st.sidebar:
     # Dynamic Reinforcement Learning & Style Policy Panel
     with st.expander("🎯 Pekiştirmeli Öğrenme & Kişisel Tarz", expanded=False):
         rl_metrics = rl_engine.get_metrics()
-        st.caption("Asistan ile konuştukça ve geri bildirim verdikçe (👍/👎, tarz butonları, örtük eleştiriler) model sizin tarzınızı burada otonom olarak pekiştirir.")
+        evo_metrics = self_evolving_rl.get_evolution_metrics()
+        
+        st.caption("🧬 **Otonom Öz-Geliştirme: 🟢 AKTİF**\n\nModel her yanıtını doğruluk, üslup ve dil kalitesi açısından anlık olarak kendisi eleştirip kurallarını otonom olarak evrilir.")
+        
+        e_col1, e_col2, e_col3 = st.columns(3)
+        e_col1.metric("Öz-Değerlendirme", f"{evo_metrics.get('total_self_evaluations', 0)}")
+        e_col2.metric("Ort. Kalite", f"%{evo_metrics.get('average_quality_score', 85.0):.0f}")
+        e_col3.metric("Otonom İlke", f"{evo_metrics.get('total_self_axioms_evolved', 0)}")
         
         m_col1, m_col2 = st.columns(2)
-        m_col1.metric("Geri Bildirim", f"{rl_metrics.get('total_feedbacks', 0)}")
+        m_col1.metric("Kullanıcı Geri Bildirimi", f"{rl_metrics.get('total_feedbacks', 0)}")
         m_col2.metric("Kümülatif Ödül", f"{rl_metrics.get('cumulative_reward', 0.0)}")
         
         axioms = rl_engine.get_active_axioms()
@@ -516,7 +525,16 @@ with tab_chat:
                         model=config.MODEL_CHAT
                     )
                     full_response = st.write_stream(stream)
-                    st.session_state.messages.append({"role": "assistant", "content": full_response})
+                    clean_full = normalize_latex(full_response)
+
+                    # Otonom RL Öz-Değerlendirme & Anlık Politika Evrimi
+                    self_eval = self_evolving_rl.evaluate_and_evolve(prompt, clean_full, mode="chat")
+                    score = self_eval.get("score", 85.0)
+                    eval_footer = f"\n\n---\n⚡ **Otonom RL Öz-Değerlendirme:** Kalite: `%{score:.0f}` | Ödül: `{self_eval.get('reward', 0.0):+.2f}` | *{self_eval.get('critique', '')}*"
+                    st.markdown(eval_footer)
+                    clean_full += eval_footer
+
+                    st.session_state.messages.append({"role": "assistant", "content": clean_full})
                     st.rerun()
 
             else:
@@ -648,6 +666,13 @@ with tab_chat:
                         cryst_footer = f"\n\n---\n💾 **Otonom Hafıza Mühürlendi:** Bu araştırma konusu `Vault/02_Theory_Notes/{cryst_res.get('filename')}` ve yerel ChromaDB vektör hafızasına kaydedildi. Artık çevrimdışı modda da yerel kaynak olarak kullanılabilir."
                         st.markdown(cryst_footer)
                         clean_full = clean_full + cryst_footer
+
+                # Step 6: Otonom RL Öz-Değerlendirme & Anlık Politika Evrimi
+                self_eval = self_evolving_rl.evaluate_and_evolve(clean_q, clean_full, retrieved_context=retrieved_context, mode="research")
+                score = self_eval.get("score", 85.0)
+                eval_footer = f"\n\n---\n⚡ **Otonom RL Öz-Değerlendirme:** Kalite: `%{score:.0f}` | Ödül: `{self_eval.get('reward', 0.0):+.2f}` | *{self_eval.get('critique', '')}*"
+                st.markdown(eval_footer)
+                clean_full = clean_full + eval_footer
 
                 st.session_state.messages.append({"role": "assistant", "content": clean_full})
                 st.rerun()
