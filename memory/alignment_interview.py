@@ -37,10 +37,14 @@ class AlignmentInterviewEngine:
     def __init__(self):
         vault.ensure_layout()
 
-    def generate_next_question(self, answered_questions: List[Dict[str, str]]) -> str:
+    def generate_next_question(
+        self,
+        answered_questions: List[Dict[str, str]],
+        current_topic: Optional[str] = None
+    ) -> str:
         """
-        Generates the next deep, targeted interview question based on what has already been
-        discussed and the user's known profile/projects.
+        Generates a fresh, topic-specific interview question based on the user's active topic,
+        prior dialogue turns, and engineering goals. Never repeats generic boilerplate templates.
         """
         about_me = profile_manager.get_about_me()
         axioms = rl_engine.get_active_axioms()
@@ -51,38 +55,60 @@ class AlignmentInterviewEngine:
             for q_data in answered_questions:
                 history_summary += f"- Soru: {q_data.get('question')}\n  Samet'in Yanıtı: {q_data.get('answer')}\n"
 
+        topic_instruction = ""
+        if current_topic:
+            topic_instruction = (
+                f"\n[AKTİF ODAK KONUSU]: '{current_topic}'\n"
+                f"Sorunu KESİNLİKLE bu konu ('{current_topic}') etrafında kurgula! "
+                f"Kullanıcının bu konudaki tasarım tercihlerini, neden bu yöntemi seçtiğini, "
+                f"hangi teknik takasları (trade-off) göze aldığını sor. Sakın alakasız konulara sapma!"
+            )
+        else:
+            topic_instruction = (
+                "\nKullanıcının şu anki genel araştırma yönelimine, donanım optimizasyonu (RTX 4050 6GB) "
+                "veya mühendislik yaklaşımına odaklanan özgün ve taze bir soru sor."
+            )
+
         prompt = [
             {
                 "role": "system",
                 "content": (
                     "Sen Samet'in yapay zeka laboratuvarındaki en yakın kıdemli mühendislik partnerisin.\n"
                     "Görevin Samet ile 'Bilişsel Zihniyet Hizalama Röportajı' (Cognitive Alignment Interview) yapmak.\n"
-                    "Amacın Samet'in YALNIZCA projelerini değil, O PROJELERİ NE AMAÇLA, NEDEN YAPTIĞINI, "
-                    "mühendislik kararlarını nasıl aldığını (hız mı doğruluk mu, donanım sınırları, sahada neyi çözdüğü) "
-                    "anlamak.\n\n"
+                    "Amacın Samet'in mühendislik kararlarını nasıl aldığını, bu teknolojileri NE AMAÇLA ve NEDEN tercih ettiğini "
+                    "anlamak.\n"
+                    f"{topic_instruction}\n\n"
                     f"KULLANICI PROFİLİ:\n{about_me}\n\n"
                     f"MEVCUT BİLİNEN TARZ KURALLARI:\n" + "\n".join([f"- {a}" for a in axioms]) + "\n\n"
                     f"{history_summary}\n"
-                    "TALİMAT:\n"
-                    "Samet'e doğrudan, samimi, saygılı ama derin bir mühendislik sorusu sor.\n"
-                    "Soru; genel havadan sudan değil, onun termal kamera, İHA, derin öğrenme projeleri, "
-                    "donanım kısıtları (RTX 4050 / gömülü kartlar), hız-doğruluk takasları veya neden bu projeyi seçtiği "
-                    "üzerine nokta atışı TEK BİR soru olmalıdır.\n"
-                    "Sadece soruyu üret, gereksiz giriş-çıkış lafı etme."
+                    "KURALLAR:\n"
+                    "- Kalıpsal, ezber veya tekrarlayan şablon cümleler KULLANMA.\n"
+                    "- Sabit olarak her defasında aynı 'termal kamera İHA' sorusunu TEKRARLAMA.\n"
+                    "- Doğrudan konunun kalbine inen, Samet'in karar felsefesini sorgulayan TEK BİR net Türkçe soru sor.\n"
+                    "- Sadece soruyu üret, giriş nezaket cümleleri kurma."
                 )
             },
             {
                 "role": "user",
-                "content": "Samet'in düşünme tarzını ve projelerinin 'neden'ini ortaya çıkaracak sıradaki röportaj sorusunu üret."
+                "content": f"Aktif konudaki zihniyet ve tercih sorusunu sor. Konu: {current_topic or 'Genel Mühendislik'}"
             }
         ]
 
         try:
-            q = "".join(list(llm.stream_generate(prompt, max_tokens=150, temperature=0.6))).strip()
-            # Clean quotes
-            return q.strip('"\'-')
-        except Exception as e:
-            return "Termal kamera ile nesne tespiti projende senin için asıl kritik başarı ölçütü nedir: Milisaniye cinsinden gecikme (latency) mi yoksa küçük hedefleri kaçırmayan maksimum mAP doğruluğu mu?"
+            q = "".join(list(llm.stream_generate(prompt, max_tokens=150, temperature=0.7))).strip()
+            q_clean = q.strip('"\'-')
+            if len(q_clean) > 20:
+                return q_clean
+        except Exception:
+            pass
+
+        # Dynamic fallback based on topic keywords
+        if current_topic and any(k in current_topic.lower() for k in ["ppo", "dpo", "rl", "reinforcement", "ödül"]):
+            return f"PPO ve DPO optimizasyonunda senin için belirleyici mühendislik kararı nedir: Bir ödül modeli eğitmenin getirdiği karmaşıklıktan kaçınmak mı, yoksa çevrimiçi simülasyonda dinamik politika keşfi mi?"
+        elif current_topic and any(k in current_topic.lower() for k in ["attention", "transformer", "flash"]):
+            return f"Dikkat mekanizmalarında senin için asıl donanım kısıtı nedir: Bellek bant genişliği (HBM IO) mi yoksa RTX 4050'nin 6GB VRAM sınırı mı? Hangisini önceliklendiriyorsun?"
+        else:
+            return f"Bu projede/mimaride senin için asıl vazgeçilmez başarı kriteri nedir: Donanım kısıtlarında minimum gecikme ve hafiflik mi, yoksa ne pahasına olursa olsun maksimum doğruluk mu?"
 
     def process_answer(
         self,
