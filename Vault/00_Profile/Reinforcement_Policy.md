@@ -22,6 +22,6 @@ Bu belge, Samet ile yapılan sohbetler ve verilen geri bildirimler (👍/👎, t
 - 'fenerbahçenin güncel teknik direktörü kimdir' sorulduğunda kullanıcının öğrettiği doğrulanmış yanıtı ('fenerbahçenin güncel teknik direktörü ismail kartaldır...') esas al; kanıt olmayan konularda asla uydurma yapma, dürüstçe 'Bilmiyorum' de.
 
 ---
-*Son Güncelleme:* `2026-10-27 02:15:33`
+*Son Güncelleme:* `2026-10-27 02:15:34`
 *Toplam Geri Bildirim Sinyali:* `9`
 
