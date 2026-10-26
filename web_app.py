@@ -421,7 +421,8 @@ with tab_chat:
                         f"{parsed['thought']}</div></details>\n\n"
                     )
                     content_to_show = thought_html + parsed["response"]
-            st.markdown(normalize_latex(content_to_show), unsafe_allow_html=True)
+            clean_display_content = re.sub(r'\n*---\n*⚡ \*\*Otonom RL Öz-Değerlendirme:\*\*.*$', '', content_to_show, flags=re.DOTALL)
+            st.markdown(normalize_latex(clean_display_content), unsafe_allow_html=True)
             
             # If assistant message (and not the initial welcome message), provide RL Feedback & Save toolbar
             if msg["role"] == "assistant" and i > 0:
@@ -431,10 +432,13 @@ with tab_chat:
                         user_q = prev_msg["content"]
                         break
                 
-                # Active RL Axioms indicator badge
-                active_axioms = rl_engine.get_active_axioms()
-                if active_axioms:
-                    st.caption(f"🎯 **Pekiştirilmiş Tarzınız Devrede:** *{active_axioms[-1]}* (Toplam {len(active_axioms)} Kural)")
+                # Dynamic RL Quality Badge
+                s_eval = msg.get("self_eval")
+                if s_eval:
+                    score = s_eval.get("score", 75.0)
+                    critique = s_eval.get("critique", "")
+                    icon = "🟢" if score >= 75 else ("🟡" if score >= 50 else "🔴")
+                    st.caption(f"{icon} **Otonom RL Kalitesi:** `%{score:.0f}` (Ödül: `{s_eval.get('reward', 0.0):+.2f}`) • *{critique}*")
 
                 # Sleek RL Feedback & Regeneration Toolbar
                 rl_col1, rl_col2, rl_col3, rl_col4, rl_col5, rl_col6 = st.columns([0.6, 0.6, 2.2, 1.4, 1.3, 1.0])
@@ -585,11 +589,11 @@ with tab_chat:
                         mode="chat"
                     )
 
-                    eval_footer = f"\n\n---\n⚡ **Otonom RL Öz-Değerlendirme:** Kalite: `%{score:.0f}` | Ödül: `{self_eval.get('reward', 0.0):+.2f}` | *{self_eval.get('critique', '')}*"
-                    st.markdown(eval_footer)
-                    clean_full += eval_footer
-
-                    st.session_state.messages.append({"role": "assistant", "content": clean_full})
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": clean_full,
+                        "self_eval": self_eval
+                    })
                     st.rerun()
 
             else:
@@ -744,11 +748,11 @@ with tab_chat:
                     mode="research"
                 )
 
-                eval_footer = f"\n\n---\n⚡ **Otonom RL Öz-Değerlendirme:** Kalite: `%{score:.0f}` | Ödül: `{self_eval.get('reward', 0.0):+.2f}` | *{self_eval.get('critique', '')}*"
-                st.markdown(eval_footer)
-                clean_full = clean_full + eval_footer
-
-                st.session_state.messages.append({"role": "assistant", "content": clean_full})
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": clean_full,
+                    "self_eval": self_eval
+                })
                 st.rerun()
 
 with tab_graph:
