@@ -187,5 +187,50 @@
     "color": "#14b8a6",
     "desc": "Eğitimde çok kollu artık bağlantılar kullanıp çıkarım anında bunları cebirsel olarak tek bir 3x3 evrişim katmanına kaynaştıran (fuse) mimari.",
     "prompt": "RepVGG eğitimdeki 1x1 ve identity artık bağlantıları çıkarımda tek bir 3x3 evrişim çekirdeğine cebirsel olarak nasıl indirger?"
+  },
+  {
+    "id": "2103.01955",
+    "title": "The Surprising Effectiveness of PPO in Cooperative Multi-Agent Games (MAPPO)",
+    "authors": "Yu et al.",
+    "domain": "Sürü İHA & İt Dalaşı (MARL)",
+    "color": "#38bdf8",
+    "desc": "Çoklu Savaşan İHA sürülerinde koordineli hava muharebesi, hava savunma delme ve 2v2/4v4 angajmanlar için çok ajanlı PPO mimarisi.",
+    "prompt": "MAPPO mimarisinin çoklu İHA koordinasyonunda merkezi eğitim - dağıtık icra (CTDE) prensibini ve PPO'ya göre avantajlarını açıkla."
+  },
+  {
+    "id": "2304.08069",
+    "title": "RT-DETR: DETRs Beat YOLOs on Real-time Object Detection",
+    "authors": "Lv et al. (Baidu)",
+    "domain": "İHA Gerçek Zamanlı Görsel Tespit",
+    "color": "#f59e0b",
+    "desc": "Savaşan İHA görev bilgisayarlarında NMS gecikmesi olmadan gerçek zamanlı hava ve yer hedefi tespiti yapan uç transformatör mimarisi.",
+    "prompt": "RT-DETR mimarisinin NMS gerektirmeyen tasarımı ve İHA üzerindeki gerçek zamanlı nesne tespiti hız avantajını açıkla."
+  },
+  {
+    "id": "1812.11703",
+    "title": "SiamRPN++: Evolution of Siamese Visual Tracking with Very Deep Networks",
+    "authors": "Li et al.",
+    "domain": "İHA Hedef Takip & Kilitlenme (VOT)",
+    "color": "#10b981",
+    "desc": "İHA kamerasından kilitlenilen hava araçlarının derin siyam ağları ve uzamsal farkındalık ile kare kare gerçek zamanlı takibi.",
+    "prompt": "SiamRPN++ mimarisinin derin konvolüsyonel omurga (ResNet) ve derin çapraz korelasyon ile görsel hedef takibini nasıl yaptığını açıkla."
+  },
+  {
+    "id": "1803.11485",
+    "title": "QMIX: Monotonic Value Function Factorisation for Deep Multi-Agent RL",
+    "authors": "Rashid et al. (Oxford)",
+    "domain": "Sürü İHA Görev & Hedef Dağıtımı",
+    "color": "#a855f7",
+    "desc": "Sürü İHA'ların ortak hava görevinde monopolistik değer fonksiyonu ayrıştırması ile optimal hedef angajmanı paylaşımı.",
+    "prompt": "QMIX algoritmasındaki monotonic değer çarpanlama (monotonicity constraint) şartını ve CTDE yapısını açıkla."
+  },
+  {
+    "id": "1711.10561",
+    "title": "Physics-Informed Neural Networks (PINNs): Nonlinear PDEs",
+    "authors": "Raissi et al.",
+    "domain": "Uçuş Dinamiği & Aerodinamik Modelleme",
+    "color": "#ec4899",
+    "desc": "Uçak ve İHA'ların Navier-Stokes aerodinamik akış ve 6-DOF uçuş dinamiği denklemlerini yapay sinir ağı kayıp fonksiyonuna gömen mimari.",
+    "prompt": "PINNs mimarisinin kısmi diferansiyel denklemleri (PDE) otomatik türev (autodiff) ile sinir ağına nasıl entegre ettiğini açıkla."
   }
 ]

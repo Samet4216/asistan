@@ -63,15 +63,18 @@ class ArxivFetcher:
         if not has_latex:
             print(f"[*] Downloading PDF for {clean_id}...")
             pdf_url = f"https://arxiv.org/pdf/{clean_id}.pdf"
-            try:
-                resp = requests.get(pdf_url, headers=self.headers, timeout=30)
-                if resp.status_code == 200:
-                    pdf_path.write_bytes(resp.content)
-                    print(f"[+] PDF saved: {pdf_path.name}")
-                else:
-                    print(f"[!] Failed to download PDF (HTTP {resp.status_code})")
-            except Exception as e:
-                print(f"[!] PDF download error: {e}")
+            for attempt in range(1, 4):
+                try:
+                    resp = requests.get(pdf_url, headers=self.headers, timeout=30)
+                    if resp.status_code == 200:
+                        pdf_path.write_bytes(resp.content)
+                        print(f"[+] PDF saved: {pdf_path.name}")
+                        break
+                    else:
+                        print(f"[!] Failed to download PDF (HTTP {resp.status_code})")
+                except Exception as e:
+                    print(f"[!] PDF download attempt {attempt} failed: {e}")
+                    time.sleep(2)
 
         tex_files = list(paper_folder.glob("*.tex"))
         return {
@@ -87,47 +90,50 @@ class ArxivFetcher:
         src_url = f"https://arxiv.org/e-print/{arxiv_id}"
         tar_path = target_dir / "source.tar.gz"
 
-        try:
-            print(f"[*] Attempting LaTeX source download for {arxiv_id}...")
-            resp = requests.get(src_url, headers=self.headers, timeout=30)
-            if resp.status_code != 200:
-                print(f"[-] No source available (HTTP {resp.status_code}). Falling back to PDF.")
+        for attempt in range(1, 4):
+            try:
+                print(f"[*] Attempting LaTeX source download for {arxiv_id} (Attempt {attempt}/3)...")
+                resp = requests.get(src_url, headers=self.headers, timeout=30)
+                if resp.status_code != 200:
+                    print(f"[-] No source available (HTTP {resp.status_code}). Falling back to PDF.")
+                    return False
+
+                tar_path.write_bytes(resp.content)
+
+                # Try extracting as tarfile
+                extracted = False
+                try:
+                    with tarfile.open(tar_path, "r:*") as tar:
+                        tar.extractall(path=target_dir)
+                        extracted = True
+                except tarfile.ReadError:
+                    # Might be single gzipped file (.tex.gz)
+                    try:
+                        with gzip.open(tar_path, "rb") as gz:
+                            decompressed = gz.read()
+                            single_tex = target_dir / f"{arxiv_id}.tex"
+                            single_tex.write_bytes(decompressed)
+                            extracted = True
+                    except Exception:
+                        pass
+
+                # Cleanup archive file
+                if tar_path.exists():
+                    tar_path.unlink()
+
+                tex_files = list(target_dir.glob("*.tex"))
+                if tex_files:
+                    print(f"[+] LaTeX source extracted: {len(tex_files)} .tex files found.")
+                    return True
                 return False
 
-            tar_path.write_bytes(resp.content)
+            except Exception as e:
+                print(f"[!] Source download attempt {attempt} error for {arxiv_id}: {e}")
+                if tar_path.exists():
+                    tar_path.unlink()
+                time.sleep(2)
 
-            # Try extracting as tarfile
-            extracted = False
-            try:
-                with tarfile.open(tar_path, "r:*") as tar:
-                    tar.extractall(path=target_dir)
-                    extracted = True
-            except tarfile.ReadError:
-                # Might be single gzipped file (.tex.gz)
-                try:
-                    with gzip.open(tar_path, "rb") as gz:
-                        decompressed = gz.read()
-                        single_tex = target_dir / f"{arxiv_id}.tex"
-                        single_tex.write_bytes(decompressed)
-                        extracted = True
-                except Exception:
-                    pass
-
-            # Cleanup archive file
-            if tar_path.exists():
-                tar_path.unlink()
-
-            tex_files = list(target_dir.glob("*.tex"))
-            if tex_files:
-                print(f"[+] LaTeX source extracted: {len(tex_files)} .tex files found.")
-                return True
-            return False
-
-        except Exception as e:
-            print(f"[!] Source download error for {arxiv_id}: {e}")
-            if tar_path.exists():
-                tar_path.unlink()
-            return False
+        return False
 
 
 if __name__ == "__main__":

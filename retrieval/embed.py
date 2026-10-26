@@ -27,7 +27,10 @@ class EmbeddingModel:
     def model(self):
         if self._model is None:
             print(f"[*] Loading embedding model '{self.model_name}' on {self.device}...")
-            self._model = SentenceTransformer(self.model_name, device=self.device)
+            try:
+                self._model = SentenceTransformer(self.model_name, device=self.device, local_files_only=True)
+            except Exception:
+                self._model = SentenceTransformer(self.model_name, device=self.device)
         return self._model
 
     def embed_documents(self, texts: List[str], batch_size: int = 16) -> List[List[float]]:

@@ -333,7 +333,8 @@ Bu belge, Samet ile yapılan sohbetler ve verilen geri bildirimler (👍/👎, t
                 if line.startswith("- "):
                     clean_item = line.lstrip("- ").strip()
                     if clean_item and not clean_item.startswith("*"):
-                        axioms.append(clean_item)
+                        if not any(bad in clean_item.lower() for bad in ["error", "httpconnection", "traceback"]):
+                            axioms.append(clean_item)
             return axioms or [
                 "Cevapları doğrudan konuya girerek, gereksiz nezaket cümleleri olmadan öz ve net tut.",
                 "Teknik derinlik, net tensör boyutları ve çalışan kod blokları sun."
@@ -341,13 +342,39 @@ Bu belge, Samet ile yapılan sohbetler ve verilen geri bildirimler (👍/👎, t
         except Exception:
             return ["Öz, net, teknik derinlikli ve kod ağırlıklı anlat."]
 
-    def get_style_prompt_injection(self) -> str:
+    def get_style_prompt_injection(self, mode: str = "academic") -> str:
         """
         Formats active learned axioms into a direct, high-priority system prompt injection.
+        mode can be 'academic' (includes tensor, code, math rules) or 'casual' (excludes rigid technical constraints).
         """
         axioms = self.get_active_axioms()
         if not axioms:
             return ""
+
+        if mode == "casual":
+            # Filter OUT rigid academic constraints so casual conversation stays natural, warm, and human
+            rigid_keywords = [
+                "tensor", "tensör", "mathematical", "formulation", "formül",
+                "fluff and pleasantries", "code references", "kod ağırlıklı",
+                "pytorch", "latex", "typography", "vram footprint", "dimensions"
+            ]
+            casual_axioms = []
+            for a in axioms:
+                lower_a = a.lower()
+                if not any(rk in lower_a for rk in rigid_keywords):
+                    casual_axioms.append(a)
+            
+            if not casual_axioms:
+                return "• Samet ile konuşurken samimi, sıcak, insansı ve cana yakın bir çalışma arkadaşı gibi konuş; hal hatır sor ve asla akademik kalıplara sığınma."
+
+            lines = [
+                "### 🎯 KULLANICIYA ÖZEL İLETİŞİM VE ÜSLUP TERCİHLERİ:",
+                "Kullanıcı ile geçmiş etkileşimlerden öğrenilmiş şu iletişim tercihlerine uy:"
+            ]
+            for a in casual_axioms:
+                lines.append(f"• {a}")
+            lines.append("• Konuşurken bir robot değil, aynı laboratuvarda çalışan samimi bir arkadaş gibi doğal ve insansı ol; hal hatır sor.")
+            return "\n".join(lines)
 
         lines = [
             "### 🎯 KULLANICIYA ÖZEL PEKİŞTİRİLMİŞ TARZ VE TERCİHLER (RL POLICY):",

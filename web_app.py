@@ -311,9 +311,7 @@ with tab_chat:
     # Initialize session messages
     if "messages" not in st.session_state:
         init_content = (
-            "Merhaba! **Sohbet & Kişisel Adaptasyon** modundayız (Qwen 2.5). "
-            "Bana kendinizden, projelerinizden, hedeflerinizden ve tarzınızdan bahsedebilirsiniz. "
-            "Verdiğiniz bilgiler ve 👍/👎 butonlarıyla üslubunuza ve tercihlerinize pekiştirmeli olarak adapte olurum."
+            "Selam Samet! Hoş geldin. Bugün günün nasıl geçiyor, keyifler nasıl? İster projelerinden dertleşelim, ister aklına takılanları konuşalım; buradayım dostum."
             if is_chat_mode else
             "Merhaba! **Araştırma & Literatür** modundayız (Qwen 2.5). "
             "Sorularınızı önce yerel 21 makale arşivimiz ve Obsidian kasamızdan araştırır, "
@@ -474,11 +472,16 @@ with tab_chat:
                 # MOD 1: 💬 SOHBET & KİŞİSEL ADAPTASYON (Qwen 2.5)
                 # ==========================================
                 clean_p_lower = prompt.lower().strip()
+                
+                # Check if this is a general factual lookup (exclude greetings and friendly chat)
+                greeting_words = ["selam", "merhaba", "naber", "nasılsın", "günaydın", "iyi akşamlar", "nasıl gidiyor", "ne yapıyorsun", "halin", "keyifler", "kanka", "dostum"]
+                is_greeting = any(gw in clean_p_lower for gw in greeting_words)
+
                 factual_triggers = [
-                    "kimdir", "nedir", "nerede", "ne zaman", "kaç", "hangi",
-                    "who is", "what is", "where is", "when did", "teknik direktör", "tarihi", "?"
+                    "kimdir", "kaç yılında", "nerede doğdu", "tarihi nedir",
+                    "who is", "when did", "teknik direktörü kim"
                 ]
-                has_factual_intent = any(t in clean_p_lower for t in factual_triggers)
+                has_factual_intent = not is_greeting and any(t in clean_p_lower for t in factual_triggers)
 
                 web_fact_context = ""
                 if has_factual_intent and is_online():
@@ -487,13 +490,13 @@ with tab_chat:
                     if wiki_briefs:
                         web_fact_context = f"\n\n[GÜNCEL REFERANS]:\n{wiki_briefs[0]['title']}: {wiki_briefs[0]['summary']}"
 
-                with st.spinner("💭 Qwen 2.5 düşünüyor ve tarzınıza göre yanıt hazırlıyor..."):
+                with st.spinner("💭 Yanıt hazırlanıyor..."):
                     augmented_user_prompt = prompt + web_fact_context if web_fact_context else prompt
                     casual_msgs = build_casual_response_prompt(augmented_user_prompt, history=st.session_state.messages[:-1])
                     stream = llm.stream_generate(
                         casual_msgs,
-                        max_tokens=3000,
-                        temperature=0.4,
+                        max_tokens=1500,
+                        temperature=0.75,
                         model=config.MODEL_CHAT
                     )
                     full_response = st.write_stream(stream)

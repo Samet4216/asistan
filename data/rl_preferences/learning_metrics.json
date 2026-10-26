@@ -1,8 +1,8 @@
 {
-  "total_feedbacks": 4,
+  "total_feedbacks": 5,
   "positive_count": 4,
-  "negative_count": 0,
-  "cumulative_reward": 4.0,
+  "negative_count": 1,
+  "cumulative_reward": 3.0,
   "learned_axioms_count": 8,
-  "last_updated": "2026-10-26T11:32:08.652038"
+  "last_updated": "2026-10-26T12:24:51.514142"
 }

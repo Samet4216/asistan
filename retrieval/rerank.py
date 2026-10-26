@@ -27,7 +27,10 @@ class Reranker:
     def model(self):
         if self._model is None:
             print(f"[*] Loading cross-encoder reranker '{self.model_name}' on {self.device}...")
-            self._model = CrossEncoder(self.model_name, device=self.device)
+            try:
+                self._model = CrossEncoder(self.model_name, device=self.device, local_files_only=True)
+            except Exception:
+                self._model = CrossEncoder(self.model_name, device=self.device)
         return self._model
 
     def rerank(
