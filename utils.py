@@ -41,6 +41,14 @@ def get_gpu_status() -> Dict[str, Any]:
     return {"available": False}
 
 
+def strip_unwanted_cjk(text: str) -> str:
+    """Strips rogue Chinese/CJK characters that multilingual models might accidentally bleed."""
+    if not text:
+        return ""
+    cleaned = re.sub(r'[\u4e00-\u9fff\u3400-\u4dbf]+', '', text)
+    return re.sub(r'[ \t]{2,}', ' ', cleaned)
+
+
 def normalize_latex(text: str) -> str:
     """
     Cleans LaTeX delimiters so KaTeX in Streamlit renders formulas crisply:
@@ -48,9 +56,12 @@ def normalize_latex(text: str) -> str:
     - Converts \\[ ... \\] -> $$ ... $$
     - Converts \\( ... \\) -> $ ... $
     - Converts standalone bracketed lines [ \\text{...} ] -> $$ ... $$
+    - Strips rogue CJK/Chinese character bleeds.
     """
     if not text:
         return ""
+
+    text = strip_unwanted_cjk(text)
 
     parts = re.split(r'(```[\s\S]*?```)', text)
     processed = []
@@ -87,6 +98,7 @@ def is_academic_or_technical_inquiry(text: str) -> bool:
 
     # Technical AI / Robotics / Math entities & keywords
     technical_entities = [
+        # Deep Learning & Neural Architectures
         "diffusion", "ddpm", "ddim", "score-based", "flow matching", "langevin",
         "robotik", "robotics", "action trajectory", "visuomotor", "manipulation", "end-effector",
         "reinforcement learning", "pekiştirmeli öğrenme", "pekiştirmeli", "ppo", "dpo", "kto", "orpo", "grpo",
@@ -101,7 +113,15 @@ def is_academic_or_technical_inquiry(text: str) -> bool:
         "sram", "hbm", "cuda", "tiling", "flops", "bandwidth", "vram", "quantization", "qlora", "lora", "peft", "4-bit", "fp16", "bf16",
         "makale", "paper", "arxiv", "literatür", "derin öğrenme", "deep learning", "yapay zeka", "ai mimarisi", "mimarisi", "mimari",
         "multimodal", "token", "embedding", "rag", "retrieval", "vektör veritabanı", "chromadb", "llm",
-        "overfitting", "regularization", "dropout", "batchnorm", "layernorm", "rmsnorm", "optimizer", "adamw", "sgd"
+        "overfitting", "regularization", "dropout", "batchnorm", "layernorm", "rmsnorm", "optimizer", "adamw", "sgd",
+        # Aerospace, Aviation, Flight Mechanics & UAV
+        "havacılık", "aerodinamik", "aerodynamics", "uçuş dinamiği", "flight dynamics", "hücum açısı", "angle of attack",
+        "lift", "drag", "taşıma kuvveti", "sürükleme kuvveti", "itki", "thrust", "kanat", "airfoil", "kanat profili",
+        "iha", "siha", "uav", "drone", "mach", "ses hızı", "aviyonik", "avionics", "pitot", "altimetre", "gyro", "jiroskop",
+        "akışkanlar mekaniği", "navier-stokes", "cfd", "türbülans", "bernoulli", "roket", "itki sistemi", "itme kuvveti",
+        # Physics, Math & Fundamental Sciences
+        "kuantum", "quantum", "fizik", "physics", "termodinamik", "thermodynamics", "matematik", "mathematics",
+        "istatistik", "olasılık", "diferansiyel", "biyoloji", "kimya", "astronomi", "elektromanyetik"
     ]
 
     # Match entities with word boundary or clean substring for multi-word phrases
@@ -121,7 +141,8 @@ def is_academic_or_technical_inquiry(text: str) -> bool:
         "nasıl üretir", "nasıl çalışır", "neden üstündür", "çalışma prensibi", "çalışma mantığı",
         "karşılaştır", "farkı nedir", "farkları nelerdir", "avantajı", "dezavantajı",
         "matematiksel formülü", "formülünü açıkla", "denklemi", "tensör boyutları", "boyut analizi",
-        "ispatı", "türetimi", "algoritması"
+        "ispatı", "türetimi", "algoritması", "literatürde", "makalede", "akademik", "bilimsel",
+        "teorik olarak", "deney", "ablation", "benchmark"
     ]
     has_analytical_trigger = any(trig in p for trig in analytical_triggers)
 

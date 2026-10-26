@@ -2,19 +2,20 @@
 Local Deep Learning Lab Assistant — Minimalist & Elegant Research Studio (Streamlit).
 Designed for distraction-free research, neural network engineering, and offline second-brain thinking:
 - Ultra-clean dark UI with Inter & Fira Code typography
+- Centered 840px reading container (Claude / ChatGPT layout)
 - Crisp KaTeX mathematical formula rendering ($...$ and $$...$$)
 - Real-time streaming generation with local Qwen 2.5 (7B) via Ollama
 - Autonomous Hybrid RAG (ChromaDB + BM25) with 57 Landmark Papers
-- Offline-first privacy and low-overhead GPU VRAM monitoring
 """
 
 import sys
 import re
 import json
+import importlib
 from pathlib import Path
 from datetime import datetime
 
-PROJECT_ROOT = Path(__file__).parent.resolve()
+PROJECT_ROOT = Path(__file__).parent.parent.resolve() if Path(__file__).parent.name == "scripts" else Path(__file__).parent.resolve()
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -56,19 +57,17 @@ except (ImportError, AttributeError):
                 if 3 < len(clean) < 80:
                     return clean
         return ""
+
 from retrieval.search import searcher
 from retrieval.web_search import web_searcher, is_online
 from retrieval.graph_rag import graph_rag_engine
+import answer.prompts as prompts_mod
+importlib.reload(prompts_mod)
 from answer.prompts import (
     build_answer_prompt,
     build_casual_response_prompt,
     build_general_expert_prompt
 )
-import memory.user_profile as up_mod
-import memory.teacher_correction as tc_mod
-importlib.reload(up_mod)
-importlib.reload(tc_mod)
-
 from memory.approval import approval_manager
 from memory.user_profile import profile_manager
 from memory.auto_memory import auto_memory
@@ -99,20 +98,40 @@ js_file = PROJECT_ROOT / "assets" / "quote_popover.js"
 if js_file.exists():
     components.html(f"<script>{js_file.read_text(encoding='utf-8')}</script>", height=0)
 
+# Load Corpus Catalog
+catalog_path = PROJECT_ROOT / "data" / "corpus_catalog.json"
+papers_info = json.loads(catalog_path.read_text(encoding="utf-8")) if catalog_path.exists() else []
+
 
 # ==============================================================================
-# SIDEBAR — Minimalist & Purposeful
+# SIDEBAR — Minimalist & Functional
 # ==============================================================================
 with st.sidebar:
     # 1. New Chat (Primary Action)
     if st.button("➕ Yeni Sohbet", use_container_width=True, type="primary"):
         st.session_state.messages = []
         st.session_state.pending_prompt = None
+        st.session_state.current_view = "💬 Sohbet"
+        st.rerun()
+
+    # 2. View Switcher (Sohbet vs Kütüphane)
+    if "current_view" not in st.session_state:
+        st.session_state.current_view = "💬 Sohbet"
+
+    selected_view = st.radio(
+        "Görünüm Seç:",
+        ["💬 Sohbet", f"📚 Kütüphane ({len(papers_info)})"],
+        index=0 if st.session_state.current_view == "💬 Sohbet" else 1,
+        label_visibility="collapsed",
+        horizontal=True
+    )
+    if selected_view != st.session_state.current_view:
+        st.session_state.current_view = selected_view
         st.rerun()
 
     st.write("")
 
-    # 2. Compact Hardware Status Card
+    # 3. Compact Hardware Status Card
     gpu = get_gpu_status()
     if gpu.get("available"):
         vram_used = gpu['used']
@@ -120,15 +139,15 @@ with st.sidebar:
         vram_pct = int((vram_used / vram_total) * 100)
         
         st.markdown(f"""
-        <div style="background:rgba(15,23,42,0.5); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:12px; margin-bottom:8px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                <span style="font-size:0.82rem; font-weight:600; color:#f8fafc;">⚡ {gpu['name']}</span>
+        <div style="background:rgba(15,23,42,0.5); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:10px 12px; margin-bottom:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span style="font-size:0.8rem; font-weight:600; color:#f8fafc;">⚡ {gpu['name']}</span>
                 <span style="font-size:0.75rem; color:#94a3b8;">{gpu['temp']} °C</span>
             </div>
-            <div style="width:100%; height:6px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden; margin:6px 0;">
+            <div style="width:100%; height:5px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden; margin:5px 0;">
                 <div style="width:{vram_pct}%; height:100%; background:#38bdf8; border-radius:4px;"></div>
             </div>
-            <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#64748b;">
+            <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:#64748b;">
                 <span>VRAM: {vram_used} / {vram_total} MB</span>
                 <span>%{vram_pct}</span>
             </div>
@@ -145,7 +164,7 @@ with st.sidebar:
 
     st.divider()
 
-    # 3. Add Knowledge (Clean Collapsible Expander)
+    # 4. Add Knowledge (Clean Collapsible Expander)
     with st.expander("📥 Hafızaya Kaynak Ekle", expanded=False):
         tab_up_file, tab_up_arxiv = st.tabs(["Dosya Yükle", "arXiv"])
         
@@ -180,21 +199,17 @@ with st.sidebar:
                         else:
                             st.error(f"Hata: {res.get('error')}")
 
-    # 4. User Profile & Preferences (Clean Collapsible Expander)
-    with st.expander("👤 Araştırmacı Profili & Pekiştirilmiş Hafıza", expanded=False):
+    # 5. User Profile & Reinforcement Memory (Clean Collapsible Expander)
+    with st.expander("👤 Araştırmacı Profili & Hafıza", expanded=False):
         current_about = profile_manager.get_about_me()
         metrics = rl_engine.get_metrics()
-        teacher_count = getattr(teacher_engine, "count", lambda: len(getattr(teacher_engine, "get_all_corrections", lambda: [])()))()
-        st.caption(f"🎯 **Pekiştirilmiş Kural:** {metrics.get('learned_axioms_count', 0)} | 🎓 **Öğretilen Doğru Bilgi:** {teacher_count} | ⭐ **Altın Örnek:** {metrics.get('gold_exemplars_count', 0)}")
-        st.markdown(f"<div style='font-size:0.82rem; color:#cbd5e1; max-height:120px; overflow-y:auto; margin-bottom:6px;'>{current_about}</div>", unsafe_allow_html=True)
-        persona_curr = getattr(profile_manager, "get_persona", lambda: "Kullanıcı samimi ve yaşayan bir Türkçe konuşur.")()
-        st.caption("🗣️ **Sohbet & Konuşma Aynalama:**")
-        st.markdown(f"<div style='font-size:0.78rem; color:#94a3b8; max-height:80px; overflow-y:auto; border-left:2px solid #38bdf8; padding-left:8px; margin-bottom:8px;'>{persona_curr}</div>", unsafe_allow_html=True)
+        st.caption(f"🎯 **Pekiştirilmiş Kural:** {metrics.get('learned_axioms_count', 0)} | ⭐ **Altın Örnek:** {metrics.get('gold_exemplars_count', 0)}")
+        st.markdown(f"<div style='font-size:0.8rem; color:#cbd5e1; max-height:130px; overflow-y:auto; margin-bottom:8px;'>{current_about}</div>", unsafe_allow_html=True)
         col_prof1, col_prof2 = st.columns(2)
         with col_prof1:
-            if st.button("🔄 Hafızayı Senkronize Et", key="btn_sync_self_train", use_container_width=True, help="Öğrenilen kuralları, DPO eğitim çiftlerini ve Modelfile'ı günceller"):
+            if st.button("🔄 Senkronize Et", key="btn_sync_self_train", use_container_width=True, help="Öğrenilen kuralları, DPO eğitim çiftlerini ve Modelfile'ı günceller"):
                 s_res = collector.sync_self_training()
-                st.toast(f"✅ Model hafızası senkronize edildi! ({s_res.get('sharegpt_dialogs', 0)} diyalog)", icon="🧠")
+                st.toast(f"✅ Hafıza senkronize edildi! ({s_res.get('sharegpt_dialogs', 0)} diyalog)", icon="🧠")
                 st.rerun()
         with col_prof2:
             if st.button("Tarzı Sıfırla", key="btn_reset_style", use_container_width=True):
@@ -202,7 +217,7 @@ with st.sidebar:
                 st.toast("Tarz politikası sıfırlandı.", icon="🔄")
                 st.rerun()
 
-    # 5. Obsidian Drafts (Only shown if pending drafts exist)
+    # 6. Obsidian Drafts (Only shown if pending drafts exist)
     drafts = approval_manager.list_drafts()
     if drafts:
         with st.expander(f"📝 Bekleyen Taslaklar ({len(drafts)})", expanded=False):
@@ -215,62 +230,84 @@ with st.sidebar:
 
 
 # ==============================================================================
-# MAIN WORKSPACE — Sleek Header & 2 Simple Views
+# VIEW 1: MAKALE KÜTÜPHANESİ
 # ==============================================================================
-
-# Load Corpus Catalog
-catalog_path = PROJECT_ROOT / "data" / "corpus_catalog.json"
-papers_info = json.loads(catalog_path.read_text(encoding="utf-8")) if catalog_path.exists() else []
-
-# Top Minimalist Header Bar
-st.markdown(f"""
-<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0 16px 0; border-bottom:1px solid rgba(255,255,255,0.06); margin-bottom:18px;">
-    <div style="display:flex; align-items:center; gap:10px;">
-        <span style="font-size:1.5rem;">🔬</span>
+if st.session_state.current_view.startswith("📚"):
+    st.markdown(f"""
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0 16px 0; border-bottom:1px solid rgba(255,255,255,0.06); margin-bottom:18px;">
         <div>
-            <div style="font-weight:600; font-size:1.15rem; color:#f8fafc; letter-spacing:-0.02em;">Yapay Zeka Laboratuvar Asistanı</div>
-            <div style="font-size:0.78rem; color:#64748b;">Qwen 2.5 (7B) • RTX 4050 • Yerel Hibrit Hafıza ({len(papers_info)} Makale)</div>
+            <div style="font-weight:600; font-size:1.2rem; color:#f8fafc;">📚 İndekslenmiş Makale Kütüphanesi ({len(papers_info)} Makale)</div>
+            <div style="font-size:0.8rem; color:#94a3b8;">Yerel ChromaDB vektör tabanına ve hibrit aramaya (BM25 + BGE Embeddings) tam metin ve formülleriyle eklenmiş öncü makaleler.</div>
         </div>
     </div>
-    <div style="display:flex; align-items:center; gap:8px;">
-        <span style="display:inline-flex; align-items:center; gap:6px; font-size:0.75rem; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.2); padding:4px 10px; border-radius:999px;">
-            <span style="width:6px; height:6px; background:#10b981; border-radius:50%;"></span> Çevrimdışı & Yerel
-        </span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-# 2 Simple Tabs: Asistan Chat & Makale Kütüphanesi
-TAB_CHAT = "💬 Sohbet & Asistan"
-TAB_LIB = f"📚 Makale Kütüphanesi ({len(papers_info)})"
+    search_filter = st.text_input("🔍 Kütüphanede Filtrele:", placeholder="Örn: LoRA, Transformer, YOLO, Attention...", label_visibility="collapsed")
 
-if "switch_to_tab" in st.session_state and st.session_state.switch_to_tab:
-    st.session_state.active_main_tab = st.session_state.switch_to_tab
-    st.session_state.switch_to_tab = None
+    filtered_papers = papers_info
+    if search_filter.strip():
+        q_term = search_filter.strip().lower()
+        filtered_papers = [
+            p for p in papers_info
+            if q_term in p.get("title", "").lower() or q_term in p.get("domain", "").lower() or q_term in p.get("desc", "").lower() or q_term in p.get("id", "").lower()
+        ]
 
-if "active_main_tab" not in st.session_state:
-    st.session_state.active_main_tab = TAB_CHAT
+    st.caption(f"Gösterilen: {len(filtered_papers)} makale")
 
-tab_chat, tab_library = st.tabs([TAB_CHAT, TAB_LIB], key="active_main_tab", on_change="rerun")
+    cols_per_row = 2
+    rows = [filtered_papers[i:i + cols_per_row] for i in range(0, len(filtered_papers), cols_per_row)]
+    for row in rows:
+        grid_cols = st.columns(cols_per_row)
+        for col_idx, p in enumerate(row):
+            with grid_cols[col_idx]:
+                domain_color = p.get('color', '#38bdf8')
+                st.markdown(f"""
+                <div style="background:rgba(15,23,42,0.6); border:1px solid rgba(255,255,255,0.06); border-left:3px solid {domain_color}; border-radius:10px; padding:14px; margin-bottom:10px; min-height:160px; display:flex; flex-direction:column; justify-content:space-between;">
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                            <span style="font-size:10px; font-weight:600; text-transform:uppercase; color:{domain_color}; letter-spacing:0.5px;">{p.get('domain', 'AI')}</span>
+                            <span style="font-size:11px; color:#64748b; font-family:'Fira Code',monospace;">arXiv:{p.get('id', '')}</span>
+                        </div>
+                        <div style="font-size:0.92rem; font-weight:600; color:#f8fafc; margin-bottom:4px; line-height:1.3;">
+                            {p.get('title', '')}
+                        </div>
+                        <div style="font-size:0.78rem; color:#94a3b8; line-height:1.4;">
+                            {p.get('desc', '')}
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                if st.button("⚡ Bu Makaleyi Sor", key=f"btn_ask_lib_{p.get('id')}", use_container_width=True):
+                    st.session_state.pending_prompt = p.get("prompt", f"{p.get('title')} makalesinin mimari yapısını, temel formüllerini ve avantajlarını açıkla.")
+                    st.session_state.current_view = "💬 Sohbet"
+                    st.rerun()
 
-# ------------------------------------------------------------------------------
-# TAB 1: SOHBET & ASİSTAN
-# ------------------------------------------------------------------------------
-with tab_chat:
-    # Initialize messages
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
 
-    # Chat export & clear actions (minimal row at top of chat)
-    if st.session_state.messages:
-        col_hdr1, col_hdr2 = st.columns([6, 1])
-        with col_hdr2:
+# ==============================================================================
+# VIEW 2: SOHBET & ASİSTAN (Pure Centered Chat)
+# ==============================================================================
+else:
+    # Top Minimalist Header
+    col_hdr_l, col_hdr_r = st.columns([6, 1.2])
+    with col_hdr_l:
+        st.markdown(f"""
+        <div style="display:flex; align-items:center; gap:8px; padding:4px 0 12px 0;">
+            <span style="font-size:1.25rem;">🔬</span>
+            <span style="font-weight:600; font-size:1.05rem; color:#f8fafc;">Yapay Zeka Laboratuvarı</span>
+            <span style="display:inline-flex; align-items:center; gap:5px; font-size:0.72rem; color:#10b981; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.2); padding:2px 8px; border-radius:999px; margin-left:6px;">
+                <span style="width:5px; height:5px; background:#10b981; border-radius:50%;"></span> Çevrimdışı & Yerel
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_hdr_r:
+        if "messages" in st.session_state and st.session_state.messages:
             export_md = "# Deep Learning Lab Assistant — Sohbet Dökümü\n\n"
             for m in st.session_state.messages:
                 role_label = "👤 **Kullanıcı:**" if m["role"] == "user" else "🤖 **Asistan:**"
                 export_md += f"### {role_label}\n\n{m['content']}\n\n---\n\n"
             st.download_button(
-                "📥 Dökümü İndir",
+                "📥 Döküm",
                 data=export_md,
                 file_name=f"asistan_sohbet_{datetime.now().strftime('%Y%m%d_%H%M')}.md",
                 mime="text/markdown",
@@ -278,32 +315,34 @@ with tab_chat:
                 use_container_width=True
             )
 
-    # Empty State: Clean Welcome & Minimalist Prompt Chips
+    # Initialize messages
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # Empty State: Minimalist Welcome Greeting
     if not st.session_state.messages:
         st.markdown(f"""
-        <div style="text-align:center; padding:36px 16px 24px 16px;">
-            <h2 style="font-weight:600; font-size:1.45rem; color:#f8fafc; margin-bottom:8px;">Nasıl yardımcı olabilirim?</h2>
-            <p style="font-size:0.9rem; color:#94a3b8; max-width:560px; margin:0 auto 24px auto;">
-                Sinir ağı mimarileri, matematiksel formüller, hiperparametreler veya yerel kütüphanedeki {len(papers_info)} makale hakkında sorular sorabilirsiniz.
+        <div style="text-align:center; padding:48px 16px 28px 16px;">
+            <div style="font-size:2.4rem; margin-bottom:10px;">🔬</div>
+            <h2 style="font-weight:600; font-size:1.4rem; color:#f8fafc; margin-bottom:6px;">Size nasıl yardımcı olabilirim?</h2>
+            <p style="font-size:0.88rem; color:#94a3b8; max-width:520px; margin:0 auto 24px auto;">
+                Sinir ağı mimarileri, optimizasyon problemleri veya yerel kütüphanedeki {len(papers_info)} makale hakkında dilediğinizi sorabilirsiniz.
             </p>
         </div>
         """, unsafe_allow_html=True)
 
         col_q1, col_q2, col_q3 = st.columns(3)
         with col_q1:
-            if st.button("⚡ LoRA ile İnce Ayar Mantığı", use_container_width=True):
-                st.session_state.pending_prompt = "LoRA düşük dereceli adaptasyon matrislerini ($W = W_0 + B \\cdot A$) nasıl kurgular ve VRAM tasarrufunu matematiksel olarak nasıl sağlar?"
-                st.session_state.switch_to_tab = TAB_CHAT
+            if st.button("⚡ LoRA ile İnce Ayar", use_container_width=True):
+                st.session_state.pending_prompt = "LoRA düşük dereceli adaptasyon matrislerini ($W = W_0 + B \cdot A$) nasıl kurgular ve VRAM tasarrufunu matematiksel olarak nasıl sağlar?"
                 st.rerun()
         with col_q2:
-            if st.button("🔍 Grad-CAM ile Karar Haritalama", use_container_width=True):
+            if st.button("🔍 Grad-CAM Haritalama", use_container_width=True):
                 st.session_state.pending_prompt = "Grad-CAM konvolüsyon katmanlarındaki gradyanları kullanarak modelin odaklandığı bölgeleri nasıl haritalandırır?"
-                st.session_state.switch_to_tab = TAB_CHAT
                 st.rerun()
         with col_q3:
             if st.button("📐 Kaiming / He İlklendirme", use_container_width=True):
                 st.session_state.pending_prompt = "Kaiming He ilklendirmesi ReLU aktivasyonunda varyansı ($Var(w) = 2/n$) nasıl korur ve vanishing gradient problemini nasıl çözer?"
-                st.session_state.switch_to_tab = TAB_CHAT
                 st.rerun()
         st.write("")
 
@@ -336,21 +375,13 @@ with tab_chat:
                 with act_col1:
                     if st.button("👍", key=f"btn_up_{idx}", help="Bu tarzı ve yaklaşımı pekiştir"):
                         rl_engine.record_feedback(user_query_for_msg, content, reward=1.0, style_tag="positive")
-                        try:
-                            if hasattr(collector, "sync_self_training"):
-                                collector.sync_self_training()
-                        except Exception:
-                            pass
+                        collector.sync_self_training()
                         st.toast("🎯 Yanıt altın örnek olarak mühürlendi ve model güncellendi! (+1.0)", icon="👍")
                         st.rerun()
                 with act_col2:
                     if st.button("👎", key=f"btn_down_{idx}", help="Bu cevabı beğenmedim / hatalı buldum"):
                         rl_engine.record_feedback(user_query_for_msg, content, reward=-1.0, style_tag="negative")
-                        try:
-                            if hasattr(collector, "sync_self_training"):
-                                collector.sync_self_training()
-                        except Exception:
-                            pass
+                        collector.sync_self_training()
                         st.toast("Geri bildirim kaydedildi (-1.0). İstersen '✏️ Doğrusunu Öğret' ile doğrusunu mühürleyebilirsin.", icon="👎")
                         st.rerun()
                 with act_col3:
@@ -389,22 +420,8 @@ with tab_chat:
                         )
                         st.toast(f"'{safe_title}' Obsidian taslaklarına kaydedildi!", icon="📝")
 
-                # Interactive Section Continuation Checkpoint (Option B - Single Click Advance)
-                is_latest_assistant = (idx == len(st.session_state.messages) - 1) or all(m["role"] != "assistant" for m in st.session_state.messages[idx+1:])
-                next_part_title = extract_next_section(content) if is_latest_assistant else ""
-
-                if next_part_title:
-                    st.markdown("""<div style="margin-top:8px;"></div>""", unsafe_allow_html=True)
-                    btn_col, _ = st.columns([3.2, 2.8])
-                    with btn_col:
-                        btn_text = f"▶️ Sıradaki Bölüme Geç: {next_part_title[:42]}"
-                        if st.button(btn_text, key=f"btn_step_next_{idx}", type="primary", use_container_width=True):
-                            st.session_state.pending_prompt = f"Devam edelim: {next_part_title}"
-                            st.session_state.switch_to_tab = TAB_CHAT
-                            st.rerun()
-
     # Chat Input Handling
-    user_input = st.chat_input("Bir soru sorun, mimari tartışın veya bir konu danışın...")
+    user_input = st.chat_input("Bir soru sorun veya bir konu danışın...")
     prompt_to_process = None
     if user_input:
         prompt_to_process = user_input
@@ -425,13 +442,12 @@ with tab_chat:
             if critique_res and critique_res.get("learned_axiom"):
                 st.toast(f"Tarzınız algılandı: {critique_res['learned_axiom']}", icon="🎯")
 
-        # Auto-memory cues & persona mirroring
-        try:
-            auto_memory.analyze_and_mirror_persona(prompt_to_process)
-            if auto_memory.has_personal_cues(prompt_to_process):
+        # Auto-memory cues
+        if auto_memory.has_personal_cues(prompt_to_process):
+            try:
                 auto_memory.extract_and_update(prompt_to_process)
-        except Exception:
-            pass
+            except Exception:
+                pass
 
         # Append and render user message
         st.session_state.messages.append({"role": "user", "content": prompt_to_process})
@@ -447,7 +463,7 @@ with tab_chat:
             if is_technical:
                 augmented_query = contextualize_query(clean_q, st.session_state.messages[:-1])
                 
-                with st.spinner("💭 Literatür taranıyor ve yanıt hazırlanıyor..."):
+                with st.spinner("💭 Yanıt hazırlanıyor..."):
                     search_res = searcher.search(
                         augmented_query,
                         top_k=config.RETRIEVAL_TOP_K,
@@ -458,48 +474,36 @@ with tab_chat:
                     has_sufficient = search_res.get("has_sufficient_evidence", False)
                     retrieved_sources = search_res.get("results", [])
 
-                    # Fallback to web/arXiv if insufficient
+                    # Fallback to web/arXiv/Wikipedia if insufficient
                     if not has_sufficient and is_online():
                         web_res = web_searcher.get_live_web_context(augmented_query)
                         if web_res.get("has_web"):
                             retrieved_context = (retrieved_context + "\n\n" + web_res["packed_context"]).strip()
                             has_sufficient = True
 
-                    if not has_sufficient:
-                        # DÜRÜST BİLMİYORUM PROTOKOLÜ (ZERO HALLUCINATION & STRICT ABSTENTION)
-                        abstain_response = (
-                            "⚠️ **Doğrulanmış Kanıt Bulunamadı / Bilmiyorum:**\n\n"
-                            "Bu soru hakkında yerel makale arşivimizde ve canlı akademik web taramasında doğrulanmış bir kanıt bulunamadı. "
-                            "Yanlış, uydurma veya yanıltıcı bilgi üretmemek adına spekülasyon yapmıyorum; bu konunun gerçek cevabını **bilmiyorum**.\n\n"
-                            "💡 *Eğer bu bilginin doğrusunu biliyorsanız, aşağıdaki **'✏️ Doğrusunu Öğret'** butonuna tıklayarak doğru cevabı sisteme mühürleyebilir ve modeli eğitebilirsiniz.*"
+                    if has_sufficient:
+                        # GraphRAG Context
+                        graph_seeds = graph_rag_engine.extract_seed_nodes(augmented_query, search_res.get("results", []))
+                        subgraph = graph_rag_engine.traverse_subgraph(graph_seeds)
+                        graph_context = graph_rag_engine.format_graph_context(subgraph)
+
+                        budget_parts = {"paper_chunks": retrieved_context}
+                        packed_report = budget.pack_context(budget_parts)
+                        safe_packed = packed_report["packed"]
+
+                        messages = build_answer_prompt(
+                            query=clean_q,
+                            packaged_context=safe_packed.get("paper_chunks", ""),
+                            graph_context=graph_context,
+                            telemetry_context="",
+                            git_diff="",
+                            error_context="",
+                            thought_plan="",
+                            deep_dive=True,
+                            history=st.session_state.messages[:-1]
                         )
-                        st.markdown(abstain_response)
-                        st.session_state.messages.append({
-                            "role": "assistant",
-                            "content": abstain_response
-                        })
-                        st.rerun()
-
-                    # GraphRAG Context
-                    graph_seeds = graph_rag_engine.extract_seed_nodes(augmented_query, search_res.get("results", []))
-                    subgraph = graph_rag_engine.traverse_subgraph(graph_seeds)
-                    graph_context = graph_rag_engine.format_graph_context(subgraph)
-
-                    budget_parts = {"paper_chunks": retrieved_context}
-                    packed_report = budget.pack_context(budget_parts)
-                    safe_packed = packed_report["packed"]
-
-                    messages = build_answer_prompt(
-                        query=clean_q,
-                        packaged_context=safe_packed.get("paper_chunks", ""),
-                        graph_context=graph_context,
-                        telemetry_context="",
-                        git_diff="",
-                        error_context="",
-                        thought_plan="",
-                        deep_dive=True,
-                        history=st.session_state.messages[:-1]
-                    )
+                    else:
+                        messages = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
 
                     stream = llm.stream_generate(messages, max_tokens=3500, temperature=0.1, model=config.MODEL_ACADEMIC)
                     full_response = st.write_stream(stream)
@@ -542,54 +546,4 @@ with tab_chat:
                         "role": "assistant",
                         "content": clean_full
                     })
-                    st.rerun()
-
-
-# ------------------------------------------------------------------------------
-# TAB 2: MAKALE KÜTÜPHANESİ
-# ------------------------------------------------------------------------------
-with tab_library:
-    st.markdown(f"### 📚 İndekslenmiş Makale Kütüphanesi ({len(papers_info)} Makale)")
-    st.caption("Yerel ChromaDB vektör tabanına ve hibrit aramaya (BM25 + BGE Embeddings) tam metin ve formülleriyle eklenmiş öncü makaleler.")
-
-    search_filter = st.text_input("🔍 Kütüphanede Ara:", placeholder="Örn: LoRA, Transformer, YOLO, Reinforcement...")
-
-    filtered_papers = papers_info
-    if search_filter.strip():
-        q_term = search_filter.strip().lower()
-        filtered_papers = [
-            p for p in papers_info
-            if q_term in p.get("title", "").lower() or q_term in p.get("domain", "").lower() or q_term in p.get("desc", "").lower() or q_term in p.get("id", "").lower()
-        ]
-
-    st.caption(f"Gösterilen: {len(filtered_papers)} makale")
-
-    cols_per_row = 2
-    rows = [filtered_papers[i:i + cols_per_row] for i in range(0, len(filtered_papers), cols_per_row)]
-    for row in rows:
-        grid_cols = st.columns(cols_per_row)
-        for col_idx, p in enumerate(row):
-            with grid_cols[col_idx]:
-                domain_color = p.get('color', '#38bdf8')
-                st.markdown(f"""
-                <div style="background:rgba(15,23,42,0.6); border:1px solid rgba(255,255,255,0.06); border-left:3px solid {domain_color}; border-radius:10px; padding:14px; margin-bottom:10px; height:180px; display:flex; flex-direction:column; justify-content:space-between;">
-                    <div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                            <span style="font-size:10px; font-weight:600; text-transform:uppercase; color:{domain_color}; letter-spacing:0.5px;">{p.get('domain', 'AI')}</span>
-                            <span style="font-size:11px; color:#64748b; font-family:'Fira Code',monospace;">arXiv:{p.get('id', '')}</span>
-                        </div>
-                        <div style="font-size:0.95rem; font-weight:600; color:#f8fafc; margin-bottom:4px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">
-                            {p.get('title', '')}
-                        </div>
-                        <div style="font-size:0.8rem; color:#94a3b8; line-height:1.4; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">
-                            {p.get('desc', '')}
-                        </div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                if st.button("⚡ Bu Makaleyi Sor", key=f"btn_ask_lib_{p.get('id')}", use_container_width=True):
-                    paper_prompt = p.get("prompt", f"{p.get('title')} makalesinin mimari yapısını, temel formüllerini ve avantajlarını açıkla.")
-                    st.session_state.pending_prompt = paper_prompt
-                    st.session_state.switch_to_tab = TAB_CHAT
-                    st.toast(f"'{p.get('title')[:32]}...' analizi başlatılıyor, sohbete yönlendiriliyorsunuz.", icon="🚀")
                     st.rerun()
