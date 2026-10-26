@@ -64,14 +64,14 @@ st.set_page_config(
 # Load modular CSS styling
 css_file = PROJECT_ROOT / "assets" / "style.css"
 if css_file.exists():
-    st.markdown(f"""
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-    {css_file.read_text(encoding='utf-8')}
-    </style>
-    """, unsafe_allow_html=True)
+    raw_css = css_file.read_text(encoding="utf-8").strip()
+    st.markdown(
+        '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
+        '<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">\n'
+        f'<style>\n{raw_css}\n</style>',
+        unsafe_allow_html=True
+    )
 
 
 # Load modular quotation popover script
