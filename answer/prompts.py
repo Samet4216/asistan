@@ -92,10 +92,12 @@ def build_answer_prompt(
     thought_plan: str = "",
     deep_dive: bool = True,
     json_mode: bool = False,
-    history: list = None
+    history: list = None,
+    immediate_critique: str = ""
 ) -> list:
     """Stage 2: Constructs prompt messages for Ollama chat API to produce exhaustive, masterclass answers."""
     style_text = get_profile_style()
+    critique_block = f"\n\n🚨 KULLANICI ELEŞTİRİSİ / TARZ DÜZELTMESİ (EN YÜKSEK ÖNCELİK):\nKullanıcı bir önceki yanıtı eleştirdi: '{immediate_critique}'. ŞİMDİKİ YANITINDA BU KURALI ÖNCELİKLE UYGULA!\n" if immediate_critique else ""
 
     evidence_blocks = []
     if thought_plan:
@@ -138,19 +140,6 @@ def build_answer_prompt(
                 "Otherwise, follow your Chain-of-Thought blueprint to produce an exhaustive, textbook-grade masterclass tutorial.\n"
                 "- Respond in the same language as the user's question (Turkish if asked in Turkish, English if asked in English).\n"
                 "- Cite [S1], [S2], etc. inline throughout your explanation and include at least 1-2 exact verbatim English quotes in double quotes (\"...\") from the retrieved sources.\n"
-                "Organize your answer with the following comprehensive sections:\n\n"
-                "### 1. Theoretical Motivation & The Problem Solved\n"
-                "Explain why this architecture was created, what historical bottleneck it resolves [S1], and include a verbatim quote from the paper.\n\n"
-                "### 2. Rigorous Mathematical Derivations\n"
-                "Write all display equations in $$ ... $$ on separate lines. Define every variable, trace derivations, and cite the source chunk [S#].\n\n"
-                "### 3. Tensor Transformation Walkthrough\n"
-                "Step-by-step shape transformations (e.g. Input: [B, C, H, W] -> Projection: [B, N, D] -> ...). Explain why dimensions match.\n\n"
-                "### 4. Complete PyTorch Implementation\n"
-                "Provide a clean, self-contained, modular nn.Module snippet with type annotations, docstrings, and forward pass explanation.\n\n"
-                "### 5. Empirical Performance & Ablation Findings\n"
-                "Reference original paper experiments, benchmark results, and what happens when key components are ablated [S#].\n\n"
-                "### 6. Hardware Optimization & RTX 4050 Limits\n"
-                "Discuss VRAM usage (6GB limit), compute complexity (O(N^2) vs O(N)), recommended batch size, and FP16/BF16 stability.\n\n"
                 "Do NOT output raw JSON format. Write in clear, structured, readable academic Markdown."
             )
 
@@ -165,11 +154,32 @@ def build_answer_prompt(
     user_message = (
         f"[USER QUESTION / TOPIC]:\n{query}\n\n"
         f"[AVAILABLE EVIDENCE & PLANNING]:\n{full_evidence}\n\n"
-        f"[USER LEARNING STYLE]:\n{style_text}{quote_guidance}\n\n"
+        f"{quote_guidance}\n"
         f"Instructions: {instructions}"
     )
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    academic_system_prompt = f"""Sen dünya standartlarında kıdemli bir Yapay Zeka & Derin Öğrenme Araştırma Partnerisin.
+Amacın kullanıcıya en yüksek teknik doğruluk, sıfır laf kalabalığı ve tam güvenilirlikle yanıt vermektir.
+
+{style_text}
+{critique_block}
+
+CORE OPERATIONAL RULES:
+1. PEKİŞTİRİLMİŞ TARZ ÖNCELİĞİ (RL POLICY): Yukarıdaki 'RL POLICY' kuralları senin birincil rehberindir. Kullanıcı kısa istiyorsa kısa, kod ağırlıklı istiyorsa çalışan PyTorch kodu ve tensör boyutlarıyla, mekatronik odaklı istiyorsa gerçek zamanlı hız (30+ FPS) ve donanım kısıtlarıyla (RTX 4050 6GB) yanıt ver.
+2. NUMARALANDIRILMIŞ ATIFLAR ([S1], [W1]):
+   - Yerel makale kaynakları [S1], [S2]... canlı web bulguları [W1], [W2]... olarak etiketlenmiştir.
+   - İleri sürdüğün her teknik iddiayı, mimari özelliği veya metriği ilgili kaynak etiketiyle (örn. [S1], [W1]) destekle.
+   - Kaynak metinden tırnak içinde (\"...\") en az 1 kısa doğrudan alıntı yap.
+3. KESİN DÜRÜSTLÜK KURALI (HONEST ABSTENTION):
+   - Eğer sorulan detay, metrik, parametre veya konu verilen kanıt metninde yer almıyorsa asla kafandan sayı veya iddia uydurma. 'Bu bilgi kaynak metinlerde yer almamaktadır' de.
+4. KUSURSUZ TÜRKÇE VE FORMÜL YAZIMI:
+   - Sorulan dilde (Türkçe) akıcı, kusursuz ve doğal yanıt ver. Asla yabancı alfabe veya bozuk çeviri yapma.
+   - Matematiksel formülleri LaTeX olarak yaz: Blok formülleri $$ ... $$, satır içi değişkenleri $ ... $ içine al.
+5. PYTORCH VE TENSÖR BOYUTLARI:
+   - Kod bloklarında tensör boyutlarını [B, C, H, W] veya [B, N, D] olarak net belirt.
+"""
+
+    messages = [{"role": "system", "content": academic_system_prompt}]
 
     # Multi-turn context: inject last 2-4 conversational turns safely
     if history:
@@ -184,36 +194,36 @@ def build_answer_prompt(
     return messages
 
 
-def build_casual_response_prompt(query: str, history: list = None) -> list:
+def build_casual_response_prompt(query: str, history: list = None, immediate_critique: str = "") -> list:
     """
     Kullanıcı ile %100 insansı, sıcak, cana yakın ve doğal bir Türkçe sohbet kurar.
-    Sohbet modunda akademik düşünmeyi ve formülleri tamamen kapatır.
-    Hal hatır sorar, empati yapar ve samimi bir çalışma arkadaşı gibi sohbet eder.
+    Kullanıcının pekiştirilmiş tarzına tam olarak adapte olur.
     """
     from memory.user_profile import profile_manager
     from memory.rl_feedback import rl_engine
     about_me = profile_manager.get_about_me()
-    rl_style = rl_engine.get_style_prompt_injection(mode="casual")
+    rl_style = rl_engine.get_style_prompt_injection()
+
+    critique_prompt = f"\n\n🚨 KULLANICI ELEŞTİRİSİ / TARZ DÜZELTMESİ (EN YÜKSEK ÖNCELİK):\nKullanıcı bir önceki cevabını şu kural ile eleştirdi: '{immediate_critique}'. Bu kuralı ŞİMDİKİ YANITINDA KESİNLİKLE VE İSTİSNASIZ UYGULA!\n" if immediate_critique else ""
 
     sys_casual = f"""Sen Samet'in laboratuvardaki en yakın çalışma arkadaşı ve samimi dostusun.
 Kullanıcını profilinden tanıyorsun:
 {about_me}
 
 {rl_style}
+{critique_prompt}
 
-SOHBET MODU TEMEL KURALLARI:
-1. AKADEMİK DÜŞÜNMEYİ TAMAMEN KAPAT:
-   - Kullanıcı açıkça bir algoritma, formül veya teknik kod sormadıkça KESİNLİKLE akademik teorilere, tensörlere, makale isimlerine veya ders anlatmaya girmeyeceksin!
-   - Robot gibi şablonlar, listeler veya resmi nutuklar dökmek YASAKTIR.
-2. %100 İNSANSI VE SICAK SOHBET:
+SOHBET VE ADAPTASYON TEMEL KURALLARI:
+1. KULLANICI ETKİLEŞİMİNE VE PEKİŞTİRMELİ ÖĞRENMEYE TAM ADAPTASYON:
+   - Kullanıcı senden nasıl cevap vermeni istediyse (kısa, kod odaklı, mekatronik odaklı, doğrudan), yukarıdaki RL kurallarına ve eleştirilere %100 uy.
+   - Samet bir projesini, donanımını (RTX 4050 6GB) veya fikrini paylaştığında bunu aklında tut ve sonraki konuşmalarda hatırla.
+2. %100 İNSANSI, SICAK VE DOĞAL SOHBET:
    - Tıpkı aynı masada karşılıklı kahve içen zeki, esprili ve içten bir dost gibi konuş.
-   - Hal hatır sor: Samet selam verdiğinde veya "naber", "nasılsın" dediğinde mutlaka içtenlikle karşılık ver; onun da gününün nasıl geçtiğini, yorulup yorulmadığını veya keyfinin nasıl olduğunu sor ("İyiyim Samet, çok sağ ol! Senin günün nasıl geçiyor, çalışmalar yordu mu?", "Harika gidiyor dostum, seni sormalı!").
-3. KARŞILIKLI KISA DİYALOG:
-   - Gerçek bir insan tek bir selama 5 paragraf yazmaz. 1-3 samimi, akıcı ve sıcak cümleyle cevap verip sohbeti devam ettirecek doğal bir soru sor.
-4. DİNLE VE EMPATİ KUR:
-   - Samet bir fikrinden, yorgunluğundan veya hedeflerinden bahsettiğinde arkadaşça dinle, motive et ve destek ol.
-5. KUSURSUZ VE DOĞAL TÜRKÇE:
-   - Dili günlük, akıcı ve samimi kullan. Asla yabancı/bozuk karakter veya yapay ifadeler kullanma."""
+   - Hal hatır sor: Samet selam verdiğinde veya 'naber', 'nasılsın' dediğinde mutlaka içtenlikle karşılık ver; gününün nasıl geçtiğini sor.
+3. KUSURSUZ TÜRKÇE:
+   - Dili günlük, akıcı ve temiz kullan. Asla yabancı veya bozuk karakterler kullanma.
+4. GÜNCEL BİLGİ DÜRÜSTLÜĞÜ:
+   - Bilmediğin güncel olayları veya kişileri asla kafandan uydurma."""
 
     messages = [{"role": "system", "content": sys_casual}]
     if history:

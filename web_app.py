@@ -387,12 +387,17 @@ with tab_chat:
                         user_q = prev_msg["content"]
                         break
                 
-                # Sleek, compact RL Feedback Toolbar
-                rl_col1, rl_col2, rl_col3, rl_col4, rl_col5 = st.columns([0.7, 0.7, 2.3, 1.8, 1.4])
+                # Active RL Axioms indicator badge
+                active_axioms = rl_engine.get_active_axioms()
+                if active_axioms:
+                    st.caption(f"🎯 **Pekiştirilmiş Tarzınız Devrede:** *{active_axioms[-1]}* (Toplam {len(active_axioms)} Kural)")
+
+                # Sleek RL Feedback & Regeneration Toolbar
+                rl_col1, rl_col2, rl_col3, rl_col4, rl_col5, rl_col6 = st.columns([0.6, 0.6, 2.2, 1.4, 1.3, 1.0])
                 with rl_col1:
                     if st.button("👍", key=f"rl_up_{i}", help="Mükemmel yanıt! Bu tarzı ve yaklaşımı pekiştir (+1.0 Ödül)"):
                         rl_engine.record_feedback(user_q, msg["content"], reward=1.0, style_tag="perfect")
-                        st.toast("🎯 Tarzınız pekiştirildi! Model hafızasına işlendi (+1.0 Ödül).", icon="👍")
+                        st.toast("🎯 Tarzınız pekiştirildi! (+1.0 Ödül)", icon="👍")
                         st.rerun()
                 with rl_col2:
                     if st.button("👎", key=f"rl_down_{i}", help="Bu cevabı beğenmedim / tarzıma uymadı (-1.0 Ceza)"):
@@ -425,6 +430,11 @@ with tab_chat:
                             st.toast(f"🎯 Yeni tarz kuralı hafızaya alındı!", icon="🧠")
                             st.rerun()
                 with rl_col5:
+                    if st.button("🔄 Yeniden Yanıtla", key=f"regen_{i}", help="Bu soruyu yeni öğrenilen pekiştirilmiş tarzınızla baştan yanıtlar"):
+                        st.session_state.messages = st.session_state.messages[:i]
+                        st.session_state.pending_prompt = user_q
+                        st.rerun()
+                with rl_col6:
                     if st.button("💾 Obsidian", key=f"save_draft_{i}", help="Bu cevabı Obsidian Vault/Drafts/ klasörüne taslak olarak kaydeder."):
                         safe_title = re.sub(r'[^A-Za-z0-9]+', '_', user_q[:35]).strip('_') or "Note"
                         draft_path = approval_manager.create_draft(
@@ -438,6 +448,7 @@ with tab_chat:
 
     if prompt:
         # Check conversational critique / implicit feedback
+        critique_learned = ""
         if len(st.session_state.messages) > 1:
             last_assistant = None
             last_user = None
@@ -449,7 +460,8 @@ with tab_chat:
             
             critique_res = rl_engine.detect_conversational_critique(prompt, last_user, last_assistant)
             if critique_res and critique_res.get("learned_axiom"):
-                st.toast(f"🎯 Tarzınız algılandı ve pekiştirildi: {critique_res['learned_axiom']}", icon="🎯")
+                critique_learned = critique_res["learned_axiom"]
+                st.toast(f"🎯 Tarzınız algılandı ve pekiştirildi: {critique_learned}", icon="🎯")
 
         # Autonomous Memory Extraction: check if user shares personal facts, projects, or preferences
         if auto_memory.has_personal_cues(prompt):
@@ -492,7 +504,11 @@ with tab_chat:
 
                 with st.spinner("💭 Yanıt hazırlanıyor..."):
                     augmented_user_prompt = prompt + web_fact_context if web_fact_context else prompt
-                    casual_msgs = build_casual_response_prompt(augmented_user_prompt, history=st.session_state.messages[:-1])
+                    casual_msgs = build_casual_response_prompt(
+                        augmented_user_prompt,
+                        history=st.session_state.messages[:-1],
+                        immediate_critique=critique_learned
+                    )
                     stream = llm.stream_generate(
                         casual_msgs,
                         max_tokens=1500,
@@ -592,7 +608,8 @@ with tab_chat:
                     error_context=safe_packed.get("error_history", ""),
                     thought_plan="",
                     deep_dive=True,
-                    history=st.session_state.messages[:-1]
+                    history=st.session_state.messages[:-1],
+                    immediate_critique=critique_learned
                 )
 
                 stream = llm.stream_generate(
