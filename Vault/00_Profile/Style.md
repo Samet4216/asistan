@@ -8,7 +8,6 @@ tags:
 
 # User Learning & Response Style (RL-Aligned)
 
-- Write mathematical equations and tensor shapes in clean, readable typography (e.g. C × H × W, z_c^h, σ(...)); avoid raw broken LaTeX macros in console.
 - kod ağırlıklı
 - Açıklamalarda her zaman çalışan PyTorch/Python kod blokları ve açık tensör boyutları (B, C, H, W) ver.
 - Zihniyet İlkesi: Samet'in Karar İlkesi: Benim için İHA'da 30 FPS üzerinde gerçek zamanlı çalışması şart, çünkü hızlı man.
@@ -16,4 +15,5 @@ tags:
 - Zihniyet İlkesi: Kendine hedef belirlemek ve kısıtların ne olduğunu anlayarak bunu aşmak.
 - Kendi hedeflerini belirle ve kısıtların ne olduğunu anlayıp onları aş.
 - Zihniyet İlkesi: Uygulamada 30+ FPS gerçek zamanlı hız, %1-2 mAP doğruluk artışından her zaman daha önceliklidir.
+- Uygulamada performans öncelikle FPS ve gerçek zamanlı tepki hızındadır, mAP doğruluğu %1-2 artışı geçerse beklenir.
 
