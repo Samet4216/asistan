@@ -257,6 +257,40 @@ def set_auto_unload(enabled: bool, timeout_seconds: int = None):
         client.timeout_seconds = timeout_seconds
 
 
+def is_model_available(model_name: str) -> bool:
+    """Checks if a given model is already downloaded and ready in Ollama."""
+    return client.is_model_available(model_name)
+
+
+def list_models() -> List[str]:
+    """Queries local Ollama instance for installed models."""
+    return client.list_models()
+
+
+def parse_deepseek_thought(raw_text: str) -> Dict[str, str]:
+    """
+    Separates DeepSeek-R1's `<think> ... </think>` internal reasoning block from the final response.
+    Returns {"thought": "...", "response": "..."}.
+    """
+    import re
+    if not raw_text:
+        return {"thought": "", "response": ""}
+    
+    # Check complete <think> ... </think>
+    match = re.search(r"<think>(.*?)</think>", raw_text, re.DOTALL)
+    if match:
+        thought = match.group(1).strip()
+        response = raw_text[match.end():].strip()
+        return {"thought": thought, "response": response}
+    
+    # Check open <think> (still thinking or unclosed)
+    if "<think>" in raw_text:
+        parts = raw_text.split("<think>", 1)
+        return {"thought": parts[1].strip(), "response": parts[0].strip()}
+
+    return {"thought": "", "response": raw_text.strip()}
+
+
 if __name__ == "__main__":
     print("[*] Testing llm.py with simple greeting...")
     test_msgs = [
