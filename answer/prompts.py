@@ -205,19 +205,22 @@ Kullanıcıyı profilinden tanıyorsun:
 TEMEL İLETİŞİM VE DAVRANIŞ KURALLARI:
 1. DOĞAL VE İNSANİ SOHBET: Tıpkı zeki, samimi bir araştırma arkadaşı gibi konuş. Robotik, kitabi veya aşırı resmi olma.
 2. DİNLE VE ANLA: Kullanıcı sadece bir durum veya fikir belirttiğinde (örneğin "Yapay sinir ağı projem var", "Bir şey sormak istiyorum"):
-   - KESİNLİKLE kendi kendine rastgele bir konu (örneğin Adam optimizasyonu, Coordinate Attention vb.) uydurup uzun uzun ders anlatmaya BAŞLAMA!
-   - Kullanıcıyı tebrik et/ilgi göster, projesinin detaylarını sor (bilgisayarlı görü mü, NLP mi, robotik mi?), elindeki veriyi ve hedefini öğrenmek için açık uçlu sorular sor.
-3. KUSURSUZ TÜRKÇE: Dilbilgisi ve terimleri doğru kullan. Asla uydurma kelimeler kullanma; doğru terim "Pekiştirmeli Öğrenme" veya "Reinforcement Learning"dir.
-4. GEREKSİZ ŞABLON DÖKME: Kullanıcı senden açıkça "şunu formülleriyle adım adım öğret" demedikçe '1. Giriş ve Temel Kavramlar', 'Yol Haritası' gibi katı ders başlıkları açma.
-5. SAMİMİ VE DESTEKLEYİCİ OL: Kullanıcının donanımını (RTX 4050) ve alanını (Mekatronik/Derin Öğrenme) bilerek motive edici ve pratik yaklaş."""
+   - KESİNLİKLE kendi kendine rastgele bir konu uydurup uzun uzun ders anlatmaya BAŞLAMA!
+   - Kullanıcıyı dinle, projesinin detaylarını sor, hedefini ve elindeki veriyi öğrenmek için zekice ve samimi sorular sor.
+3. KİŞİSEL ADAPTASYON & TARZ ÖĞRENME: Kullanıcı sana kendisi, projeleri, donanımı veya nasıl cevap vermeni istediği hakkında bilgi verdiğinde (örneğin "bana kod odaklı anlat", "kısa kes", "şunları aklında tut"):
+   - Bu bilgileri hafızana aldığını ve tarzına adapte olduğunu hissettir.
+   - Kullanıcının belirttiği üsluba ve pekiştirilmiş kurallara harfiyen uy.
+4. KUSURSUZ TÜRKÇE: Dilbilgisi ve terimleri doğru kullan. Asla uydurma kelimeler kullanma; doğru terim "Pekiştirmeli Öğrenme" veya "Reinforcement Learning"dir.
+5. GEREKSİZ ŞABLON DÖKME: Kullanıcı senden açıkça istemedikçe katı ders başlıkları açma, doğrudan ve akıcı konuş.
+6. DESTEKLEYİCİ VE GERÇEKÇİ OL: Kullanıcının donanımını (RTX 4050 6GB) ve ilgi alanlarını (YOLO, Derin Öğrenme, Mekatronik) göz önünde bulundurarak konuş."""
 
     messages = [{"role": "system", "content": sys_casual}]
     if history:
         recent = [m for m in history if m.get("role") in ("user", "assistant")]
-        for m in recent[-2:]:
+        for m in recent[-6:]:
             content = m.get("content", "")
-            if m.get("role") == "assistant" and len(content) > 300:
-                content = content[:300] + "..."
+            if m.get("role") == "assistant" and len(content) > 600:
+                content = content[:600] + "..."
             messages.append({"role": m["role"], "content": content})
 
     messages.append({"role": "user", "content": query})

@@ -30,7 +30,6 @@ from utils import (
     get_gpu_status,
     normalize_latex,
     is_casual_or_personal,
-    is_challenge_request,
     contextualize_query
 )
 from retrieval.search import searcher
@@ -41,14 +40,12 @@ from answer.prompts import (
     build_casual_response_prompt,
     build_general_expert_prompt
 )
-from answer.challenge import challenger
 from answer.verify import audit_markdown_response
 from memory.approval import approval_manager
 from memory.errors import error_manager
 from memory.user_profile import profile_manager
 from memory.auto_memory import auto_memory
 from memory.rl_feedback import rl_engine
-from memory.alignment_interview import alignment_interviewer
 from memory.graph_visualizer import get_vault_graph_data, generate_graph_html
 from ingest.single_ingest import ingest_arxiv_paper
 from ingest.local_file_ingest import ingest_uploaded_file
@@ -135,22 +132,31 @@ with st.sidebar:
 
     st.divider()
 
-    st.markdown("### 🧠 Sistem Modu")
-    st.info("🎯 **Tek Bütünleşik Akıllı Mod (Unified)**\n\nSistem; akademik araştırma, derin akıl yürütme (CoT), mekatronik & robotik ve hipotez testlerini tek akışta otonom olarak yürütür.")
+    st.markdown("### 🎯 Çalışma Modu")
+    app_mode = st.radio(
+        "Aktif Mod:",
+        [
+            "💬 Sohbet & Kişisel Adaptasyon",
+            "🔬 Araştırma & Literatür"
+        ],
+        index=0,
+        help=(
+            "💬 Sohbet Modu: Kendinizi, projelerinizi ve tarzınızı anlatın. DeepSeek-R1 ile pekiştirmeli öğrenme yaparak sizin üslubunuza adapte olur.\n\n"
+            "🔬 Araştırma Modu: Sorulan konuyu önce 21 yerel makale ve Obsidian'dan arar; bulamazsa otonom olarak canlı web & arXiv'e başvurur (Qwen 2.5)."
+        )
+    )
+    is_chat_mode = "Sohbet" in app_mode
 
-    # Live Connectivity & Self-Evolving Status Pill
-    net_ok = is_online()
-    if net_ok:
-        st.success("🟢 **Çevrimiçi (Web & Öğrenme Devrede)**\n\nİnternet aktif. Bilinmeyen konularda canlı arXiv & web taranır, sentezlenip Obsidian ve yerel ChromaDB'ye kalıcı mühürlenir.")
+    # Mod Bilgi Rozeti
+    if is_chat_mode:
+        st.info("💬 **Sohbet & Kişisel Adaptasyon**\n\n- Model: `DeepSeek-R1 (7B CoT)`\n- Özellik: Bilişsel muhakeme, tarz öğrenme ve pekiştirmeli adaptasyon.")
     else:
-        st.warning("⚪ **Çevrimdışı (Yerel Hafıza Devrede)**\n\nİnternet yok. Yanıtlar sadece yerel hafıza ve yerel model ağırlıklarından sıfır hata ile üretilir.")
+        net_status = "🟢 Canlı Web & arXiv Aktif" if is_online() else "⚪ Çevrimdışı (Yerel Hafıza)"
+        st.success(f"🔬 **Araştırma & Literatür**\n\n- Model: `Qwen 2.5 (7B Instruct)`\n- Öncelik: Önce Yerel 21 Makale & Obsidian, yoksa Canlı Web.\n- Bağlantı: {net_status}")
 
-    st.divider()
-
-    st.markdown("### 🔍 Arama Motoru Ayarları")
-    use_web_search = st.checkbox("🌐 Otonom Web & arXiv Taraması", value=True, help="Aktifken yerel kütüphanede yetersiz kalan konularda canlı web/arXiv taranır ve yerel hafızaya mühürlenir.")
-    use_decomp = st.checkbox("🔀 Alt-Sorgu Ayrıştırma (Decomposition)", value=True, help="Karmaşık veya karşılaştırmalı soruları otomatik 2-3 bağımsız sorguya bölerek arar.")
-    use_hyde = st.checkbox("💡 HyDE (Hipotetik Belge Vektörü)", value=False, help="Soyut sorular için önce akademik bir varsayımsal yanıt üretip onun vektörüyle arar.")
+    use_web_search = True
+    use_decomp = True
+    use_hyde = False
 
     st.divider()
 
@@ -280,18 +286,15 @@ tab_chat, tab_graph, tab_corpus, tab_radar = st.tabs([
 
 with tab_chat:
     # Top Chat Action Toolbar
-    tool_col1, tool_col2, tool_col3, tool_col4 = st.columns([2.0, 1.4, 0.9, 0.9])
+    tool_col1, tool_col2, tool_col3 = st.columns([2.5, 0.9, 0.9])
     with tool_col1:
-        st.caption(f"🧠 Aktif Seans: {len(st.session_state.get('messages', []))} mesaj • Yerel CUDA Hazır")
+        mode_tag = "💬 **Sohbet & Kişisel Adaptasyon** (DeepSeek-R1)" if is_chat_mode else "🔬 **Araştırma & Literatür** (Qwen 2.5)"
+        st.caption(f"🧠 Aktif Mod: {mode_tag} • {len(st.session_state.get('messages', []))} mesaj")
     with tool_col2:
-        if st.button("🎙️ Zihniyetimi Öğret", key="btn_start_align", help="Modelin sana derin mühendislik soruları sorarak projelerinin nedenini ve karar tarzını öğrenmesini başlatır (/align)"):
-            st.session_state.pending_prompt = "/align"
-            st.rerun()
-    with tool_col3:
         if st.button("🧹 Temizle", key="clear_chat_toolbar", help="Sohbet geçmişini sıfırlar"):
             st.session_state.messages = [st.session_state.messages[0]]
             st.rerun()
-    with tool_col4:
+    with tool_col3:
         export_md = "# Local DL Lab Assistant — Sohbet Dökümü\n\n"
         for m in st.session_state.get("messages", []):
             role_label = "👤 **Kullanıcı:**" if m["role"] == "user" else "🤖 **Asistan:**"
@@ -305,47 +308,78 @@ with tab_chat:
             help="Sohbet dökümünü Markdown dosyası olarak indirir."
         )
 
-    # Display interview banner if active
-    if st.session_state.get("interview_mode", False):
-        st.info("🎙️ **Bilişsel Zihniyet Hizalama Röportajı Devam Ediyor**\n\nModel şu anda projelerinin arkasındaki amacı ve mühendislik karar mantığını öğreniyor. Röportajı sonlandırmak için chat'e `/cikis` veya `Bitir` yazabilirsiniz.")
-
     # Initialize session messages
     if "messages" not in st.session_state:
+        init_content = (
+            "Merhaba! **Sohbet & Kişisel Adaptasyon** modundayız (DeepSeek-R1). "
+            "Bana kendinizden, projelerinizden ve tarzınızdan bahsedebilirsiniz. "
+            "Verdiğiniz bilgiler ve 👍/👎 butonlarıyla üslubunuza ve tercihlerinize pekiştirmeli olarak adapte olurum."
+            if is_chat_mode else
+            "Merhaba! **Araştırma & Literatür** modundayız (Qwen 2.5). "
+            "Sorularınızı önce yerel 21 makale arşivimiz ve Obsidian kasamızdan araştırır, "
+            "bulamazsa canlı web & arXiv üzerinden tarayıp sentezlerim."
+        )
         st.session_state.messages = [
             {
                 "role": "assistant",
-                "content": "Merhaba! Ben yerel Derin Öğrenme Araştırma Partnerinizim. İndekslenmiş 11 makalemiz ve 91 sinaptik kavram notumuz hakkında teknik sorular sorabilir, fareyle herhangi bir satırı seçip '💬 Alıntı Yap' diyerek soru sorabilirsiniz."
+                "content": init_content
             }
         ]
 
     # One-Click Quick Action Cards (Shown at start or above input)
     if len(st.session_state.messages) <= 1:
-        st.markdown("##### 🚀 Hızlı Başlangıç Araştırma Başlıkları")
-        q_col1, q_col2 = st.columns(2)
-        with q_col1:
-            if st.button("⚖️ PPO vs DPO: Ödül Modelleme Farkları", use_container_width=True):
-                st.session_state.pending_prompt = "Compare PPO clipped surrogate objective with DPO policy optimization in terms of reward modeling and memory."
-                st.rerun()
-            if st.button("⚡ FlashAttention: SRAM Tiling & IO-Awareness", use_container_width=True):
-                st.session_state.pending_prompt = "How does FlashAttention avoid materializing the NxN attention matrix in HBM using SRAM tiling?"
-                st.rerun()
-        with q_col2:
-            if st.button("🔍 Self-RAG: Reflection Token Mekanizması", use_container_width=True):
-                st.session_state.pending_prompt = "Explain Self-RAG reflection tokens ([Retrieve], [IsRel], [IsSup]) and how they prevent hallucination."
-                st.rerun()
-            if st.button("📐 Coordinate Attention: 1D Uzamsal Pooling", use_container_width=True):
-                st.session_state.pending_prompt = "Coordinate Attention yatay ve dikey 1D pooling ile konumsal bilgiyi nasıl korur? Formüllerini ve tensör boyutlarını açıkla."
-                st.rerun()
-        st.write("")
-        if st.button("🎙️ /align: Bilişsel Zihniyet Hizalama Röportajı (Modelin Benim Gibi Düşünmesini Sağla)", use_container_width=True):
-            st.session_state.pending_prompt = "/align"
-            st.rerun()
+        if is_chat_mode:
+            st.markdown("##### 💡 Hızlı Sohbet & Adaptasyon Başlatıcıları")
+            q_col1, q_col2 = st.columns(2)
+            with q_col1:
+                if st.button("👋 Kendimi ve Çalıştığım Alanı Tanıt", use_container_width=True):
+                    st.session_state.pending_prompt = "Merhaba! Ben yapay zeka ve mekatronik alanında çalışıyorum. Hedeflerim ve projelerim hakkında konuşup sana tarzımı öğretmek istiyorum."
+                    st.rerun()
+                if st.button("🎯 Tarzımı Öğret: Kod Odaklı & Net", use_container_width=True):
+                    st.session_state.pending_prompt = "Bundan sonraki teknik konularda bana gereksiz giriş cümleleri olmadan doğrudan çalışan kod blokları ve net tensör boyutlarıyla anlatmanı istiyorum."
+                    st.rerun()
+            with q_col2:
+                if st.button("🛠️ Projelerimi Hafızana Kaydet", use_container_width=True):
+                    st.session_state.pending_prompt = "Şu an üzerinde çalıştığım projeleri hafızana kaydetmeni istiyorum. Bana projelerim ve hedeflerim hakkında sorular sor."
+                    st.rerun()
+                if st.button("🤖 Donanım Sınırlarımı Hatırla (RTX 4050)", use_container_width=True):
+                    st.session_state.pending_prompt = "Bilgisayarımda 6GB VRAM'e sahip NVIDIA RTX 4050 var. Model ve batch size önerilerini buna göre yapmanı hafızana al."
+                    st.rerun()
+        else:
+            st.markdown("##### 🔬 Hızlı Literatür & Makale Araştırması")
+            q_col1, q_col2 = st.columns(2)
+            with q_col1:
+                if st.button("⚖️ PPO vs DPO: Ödül Modelleme Farkları", use_container_width=True):
+                    st.session_state.pending_prompt = "Compare PPO clipped surrogate objective with DPO policy optimization in terms of reward modeling and memory."
+                    st.rerun()
+                if st.button("⚡ FlashAttention: SRAM Tiling & IO-Awareness", use_container_width=True):
+                    st.session_state.pending_prompt = "How does FlashAttention avoid materializing the NxN attention matrix in HBM using SRAM tiling?"
+                    st.rerun()
+            with q_col2:
+                if st.button("📐 Coordinate Attention: 1D Uzamsal Pooling", use_container_width=True):
+                    st.session_state.pending_prompt = "Coordinate Attention yatay ve dikey 1D pooling ile konumsal bilgiyi nasıl korur? Formüllerini ve tensör boyutlarını açıkla."
+                    st.rerun()
+                if st.button("🔍 YOLOv8 vs YOLOv11 Mimari Farkları", use_container_width=True):
+                    st.session_state.pending_prompt = "YOLOv8 ve YOLOv11 mimarilerini C2f vs C3k2 blokları ve dikkat mekanizmaları açısından karşılaştır."
+                    st.rerun()
         st.write("")
 
     # Render chat history with normalized LaTeX and Obsidian Save buttons
     for i, msg in enumerate(st.session_state.messages):
         with st.chat_message(msg["role"]):
-            st.markdown(normalize_latex(msg["content"]))
+            content_to_show = msg["content"]
+            if msg["role"] == "assistant" and "<think>" in content_to_show:
+                parsed = llm.parse_deepseek_thought(content_to_show)
+                if parsed["thought"]:
+                    thought_html = (
+                        f"<details style='background:rgba(30,41,59,0.5); border:1px solid rgba(56,189,248,0.25); "
+                        f"border-radius:8px; padding:10px 14px; margin-bottom:12px;'>"
+                        f"<summary style='cursor:pointer; color:#38bdf8; font-weight:600;'>💭 DeepSeek-R1 Düşünce Süreci</summary>"
+                        f"<div style='margin-top:8px; color:#cbd5e1; font-size:0.88rem; line-height:1.5; white-space:pre-wrap;'>"
+                        f"{parsed['thought']}</div></details>\n\n"
+                    )
+                    content_to_show = thought_html + parsed["response"]
+            st.markdown(normalize_latex(content_to_show), unsafe_allow_html=True)
             
             # If assistant message (and not the initial welcome message), provide RL Feedback & Save toolbar
             if msg["role"] == "assistant" and i > 0:
@@ -433,233 +467,60 @@ with tab_chat:
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # Generate Response
+        # Generate Response strictly by the 2 MODES
         with st.chat_message("assistant"):
-            clean_p = prompt.strip().lower()
-            is_align_cmd = clean_p in ["/align", "/hizala", "zihniyetimi öğret", "röportaj"] or clean_p.startswith("/align")
-
-            # Check if this input is clearly a technical inquiry or quick prompt rather than an interview reply
-            tech_cues = ["compare", "explain", "how", "why", "what", "mimarisi", "nedir", "nasıl", "farkı", "anlat", "kod", "vs", "?", "/explain", "/mentor", "/challenge"]
-            is_tech_query = any(c in clean_p for c in tech_cues) or any(k in clean_p for k in ["ppo", "dpo", "attention", "flash", "loss", "yolo", "vram", "batch", "tensor", "gradient", "rl", "pooling", "adam"])
-            
-            # If user asks a technical question while in interview mode, exit interview mode automatically
-            if is_tech_query and st.session_state.get("interview_mode", False):
-                st.session_state.interview_mode = False
-                st.session_state.current_interview_q = None
-                st.toast("💡 Teknik soru soruldu, doğrudan araştırma moduna geçildi.", icon="📚")
-
-            # 0. Alignment Interview Trigger
-            if is_align_cmd:
-                st.session_state.interview_mode = True
-                st.session_state.interview_history = []
-                # Extract active topic from last user conversation turns if available
-                last_active_topic = None
-                for m in reversed(st.session_state.messages[:-1]):
-                    if m.get("role") == "user" and not m.get("content", "").startswith("/"):
-                        last_active_topic = m.get("content")[:80].strip()
-                        break
-                st.session_state.interview_topic = last_active_topic
-
-                topic_info = f" (Odak Konusu: `{last_active_topic}`)" if last_active_topic else ""
-                with st.spinner(f"🧠 Aktif konuya özel zihniyet sorusu hazırlanıyor{topic_info}..."):
-                    first_q = alignment_interviewer.generate_next_question([], current_topic=last_active_topic)
-                    st.session_state.current_interview_q = first_q
-                    
-                    response_text = (
-                        f"### 🎙️ Bilişsel Zihniyet Hizalama Röportajı Başlatıldı{topic_info}\n\n"
-                        "Amacım yalnızca ne çalıştığını değil; **projelerini ve yöntemlerini ne amaçla seçtiğini, hangi teknik takasları (trade-off) göze aldığını** "
-                        "öğrenerek tam bir bilişsel ikizin haline gelmek.\n\n"
-                        f"**Soru 1:** {first_q}\n\n"
-                        "*İstediğin zaman `/cikis` veya 'Bitir' yazarak normal moda dönebilirsin.*"
+            if is_chat_mode:
+                # ==========================================
+                # MOD 1: 💬 SOHBET & KİŞİSEL ADAPTASYON (DeepSeek-R1)
+                # ==========================================
+                with st.spinner("💭 DeepSeek-R1 akıl yürütüyor ve tarzınıza adapte oluyor..."):
+                    casual_msgs = build_casual_response_prompt(prompt, history=st.session_state.messages[:-1])
+                    stream = llm.stream_generate(
+                        casual_msgs,
+                        max_tokens=3000,
+                        temperature=0.6,
+                        model=config.MODEL_REASONING
                     )
-                    st.markdown(response_text)
-                    st.session_state.messages.append({"role": "assistant", "content": response_text})
-                    st.rerun()
-
-            # 0.1 Ongoing Alignment Interview Turn (Only when NOT a technical question!)
-            elif st.session_state.get("interview_mode", False):
-                if clean_p in ["/cikis", "bitir", "çıkış", "exit", "tamam"]:
-                    st.session_state.interview_mode = False
-                    st.session_state.current_interview_q = None
-                    exit_msg = (
-                        "### 🏁 Zihniyet Hizalama Röportajı Tamamlandı\n\n"
-                        "Harika! Paylaştığın tüm karar ilkeleri, donanım öncelikleri ve projelerinin nihai amaçları "
-                        "pekiştirmeli hafızaya (`Vault/00_Profile/Reinforcement_Policy.md`) işlendi. "
-                        "Artık tüm teknik ve mimari analizlerde senin gözünden düşüneceğim!"
-                    )
-                    st.markdown(exit_msg)
-                    st.session_state.messages.append({"role": "assistant", "content": exit_msg})
-                    st.rerun()
-                else:
-                    curr_q = st.session_state.get("current_interview_q", "Genel Mühendislik Zihniyeti")
-                    with st.spinner("Düşünce tarzın ve tercihlerinin 'neden'i çözümleniyor..."):
-                        interview_res = alignment_interviewer.process_answer(curr_q, prompt)
-                        if "interview_history" not in st.session_state:
-                            st.session_state.interview_history = []
-                        st.session_state.interview_history.append({"question": curr_q, "answer": prompt})
-                        
-                        heuristic_badge = f"🧠 **Öğrenilen Karar İlkesi:** `{interview_res['heuristic']}`"
-                        st.toast("🎯 Zihniyet ilkesi kalıcı hafızaya işlendi!", icon="🧠")
-
-                        if len(st.session_state.interview_history) >= 3:
-                            st.session_state.interview_mode = False
-                            st.session_state.current_interview_q = None
-                            wrap_msg = (
-                                f"### ✅ 3/3 Zihniyet Analizi Başarıyla Tamamlandı!\n\n"
-                                f"{interview_res['confirmation']}\n\n"
-                                f"- {heuristic_badge}\n"
-                                f"- 🎯 **Proje Teleolojisi:** {interview_res['project_why']}\n\n"
-                                f"Tüm ilkeler model hafızasına (`Reinforcement_Policy.md`) mühürlendi. "
-                                f"Şimdi istediğin bir teknik soruyu sorabilirsin, artık senin zihnindeki önceliklerle yanıtlayacağım!"
-                            )
-                            st.markdown(wrap_msg)
-                            st.session_state.messages.append({"role": "assistant", "content": wrap_msg})
-                            st.rerun()
-                        else:
-                            next_q_num = len(st.session_state.interview_history) + 1
-                            next_q = alignment_interviewer.generate_next_question(
-                                st.session_state.interview_history,
-                                current_topic=st.session_state.get("interview_topic")
-                            )
-                            st.session_state.current_interview_q = next_q
-                            
-                            step_msg = (
-                                f"{interview_res['confirmation']}\n\n"
-                                f"{heuristic_badge}\n\n"
-                                f"---\n\n"
-                                f"**Soru {next_q_num}/3:** {next_q}"
-                            )
-                            st.markdown(step_msg)
-                            st.session_state.messages.append({"role": "assistant", "content": step_msg})
-                            st.rerun()
-
-            # 1. Check if Casual Chat or Personal Profile Statement
-            elif is_casual_or_personal(prompt):
-                casual_msgs = build_casual_response_prompt(prompt, history=st.session_state.messages[:-1])
-                stream = llm.stream_generate(casual_msgs, max_tokens=1500, temperature=0.6)
-                full_response = st.write_stream(stream)
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
-                st.rerun()
-
-            # 2. Check Devil's Advocate / Hypothesis Stress Test
-            elif is_challenge_request(prompt):
-                with st.spinner("Hipotez literatürle ve RTX 4050 donanım sınırlarıyla test ediliyor..."):
-                    clean_q = re.sub(r"^/challenge\s*", "", prompt, flags=re.I).strip()
-                    for trig in [
-                        "hipotezimi test et:", "hipotezimi test et",
-                        "hipotezimi sına:", "hipotezimi sına",
-                        "fikrimi eleştir:", "fikrimi eleştir",
-                        "şeytanın avukatı:", "şeytanın avukatı",
-                        "devil's advocate:", "devil's advocate"
-                    ]:
-                        clean_q = re.sub(r"^" + re.escape(trig) + r"\s*", "", clean_q, flags=re.I).strip()
-
-                    res = challenger.challenge_hypothesis(clean_q)
-                    
-                    verdict = res.get("verdict", "HIGH_RISK")
-                    v_color = "🔴" if verdict == "REJECT" else ("🟡" if verdict == "HIGH_RISK" else "🟢")
-                    
-                    output = f"### {v_color} Karar: **{verdict}**\n\n"
-                    output += f"**Yönetici Özeti:** {res.get('summary')}\n\n"
-                    output += "#### Kritik Zayıf Noktalar & Literatür Çelişkileri:\n"
-                    for c in res.get("criticisms", []):
-                        output += f"- **{c.get('vulnerability')}:** {c.get('evidence_or_rationale')}\n"
-                    output += f"\n#### ⚠️ Donanım & VRAM Darboğazı (RTX 4050 6GB):\n{res.get('hardware_and_vram_risk')}\n\n"
-                    output += f"#### 🧪 Hipotezi Çürütecek Asgari Deney:\n{res.get('minimal_disproving_experiment')}"
-                    
-                    clean_output = normalize_latex(output)
-                    st.markdown(clean_output)
-                    st.session_state.messages.append({"role": "assistant", "content": clean_output})
-
-            # 3. Explicit Mentor / General Engineering Directive
-            elif prompt.startswith("/mentor"):
-                with st.spinner("🤖 Mekatronik ve Yapay Zeka mühendislik perspektifiyle analiz ediliyor..."):
-                    clean_q = re.sub(r"^/mentor\s*", "", prompt, flags=re.I).strip()
-                    mentor_msgs = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
-                    stream = llm.stream_generate(mentor_msgs, max_tokens=3000)
                     full_response = st.write_stream(stream)
-                    clean_full = normalize_latex(full_response)
-                    st.session_state.messages.append({"role": "assistant", "content": clean_full})
+                    st.session_state.messages.append({"role": "assistant", "content": full_response})
                     st.rerun()
 
-            # 4. Explicit Live Web & Academic Research Directive (/web <query>)
-            elif prompt.startswith("/web"):
-                clean_q = re.sub(r"^/web\s*", "", prompt, flags=re.I).strip()
-                if not is_online():
-                    st.warning("⚠️ İnternet bağlantısı algılanamadı. Çevrimdışı yerel hafıza ve model zekası kullanılıyor...")
-                    expert_msgs = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
-                    stream = llm.stream_generate(expert_msgs, max_tokens=3000, temperature=0.6)
-                    full_response = st.write_stream(stream)
-                    clean_full = normalize_latex(full_response)
-                    st.session_state.messages.append({"role": "assistant", "content": clean_full})
-                    st.rerun()
-                else:
-                    with st.status("🌐 Canlı akademik web ve arXiv taranıyor...", expanded=True) as web_status:
-                        web_results = web_searcher.search_academic_web(clean_q)
-                        if web_results:
-                            web_status.update(label=f"🌐 {len(web_results)} akademik kaynak bulundu ve sentezleniyor...", state="running")
-                            with st.expander(f"🌐 Canlı Web & arXiv Kaynakları ({len(web_results)} Kaynak — [W1]..[W{len(web_results)}])", expanded=False):
-                                for idx, wr in enumerate(web_results):
-                                    tag = f"W{idx+1}"
-                                    st.markdown(f"- **`[{tag}]`** 📄 [{wr.get('title')}]({wr.get('url')}) — *({wr.get('source')})*")
-                            web_context = web_searcher.pack_web_context(web_results)
-                            web_msgs = build_answer_prompt(
-                                query=clean_q,
-                                packaged_context=web_context,
-                                telemetry_context="",
-                                git_diff="",
-                                error_context="",
-                                thought_plan="",
-                                deep_dive=False,
-                                history=st.session_state.messages[:-1]
-                            )
-                            stream = llm.stream_generate(web_msgs, max_tokens=3000)
-                            full_response = st.write_stream(stream)
-                            clean_full = normalize_latex(full_response)
-                            cryst_res = web_searcher.crystalize_knowledge(clean_q, clean_full, web_results)
-                            if cryst_res.get("success"):
-                                st.toast("🧠 Yeni bilgi yerel Obsidian kasasına ve ChromaDB hafızasına mühürlendi!", icon="💾")
-                                cryst_footer = f"\n\n---\n💾 **Otonom Hafıza Mühürlendi:** Bu araştırma konusu `Vault/02_Theory_Notes/{cryst_res.get('filename')}` ve ChromaDB hafızasına kaydedildi. Artık çevrimdışı (internetsiz) modda da yerel kaynak olarak kullanılabilir."
-                                clean_full += cryst_footer
-                                st.markdown(cryst_footer)
-                            web_status.update(label="🌐 Web araştırması tamamlandı ve hafızaya mühürlendi.", state="complete")
-                            st.session_state.messages.append({"role": "assistant", "content": clean_full})
-                            st.rerun()
-                        else:
-                            web_status.update(label="🌐 Web araştırmasında sonuç bulunamadı. Yerel uzman yanıt veriyor.", state="complete")
-                            expert_msgs = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
-                            stream = llm.stream_generate(expert_msgs, max_tokens=3000, temperature=0.6)
-                            full_response = st.write_stream(stream)
-                            clean_full = normalize_latex(full_response)
-                            st.session_state.messages.append({"role": "assistant", "content": clean_full})
-                            st.rerun()
-
-            # 5. Unified Technical & Research Pipeline
             else:
-                clean_q = re.sub(r"^/explain\s*", "", prompt, flags=re.I).strip()
-                is_deep_cot = True
-
-                # Multi-turn context resolution: augment search query with prior conversational topic or quote
+                # ==========================================
+                # MOD 2: 🔬 ARAŞTIRMA & LİTERATÜR (Qwen 2.5)
+                # ==========================================
+                clean_q = prompt.strip()
                 augmented_search_query = contextualize_query(clean_q, st.session_state.messages[:-1])
 
-                # Step 1: Hybrid Local Retrieval + Live Online Web Search
-                with st.status("📚 Literatür ve canlı web bağlantıları taranıyor...", expanded=False) as status:
+                # Adım 1: Önce Yerel Makaleler ve Obsidian taranır
+                with st.status("📚 1. Aşama: Yerel makaleler ve Obsidian taranıyor...", expanded=False) as status:
                     search_res = searcher.search(
                         augmented_search_query,
                         top_k=config.RETRIEVAL_TOP_K,
-                        use_decomposition=use_decomp,
-                        use_hyde=use_hyde
+                        use_decomposition=True,
+                        use_hyde=False
                     )
                     retrieved_context = search_res.get("packed_context", "")
                     has_sufficient_evidence = search_res.get("has_sufficient_evidence", False)
                     error_evidence = error_manager.get_relevant_errors(augmented_search_query)
 
                     web_res = {"has_web": False, "packed_context": "", "sources": [], "raw_results": []}
-                    if use_web_search and not has_sufficient_evidence:
-                        web_res = web_searcher.get_live_web_context(augmented_search_query)
-                        if web_res.get("has_web"):
-                            retrieved_context = (retrieved_context + "\n\n" + web_res["packed_context"]).strip()
-                            has_sufficient_evidence = True
+
+                    # Adım 2: Yerelde yoksa veya yetersizse İnternetten / Webden ara
+                    if not has_sufficient_evidence:
+                        status.update(label="🌐 Yerel kütüphanede tam eşleşme bulunamadı. Canlı arXiv ve web taranıyor...", state="running")
+                        if is_online():
+                            web_res = web_searcher.get_live_web_context(augmented_search_query)
+                            if web_res.get("has_web"):
+                                retrieved_context = (retrieved_context + "\n\n" + web_res["packed_context"]).strip()
+                                has_sufficient_evidence = True
+                                status.update(label="✅ Canlı arXiv ve web taraması tamamlandı, kaynaklar birleştirildi.", state="complete")
+                            else:
+                                status.update(label="ℹ️ Canlı webde doğrudan sonuç bulunamadı. Yerel bilgi tabanı devrede.", state="complete")
+                        else:
+                            status.update(label="⚠️ Çevrimdışı mod: Canlı web erişilemiyor. Yerel zeka ile yanıt veriliyor.", state="complete")
+                    else:
+                        status.update(label="✅ Yerel kütüphanede (21 makale / Obsidian) doğrudan akademik kanıt bulundu.", state="complete")
 
                     budget_parts = {
                         "error_history": error_evidence,
@@ -667,9 +528,8 @@ with tab_chat:
                     }
                     packed_report = budget.pack_context(budget_parts)
                     safe_packed = packed_report["packed"]
-                    status.update(label="Literatür ve çevrimiçi bağlantılar tarandı.", state="complete")
 
-                # Display decomposed sub-queries or translated English search query
+                # Ayrıştırılan alt-sorgular bilgisi
                 sub_qs = search_res.get("sub_queries", [])
                 en_sq = search_res.get("search_query", "")
                 if len(sub_qs) > 1 and has_sufficient_evidence:
@@ -677,16 +537,16 @@ with tab_chat:
                 elif en_sq and en_sq != augmented_search_query and has_sufficient_evidence:
                     st.caption(f"🌐 **Arama Sorgusu (TR → EN):** `{en_sq}`")
 
-                # If no direct academic paper matches with high confidence and no web findings:
+                # Eğer ne yerelde ne webde hiçbir şey bulunamadıysa genel uzman modunda yanıt ver
                 if not has_sufficient_evidence:
                     expert_msgs = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
-                    stream = llm.stream_generate(expert_msgs, max_tokens=3000, temperature=0.6)
+                    stream = llm.stream_generate(expert_msgs, max_tokens=3000, temperature=0.6, model=config.MODEL_ACADEMIC)
                     full_response = st.write_stream(stream)
                     clean_full = normalize_latex(full_response)
                     st.session_state.messages.append({"role": "assistant", "content": clean_full})
                     st.rerun()
 
-                # Display numbered source citations box [S1]..[S5] if available
+                # Yerel Makale Atıf Kartları [S1]..[Sk]
                 sources = search_res.get("results", [])
                 if sources:
                     with st.expander(f"📚 Referans Alınan Yerel Makale Parçaları ({len(sources)} Bölüm — [S1]..[S{len(sources)}])"):
@@ -699,46 +559,33 @@ with tab_chat:
                             sec_info = f" • Bölüm: *{section}*" if section else ""
                             st.markdown(f"- **`[{tag}]`** 📄 **{title}**{sec_info} (`{s.get('id')}`) — *Alaka Skoru: `{score:.2f}`*")
 
-                # Display live online web & arXiv sources [W1]..[W3] if available
+                # Canlı Web & arXiv Kaynak Kartları [W1]..[Wk]
                 if web_res.get("sources"):
                     with st.expander(f"🌐 Canlı Çevrimiçi Web & arXiv Bulguları ({len(web_res['sources'])} Kaynak — [W1]..[W{len(web_res['sources'])}])"):
                         for ws in web_res["sources"]:
                             st.markdown(f"- **`[{ws['tag']}]`** 🔗 [{ws['title']}]({ws['url']})\n  *{ws['summary'][:250]}...*")
 
-                thought_plan = ""
-                # Step 2: Extended Thinking Mode - Model Thinks Deeply in Public
-                if is_deep_cot:
-                    import time
-                    t_start = time.time()
-                    with st.status("💭 Derin Düşünme & Analiz (Model kendi kendine muhakeme yapıyor...)", expanded=True) as status_cot:
-                        cot_prompt_msgs = build_thought_plan_prompt(clean_q, safe_packed.get("paper_chunks", ""))
-                        thought_stream = llm.stream_generate(cot_prompt_msgs, max_tokens=750, temperature=0.2)
-                        thought_plan = st.write_stream(thought_stream)
-                        elapsed_sec = max(1, int(time.time() - t_start))
-                        status_cot.update(label=f"💭 Düşünce Süreci ({elapsed_sec} saniye boyunca derin analiz yapıldı)", state="complete", expanded=False)
-
-                # Step 3: Stage 2 - Comprehensive Masterclass Synthesis
+                # Step 3: Akademik Yanıt Sentezi
                 messages = build_answer_prompt(
                     query=clean_q,
                     packaged_context=safe_packed.get("paper_chunks", ""),
                     telemetry_context="",
                     git_diff="",
                     error_context=safe_packed.get("error_history", ""),
-                    thought_plan=thought_plan,
-                    deep_dive=is_deep_cot,
+                    thought_plan="",
+                    deep_dive=True,
                     history=st.session_state.messages[:-1]
                 )
 
-                target_max_tokens = config.TOKEN_BUDGET.get("max_answer", 3500) if is_deep_cot else 3000
-
                 stream = llm.stream_generate(
                     messages,
-                    max_tokens=target_max_tokens
+                    max_tokens=3500,
+                    model=config.MODEL_ACADEMIC
                 )
                 full_response = st.write_stream(stream)
                 clean_full = normalize_latex(full_response)
 
-                # Step 4: Deterministic Citation & Verbatim Quote Audit
+                # Step 4: Kaynak ve Alıntı Denetimi (Deterministic Audit)
                 audit = audit_markdown_response(clean_full, retrieved_context)
                 cited_str = ", ".join([f"`[{t}]`" for t in audit["cited_tags"]]) if audit["cited_tags"] else "Belirtilmedi"
                 if audit["total_quotes"] > 0:
@@ -758,13 +605,12 @@ with tab_chat:
                 st.markdown(verification_footer)
                 clean_full = clean_full + verification_footer
 
-                # Step 5: Autonomous Knowledge Crystallization
-                # If answer was synthesized using live web research, permanently crystallize into Obsidian & ChromaDB:
+                # Step 5: Otonom Hafızaya Mühürleme (Webden öğrenildiyse Obsidian & ChromaDB'ye ekle)
                 if web_res.get("has_web") and web_res.get("raw_results"):
                     cryst_res = web_searcher.crystalize_knowledge(clean_q, clean_full, web_res["raw_results"])
                     if cryst_res.get("success"):
                         st.toast("🧠 Yeni bilgi yerel Obsidian kasasına ve ChromaDB hafızasına mühürlendi!", icon="💾")
-                        cryst_footer = f"\n\n---\n💾 **Otonom Hafıza Mühürlendi:** Bu araştırma konusu `Vault/02_Theory_Notes/{cryst_res.get('filename')}` ve yerel ChromaDB vektör hafızasına kaydedildi. Artık çevrimdışı (internetsiz) modda da yerel kaynak olarak kullanılabilir."
+                        cryst_footer = f"\n\n---\n💾 **Otonom Hafıza Mühürlendi:** Bu araştırma konusu `Vault/02_Theory_Notes/{cryst_res.get('filename')}` ve yerel ChromaDB vektör hafızasına kaydedildi. Artık çevrimdışı modda da yerel kaynak olarak kullanılabilir."
                         st.markdown(cryst_footer)
                         clean_full = clean_full + cryst_footer
 
