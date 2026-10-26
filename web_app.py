@@ -24,13 +24,38 @@ import psutil
 import config
 import llm
 import budget
+import importlib
+import utils
+importlib.reload(utils)
 from utils import (
     get_gpu_status,
     normalize_latex,
     is_academic_or_technical_inquiry,
-    contextualize_query,
-    extract_next_section
+    contextualize_query
 )
+
+try:
+    from utils import extract_next_section
+except (ImportError, AttributeError):
+    def extract_next_section(text: str) -> str:
+        if not text:
+            return ""
+        patterns = [
+            r'(?:Sıradaki|Sonraki)\s*(?:Adım|Bölüm|Parça)[^:\n]*[:\-]\s*([^\n\r*]+)',
+            r'(?:devam edelim mi|geçelim mi)[^(\n]*\((?:\*\*)?([^)\*]+)(?:\*\*)?\)',
+            r'Bölüm\s*(\d+/\d+[^:\n]*:[^\n\r*]+)',
+            r'🎯\s*(?:Bölüm|Parça)\s*\d+/\d+\s*tamamlandı[^\n]*\n+[^:\n]*:\s*([^\n\r*]+)'
+        ]
+        for p in patterns:
+            m = re.search(p, text, re.IGNORECASE)
+            if m:
+                clean = m.group(1).strip().strip('*').strip()
+                clean = re.sub(r'[\?\.!:]+$', '', clean).strip()
+                if clean.count('(') > clean.count(')'):
+                    clean += ')'
+                if 3 < len(clean) < 80:
+                    return clean
+        return ""
 from retrieval.search import searcher
 from retrieval.web_search import web_searcher, is_online
 from retrieval.graph_rag import graph_rag_engine
