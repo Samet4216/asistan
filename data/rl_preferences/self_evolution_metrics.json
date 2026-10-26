@@ -1,7 +1,9 @@
 {
-  "total_self_evaluations": 0,
-  "average_quality_score": 0.0,
-  "total_self_axioms_evolved": 0,
+  "total_self_evaluations": 11,
+  "average_quality_score": 77.4,
+  "total_self_axioms_evolved": 1,
   "history": [],
-  "last_evolution": "2026-10-26T20:36:00"
+  "last_evolution": "2026-10-26T21:41:49.672441",
+  "last_evaluation_score": 80.0,
+  "last_evaluation_time": "2026-10-26T23:58:26.347113"
 }

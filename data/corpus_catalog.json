@@ -286,5 +286,104 @@
     "color": "#10b981",
     "desc": "Simulator Gazebo/Isaac Sim ortamindan fiziksel robot donanimina sifir hatayla transfer.",
     "prompt": "Domain Randomization tekniginin sim-to-real gecisteki matematiksel mantigini acikla."
+  },
+  {
+    "id": "2110.06864",
+    "title": "ByteTrack: Multi-Object Tracking by Associating Every Detection Box",
+    "authors": "Zhang et al.",
+    "domain": "İHA Hedef Takip & Veri Eşleme (MOT)",
+    "color": "#10b981",
+    "desc": "Düşük güven skorlu tespit kutularını atmadan Kalman filtresi ve BYTE veri eşleme algoritmasıyla hedefin kilitlenmesini kesintisiz koruyan mimari.",
+    "prompt": "ByteTrack algoritmasının iki aşamalı (high-score ve low-score) kutu eşleme mantığını ve İHA kamerasındaki hedef takibi avantajlarını açıkla."
+  },
+  {
+    "id": "2206.14651",
+    "title": "BoT-SORT: Robust Associations Multi-Pedestrian Tracking",
+    "authors": "Aharon et al.",
+    "domain": "Kamera Hareketi Telafisi & Kalman Filtresi",
+    "color": "#06b6d4",
+    "desc": "İHA manevra yaparken kamera açısının dönmesini Kamera Hareket Telafisi (CMC) ve geliştirilmiş Kalman durumuyla (x, y, w, h) modelleyen mimari.",
+    "prompt": "BoT-SORT mimarisinde Kamera Hareket Telafisi (Camera Motion Compensation - CMC) ve Kalman filtresi durum vektörü formülasyonunu açıkla."
+  },
+  {
+    "id": "2008.08835",
+    "title": "EGO-Planner: An ESDF-Free Gradient-Based Local Planner for Quadrotors",
+    "authors": "Zhou et al. (Zhejiang Univ.)",
+    "domain": "İHA Yörünge Planlama & Engelden Kaçınma",
+    "color": "#f59e0b",
+    "desc": "Ağır mesafe haritaları (ESDF) kullanmadan B-spline eğrileri ve ceza gradyanlarıyla İHA'ların gerçek zamanlı engelden kaçmasını sağlayan yerel yörünge planlayıcı.",
+    "prompt": "EGO-Planner algoritmasının B-spline eğri parametrizasyonu ve haritasız (ESDF-free) gradyan tabanlı yörünge optimizasyonunu açıkla."
+  },
+  {
+    "id": "2104.09918",
+    "title": "KalmanNet: Neural Network Aided Kalman Filtering for State Estimation",
+    "authors": "Revach et al.",
+    "domain": "Yapay Zeka Destekli Kalman Filtresi",
+    "color": "#8b5cf6",
+    "desc": "Gürültü kovaryans matrislerini (Q ve R) elle tahmin etmek yerine RNN tabanlı mimariyle Kalman kazancını dinamik öğrenen gürültüye dayanıklı durum kestirici.",
+    "prompt": "KalmanNet mimarisinin Kalman kazancını (Kalman Gain) derin sinir ağıyla nasıl öğrendiğini ve gürültülü sensörlerdeki üstünlüğünü açıkla."
+  },
+  {
+    "id": "1503.02531",
+    "title": "Distilling the Knowledge in a Neural Network",
+    "authors": "Hinton et al. (Google Brain)",
+    "domain": "Model Küçültme & Bilgi Damıtma (Edge AI)",
+    "color": "#ec4899",
+    "desc": "Büyük ve yavaş bir öğretmen modelin bilgisini İHA uç donanımında çalışan hafif öğrenci modele sıcaklık (T) yumuşatmalı softmax ile aktaran temel makale.",
+    "prompt": "Knowledge Distillation kuramındaki sıcaklık (temperature T) parametreli yumuşatılmış softmax ve damıtma kaybı (distillation loss) fonksiyonunu açıkla."
+  },
+  {
+    "id": "2202.06456",
+    "title": "SAHI: Slicing Aided Hyper Inference and Fine-Tuning for Small Object Detection",
+    "authors": "Akyon et al.",
+    "domain": "İHA Küçük Hedef Tespiti",
+    "color": "#f97316",
+    "desc": "Uzak ve birkaç piksellik küçük İHA hava hedeflerini dilimleme (slicing) ile kaçırmadan tespit eden açık kaynak standardı.",
+    "prompt": "SAHI mimarisinin dilimleme tabanlı çıkarım (slicing aided hyper inference) mantığını ve küçük hedef tespitindeki üstünlüğünü açıkla."
+  },
+  {
+    "id": "2203.11991",
+    "title": "OSTrack: Joint Monocular 3D and 2D One-Stream Visual Tracking",
+    "authors": "Ye et al.",
+    "domain": "Hava Hedef Takip & Kilitlenme",
+    "color": "#10b981",
+    "desc": "Hedef şablonu ile arama bölgesini tek bir Transformer katmanında birleştiren yüksek FPS hedef takip mimarisi.",
+    "prompt": "OSTrack mimarisinin tek akışlı (one-stream) dikkat mekanizmasıyla hedef takibini nasıl yaptığını ve Siamese modellere üstünlüğünü açıkla."
+  },
+  {
+    "id": "2207.08051",
+    "title": "CFT: Cross-Modality Feature Fusion Transformer for Multispectral Detection",
+    "authors": "Qingyun et al.",
+    "domain": "Termal Kamera & Sensör Füzyonu",
+    "color": "#ef4444",
+    "desc": "Termal kızılötesi ve RGB kamera kanallarını Transformer dikkat mekanizmasıyla kaynaştırarak gece-gündüz hedef tespitini maksimize eden mimari.",
+    "prompt": "CFT mimarisinin termal ve görünür ışık özelliklerini çapraz dikkat (cross-attention) ile nasıl birleştirdiğini açıkla."
+  },
+  {
+    "id": "2303.14189",
+    "title": "FastViT: A Fast Hybrid Vision Transformer using Structural Reparameterization",
+    "authors": "Vasu et al. (Apple)",
+    "domain": "Gömülü Uç Yapay Zeka (Fast Edge AI)",
+    "color": "#38bdf8",
+    "desc": "Uç donanımlarda Vision Transformer doğruluğunu CNN hızında ve rekor gecikmeyle çalıştıran hibrit mimari.",
+    "prompt": "FastViT mimarisindeki yapısal yeniden parametrelendirme (structural reparameterization) ve RepMixer bloğunun hız avantajını açıkla."
+  },
+  {
+    "id": "2301.12900",
+    "title": "DepGraph: Towards Any Structural Pruning",
+    "authors": "Fang et al.",
+    "domain": "Model Sıkıştırma & Budama (Pruning)",
+    "color": "#a855f7",
+    "desc": "YOLO ve konvolüsyonel modelleri doğruluğu bozmadan %40 küçülterek donanımda 30+ FPS'e ulaştıran yapısal budama kütüphanesi.",
+    "prompt": "DepGraph algoritmasının katman bağımlılık grafiğini çıkararak yapısal budamayı (structural pruning) nasıl otomatikleştirdiğini açıkla."
+  },
+  {
+    "id": "2006.05768",
+    "title": "Deep Drone Acrobatics",
+    "authors": "Kaufmann et al. (ETH Zurich / Scaramuzza)",
+    "domain": "İHA Çevik Uçuş & Otonom Manevra",
+    "color": "#ec4899",
+    "desc": "Yüksek G kuvvetli hava muharebesi ve it dalaşında görsel sensörlerden doğrudan agresif uçuş komutları üreten derin öğrenme mimarisi.",
+    "prompt": "Deep Drone Acrobatics makalesindeki sim-to-real transfer ve agresif yörünge izleme mantığını açıkla."
   }
 ]
