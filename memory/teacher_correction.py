@@ -149,7 +149,8 @@ tags:
             self.indexer.index_paper_chunks(truth_chunk)
             # Clear BM25 cache in searcher
             from retrieval.search import searcher
-            searcher._bm25_cache.clear()
+            if hasattr(searcher, "_bm25_cache") and isinstance(searcher._bm25_cache, dict):
+                searcher._bm25_cache.clear()
         except Exception as e:
             print(f"[!] Error indexing teacher chunk in ChromaDB: {e}")
 

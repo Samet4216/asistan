@@ -62,7 +62,17 @@ from retrieval.search import searcher
 from retrieval.web_search import web_searcher, is_online
 from retrieval.graph_rag import graph_rag_engine
 import answer.prompts as prompts_mod
+import memory.user_profile as up_mod
+import memory.teacher_correction as tc_mod
+import memory.conversation_collector as cc_mod
+import memory.rl_feedback as rl_mod
+
 importlib.reload(prompts_mod)
+importlib.reload(up_mod)
+importlib.reload(tc_mod)
+importlib.reload(cc_mod)
+importlib.reload(rl_mod)
+
 from answer.prompts import (
     build_answer_prompt,
     build_casual_response_prompt,
@@ -77,6 +87,21 @@ from memory.conversation_collector import collector
 from memory.teacher_correction import teacher_engine
 from ingest.single_ingest import ingest_arxiv_paper
 from ingest.local_file_ingest import ingest_uploaded_file
+
+
+def safe_sync_self_training():
+    """Safely executes self-training sync even under Streamlit hot-reload cache."""
+    try:
+        if hasattr(collector, "sync_self_training"):
+            return collector.sync_self_training()
+        else:
+            import memory.conversation_collector as _cc
+            importlib.reload(_cc)
+            if hasattr(_cc.collector, "sync_self_training"):
+                return _cc.collector.sync_self_training()
+    except Exception as e:
+        print(f"[!] Warning during self-training sync: {e}")
+    return {}
 
 
 # Page configuration
@@ -208,7 +233,7 @@ with st.sidebar:
         col_prof1, col_prof2 = st.columns(2)
         with col_prof1:
             if st.button("🔄 Senkronize Et", key="btn_sync_self_train", use_container_width=True, help="Öğrenilen kuralları, DPO eğitim çiftlerini ve Modelfile'ı günceller"):
-                s_res = collector.sync_self_training()
+                s_res = safe_sync_self_training()
                 st.toast(f"✅ Hafıza senkronize edildi! ({s_res.get('sharegpt_dialogs', 0)} diyalog)", icon="🧠")
                 st.rerun()
         with col_prof2:
@@ -375,13 +400,13 @@ else:
                 with act_col1:
                     if st.button("👍", key=f"btn_up_{idx}", help="Bu tarzı ve yaklaşımı pekiştir"):
                         rl_engine.record_feedback(user_query_for_msg, content, reward=1.0, style_tag="positive")
-                        collector.sync_self_training()
+                        safe_sync_self_training()
                         st.toast("🎯 Yanıt altın örnek olarak mühürlendi ve model güncellendi! (+1.0)", icon="👍")
                         st.rerun()
                 with act_col2:
                     if st.button("👎", key=f"btn_down_{idx}", help="Bu cevabı beğenmedim / hatalı buldum"):
                         rl_engine.record_feedback(user_query_for_msg, content, reward=-1.0, style_tag="negative")
-                        collector.sync_self_training()
+                        safe_sync_self_training()
                         st.toast("Geri bildirim kaydedildi (-1.0). İstersen '✏️ Doğrusunu Öğret' ile doğrusunu mühürleyebilirsin.", icon="👎")
                         st.rerun()
                 with act_col3:
@@ -392,21 +417,24 @@ else:
                         teacher_critique = st.text_input("Neyi yanlış bildi? (Opsiyonel)", placeholder="Örn: Formülü uydurmuş...", key=f"teacher_crit_{idx}")
                         if st.button("💾 Doğru Cevabı Mühürle & Eğit", key=f"btn_seal_truth_{idx}", use_container_width=True):
                             if teacher_ans.strip():
-                                res = teacher_engine.record_correction(
-                                    query=user_query_for_msg,
-                                    wrong_response=content,
-                                    ground_truth=teacher_ans.strip(),
-                                    critique=teacher_critique.strip()
-                                )
-                                if res.get("success"):
-                                    collector.sync_self_training()
-                                    st.session_state.messages[idx]["content"] = (
-                                        content + f"\n\n---\n✅ **[Doğrulanmış Öğretmen Yanıtı (Ground Truth)]:**\n\n{teacher_ans.strip()}"
+                                try:
+                                    res = teacher_engine.record_correction(
+                                        query=user_query_for_msg,
+                                        wrong_response=content,
+                                        ground_truth=teacher_ans.strip(),
+                                        critique=teacher_critique.strip()
                                     )
-                                    st.toast("🎯 Doğru cevap hafızaya mühürlendi ve modele öğretildi!", icon="🎓")
-                                    st.rerun()
-                                else:
-                                    st.error(res.get("error", "Kayıt başarısız."))
+                                    if res.get("success"):
+                                        safe_sync_self_training()
+                                        st.session_state.messages[idx]["content"] = (
+                                            content + f"\n\n---\n✅ **[Doğrulanmış Öğretmen Yanıtı (Ground Truth)]:**\n\n{teacher_ans.strip()}"
+                                        )
+                                        st.toast("🎯 Doğru cevap hafızaya mühürlendi ve modele öğretildi!", icon="🎓")
+                                        st.rerun()
+                                    else:
+                                        st.error(res.get("error", "Kayıt başarısız."))
+                                except Exception as e_teach:
+                                    st.error(f"Kayıt sırasında hata: {e_teach}")
                             else:
                                 st.warning("Lütfen doğru cevabı girin.")
                 with act_col4:
@@ -502,12 +530,18 @@ else:
                             deep_dive=True,
                             history=st.session_state.messages[:-1]
                         )
+                        stream = llm.stream_generate(messages, max_tokens=3500, temperature=0.0, model=config.MODEL_ACADEMIC)
+                        full_response = st.write_stream(stream)
+                        clean_full = normalize_latex(full_response)
                     else:
-                        messages = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
-
-                    stream = llm.stream_generate(messages, max_tokens=3500, temperature=0.1, model=config.MODEL_ACADEMIC)
-                    full_response = st.write_stream(stream)
-                    clean_full = normalize_latex(full_response)
+                        # SIFIR HALÜSİNASYON / KESİN DÜRÜSTLÜK (ZERO-HALLUCINATION STRICT ABSTENTION)
+                        # Literatürde veya yerel makalelerde doğrulanmış kanıt yoksa ASLA spekülasyon veya uydurma bilgi üretilmez.
+                        clean_full = (
+                            "⚠️ **Bu konu hakkında yerel makale arşivimizde ve taranan literatürde doğrulanmış bir akademik kanıt veya bilgi bulunmamaktadır; bu yüzden bilmiyorum.**\n\n"
+                            "Halüsinasyon, uydurma veya yanıltıcı bilgi üretmemek adına varsayımsal tahminde bulunmuyorum. "
+                            "Eğer bu konuyla ilgili doğru bilgiye sahipseniz, aşağıdaki **'✏️ Doğrusunu Öğret'** butonuna tıklayarak doğrudan gerçeği sisteme öğretebilirsiniz."
+                        )
+                        st.markdown(clean_full)
 
                     # Silent interaction recording
                     self_eval = self_evolving_rl.evaluate_and_evolve(clean_q, clean_full, mode="research")

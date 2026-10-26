@@ -231,17 +231,35 @@ class AcademicWebSearcher:
         """
         Combines live arXiv papers, Wikipedia concepts, and technical web links
         into a unified Markdown context block labeled [W1]..[W3].
+        Validates semantic relevance with Cross-Encoder reranker to eliminate hallucinations.
         """
         if not is_online():
             return {"has_web": False, "packed_context": "", "sources": [], "raw_results": []}
 
-        raw_results = self.search_academic_web(query, max_results=3)
+        raw_results = self.search_academic_web(query, max_results=4)
         if not raw_results:
             return {"has_web": False, "packed_context": "", "sources": [], "raw_results": []}
 
-        packed_context = self.pack_web_context(raw_results)
+        # Cross-Encoder relevance validation
+        try:
+            from retrieval.rerank import reranker
+            candidates = []
+            for item in raw_results:
+                candidates.append({
+                    "id": item.get("url", item.get("title", "")),
+                    "content": f"{item.get('title', '')}\n{item.get('summary', '')}",
+                    "raw": item
+                })
+            reranked, has_sufficient = reranker.rerank(query, candidates, top_n=3)
+            if not has_sufficient or not reranked:
+                return {"has_web": False, "packed_context": "", "sources": [], "raw_results": []}
+            valid_results = [c["raw"] for c in reranked]
+        except Exception:
+            valid_results = raw_results[:3]
+
+        packed_context = self.pack_web_context(valid_results)
         sources = []
-        for idx, item in enumerate(raw_results):
+        for idx, item in enumerate(valid_results):
             sources.append({
                 "tag": f"W{idx+1}",
                 "title": item.get("title", "Online Source"),
@@ -254,7 +272,7 @@ class AcademicWebSearcher:
             "has_web": True,
             "packed_context": packed_context,
             "sources": sources,
-            "raw_results": raw_results
+            "raw_results": valid_results
         }
 
     def pack_web_context(self, results: List[Dict[str, Any]]) -> str:

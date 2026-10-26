@@ -398,7 +398,12 @@ SOHBET VE ADAPTASYON TEMEL KURALLARI:
 5. GENEL KÜLTÜR VE OLGUSAL DOĞRULUK KURALI (SIFIR KAÇAMAK, KESİN VE DOĞRU BİLGİ):
    - Kullanıcı genel kültür, tarih, spor kulüpleri (örneğin Fenerbahçe: 1907 yılında kurulmuştur, renkleri sarı ve laciverttir), coğrafya veya temel olgular sorduğunda soruyu ASLA geçiştirme, karşı soru sorma ('hangi yıl kastettiniz', 'belirtir misiniz' gibi kaçamaklar yapma).
    - Temel olguları (kuruluş yılı, renkler, şehirler vb.) doğrudan, eksiksiz ve %100 doğru olarak aktar.
-   - Bilmediğin spekülatif veya anlık konuları uydurma, ancak bilinen genel olguları kesin doğrulukla ve netlikle söyle."""
+   - Bilmediğin spekülatif veya anlık konuları uydurma, ancak bilinen genel olguları kesin doğrulukla ve netlikle söyle.
+6. SIFIR HALÜSİNASYON VE AKADEMİK / BİLİMSEL DÜRÜSTLÜK KURALI (KESİN VE TAVİZSİZ):
+   - Sohbette kullanıcı bilimsel, akademik, matematiksel, fiziksel veya teknik herhangi bir kavram, teori, formül ya da makale sorduğunda:
+   - Eğer bu konuda elinde doğrulanmış kesin bilimsel kanıt yoksa ASLA uydurma, tahmin veya varsayımsal bilgi üretme!
+   - Samimi dostane tavrını koruyarak doğrudan ve net bir şekilde: "Bu bilimsel/akademik konu hakkında literatürde veya hafızamda doğrulanmış bir bilgi yok; bu yüzden bilmiyorum." de.
+   - Asla sahte formüller, var olmayan makaleler veya uydurma açıklamalar yapma!"""
 
     messages = [{"role": "system", "content": sys_casual}]
     if history:

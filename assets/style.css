@@ -8,19 +8,27 @@
     color: #e2e8f0 !important;
 }
 
-/* Sidebar - Clean Dark Surface */
+/* Centered & Focused Chat Container (ChatGPT/Claude Style) */
+.main .block-container {
+    max-width: 840px !important;
+    padding-top: 1.5rem !important;
+    padding-bottom: 6rem !important;
+    margin: 0 auto !important;
+}
+
+/* Sidebar - Clean Dark Glass Surface */
 section[data-testid="stSidebar"] {
-    background: #0d121f !important;
+    background: #0c111d !important;
     border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
     box-shadow: none !important;
 }
 
 section[data-testid="stSidebar"] > div:first-child {
-    padding-top: 1.5rem !important;
+    padding-top: 1.2rem !important;
     padding-bottom: 2rem !important;
 }
 
-/* Clean Sleek Scrollbars */
+/* Sleek Scrollbars */
 ::-webkit-scrollbar {
     width: 5px;
     height: 5px;
@@ -38,7 +46,8 @@ section[data-testid="stSidebar"] > div:first-child {
 
 /* Typography & Line Spacing */
 p, li, span {
-    line-height: 1.7 !important;
+    line-height: 1.72 !important;
+    font-size: 0.94rem !important;
 }
 
 /* Chat Message Bubbles - Minimalist & Elegant */
@@ -120,7 +129,7 @@ div[data-testid="stMetricValue"] {
 .stButton > button {
     border-radius: 8px !important;
     font-weight: 500 !important;
-    font-size: 0.85rem !important;
+    font-size: 0.84rem !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
     background: rgba(255, 255, 255, 0.03) !important;
     color: #cbd5e1 !important;
@@ -154,39 +163,32 @@ div[data-testid="stMetricValue"] {
     border: 1px solid rgba(255, 255, 255, 0.05) !important;
     border-radius: 8px !important;
     color: #94a3b8 !important;
-    font-size: 0.88rem !important;
+    font-size: 0.86rem !important;
     font-weight: 500 !important;
 }
 
-/* Tabs Styling */
-.stTabs [data-baseweb="tab-list"] {
-    gap: 8px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    padding-bottom: 4px;
+/* Radio button pills for clean switching */
+div[data-testid="stRadio"] > div {
+    gap: 6px;
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 3px;
+    border-radius: 8px;
 }
-
-.stTabs [data-baseweb="tab"] {
-    height: 38px;
-    padding: 0 16px;
-    background-color: transparent;
+div[data-testid="stRadio"] label {
+    padding: 6px 14px;
     border-radius: 6px;
-    color: #94a3b8;
-    font-size: 0.88rem;
+    cursor: pointer;
+    font-size: 0.82rem;
     font-weight: 500;
-}
-
-.stTabs [aria-selected="true"] {
-    background-color: rgba(56, 189, 248, 0.1) !important;
-    color: #38bdf8 !important;
-    font-weight: 600;
 }
 
 /* Chat Input Bar - Sleek Floating Style */
 [data-testid="stChatInput"] {
     border-radius: 12px !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    background: rgba(15, 23, 42, 0.8) !important;
-    backdrop-filter: blur(12px) !important;
+    background: rgba(15, 23, 42, 0.85) !important;
+    backdrop-filter: blur(16px) !important;
 }
 
 [data-testid="stChatInput"]:focus-within {
