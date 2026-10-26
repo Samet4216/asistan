@@ -1,5 +1,5 @@
 """
-Batch Ingestion Script for Recommended Drone & Thermal AI Papers.
+Batch Ingestion Script for Recommended Dogfight, YOLOv9, and Night Vision AI Papers.
 Downloads, chunks, and indexes high-priority papers into ChromaDB and updates corpus catalog.
 """
 
@@ -22,58 +22,58 @@ from ingest.single_ingest import ingest_arxiv_paper
 
 PAPERS_TO_ADD = [
     {
-        "id": "2202.06456",
-        "title": "SAHI: Slicing Aided Hyper Inference and Fine-Tuning for Small Object Detection",
-        "authors": "Akyon et al.",
-        "domain": "İHA Küçük Hedef Tespiti",
+        "id": "2203.14360",
+        "title": "Observation-Centric SORT (OC-SORT): Robust Object Tracking for Fast Maneuvers",
+        "authors": "Cao et al.",
+        "domain": "İHA İt Dalaşı & Viraj Takibi",
         "color": "#f97316",
-        "desc": "Uzak ve birkaç piksellik küçük İHA hava hedeflerini dilimleme (slicing) ile kaçırmadan tespit eden açık kaynak standardı.",
-        "prompt": "SAHI mimarisinin dilimleme tabanlı çıkarım (slicing aided hyper inference) mantığını ve küçük hedef tespitindeki üstünlüğünü açıkla."
+        "desc": "Hedef ani manevra veya viraj yaptığında Kalman filtresinin yön sapmasını gözlem merkezli düzelten ve kilidin kopmasını engelleyen algoritma.",
+        "prompt": "OC-SORT mimarisi klasik SORT ve ByteTrack modellerine göre ani dönüşlerde ve hedef kaybolmalarında kilitlenmeyi nasıl korur?"
     },
     {
-        "id": "2203.11991",
-        "title": "OSTrack: Joint Monocular 3D and 2D One-Stream Visual Tracking",
-        "authors": "Ye et al.",
+        "id": "2112.00995",
+        "title": "SwinTrack: Visual Tracking with Swin Transformer",
+        "authors": "Lin et al.",
         "domain": "Hava Hedef Takip & Kilitlenme",
         "color": "#10b981",
-        "desc": "Hedef şablonu ile arama bölgesini tek bir Transformer katmanında birleştiren yüksek FPS hedef takip mimarisi.",
-        "prompt": "OSTrack mimarisinin tek akışlı (one-stream) dikkat mekanizmasıyla hedef takibini nasıl yaptığını ve Siamese modellere üstünlüğünü açıkla."
+        "desc": "Swin Transformer'ın pencereli dikkat mimarisini kullanarak yakın ve uzak ölçeklerdeki hava hedeflerini kararlı takip eden yapı.",
+        "prompt": "SwinTrack mimarisinin hedef ve arama alanını birleştiren hiyerarşik dikkat mekanizmasını açıkla."
     },
     {
-        "id": "2207.08051",
-        "title": "CFT: Cross-Modality Feature Fusion Transformer for Multispectral Detection",
-        "authors": "Qingyun et al.",
-        "domain": "Termal Kamera & Sensör Füzyonu",
+        "id": "2402.13616",
+        "title": "YOLOv9: Learning What You Want to Learn Using Programmable Gradient Information (PGI)",
+        "authors": "Wang, Bochkovskiy & Liao",
+        "domain": "YOLO Mimarisi & PGI Teorisi",
         "color": "#ef4444",
-        "desc": "Termal kızılötesi ve RGB kamera kanallarını Transformer dikkat mekanizmasıyla kaynaştırarak gece-gündüz hedef tespitini maksimize eden mimari.",
-        "prompt": "CFT mimarisinin termal ve görünür ışık özelliklerini çapraz dikkat (cross-attention) ile nasıl birleştirdiğini açıkla."
+        "desc": "Derin ağlarda küçük hedeflere ait bilginin kaybolmasını engelleyen PGI (Programlanabilir Gradyan Bilgisi) ve GELAN mimarisi.",
+        "prompt": "YOLOv9 mimarisindeki Programmable Gradient Information (PGI) ve tersinir fonksiyonlar derin katmanlarda bilgi kaybını nasıl önler?"
     },
     {
-        "id": "2303.14189",
-        "title": "FastViT: A Fast Hybrid Vision Transformer using Structural Reparameterization",
-        "authors": "Vasu et al. (Apple)",
-        "domain": "Gömülü Uç Yapay Zeka (Fast Edge AI)",
-        "color": "#38bdf8",
-        "desc": "Uç donanımlarda Vision Transformer doğruluğunu CNN hızında ve rekor gecikmeyle çalıştıran hibrit mimari.",
-        "prompt": "FastViT mimarisindeki yapısal yeniden parametrelendirme (structural reparameterization) ve RepMixer bloğunun hız avantajını açıkla."
+        "id": "2309.11331",
+        "title": "Gold-YOLO: Efficient Object Detector via Gather-and-Distribute Mechanism",
+        "authors": "Wang et al.",
+        "domain": "Hedef Tespiti & FPN İyileştirme",
+        "color": "#eab308",
+        "desc": "Klasik FPN/PAN yapılarının yerine geçerek hedef özelliklerini tüm ölçeklere minimum gecikmeyle yayan Topla ve Dağıt (GD) mekanizması.",
+        "prompt": "Gold-YOLO mimarisindeki Gather-and-Distribute (GD) mekanizması FPN yapılarına göre küçük hedeflerin tespitinde nasıl avantaj sağlar?"
     },
     {
-        "id": "2301.12900",
-        "title": "DepGraph: Towards Any Structural Pruning",
-        "authors": "Fang et al.",
-        "domain": "Model Sıkıştırma & Budama (Pruning)",
+        "id": "2001.06826",
+        "title": "Zero-DCE: Zero-Reference Deep Curve Estimation for Low-Light Vision",
+        "authors": "Guo et al.",
+        "domain": "Gece & Sis Görüntü İyileştirme",
         "color": "#a855f7",
-        "desc": "YOLO ve konvolüsyonel modelleri doğruluğu bozmadan %40 küçülterek donanımda 30+ FPS'e ulaştıran yapısal budama kütüphanesi.",
-        "prompt": "DepGraph algoritmasının katman bağımlılık grafiğini çıkararak yapısal budamayı (structural pruning) nasıl otomatikleştirdiğini açıkla."
+        "desc": "Referans görüntü olmadan 300+ FPS hızda gece ve sisli kamera görüntülerini anında aydınlatan ve netleştiren hafif sinir ağı.",
+        "prompt": "Zero-DCE mimarisi dinamik eğri kestirimi (deep curve estimation) ve referanssız kayıp fonksiyonlarıyla gece görüntüsünü nasıl iyileştirir?"
     },
     {
-        "id": "2006.05768",
-        "title": "Deep Drone Acrobatics",
-        "authors": "Kaufmann et al. (ETH Zurich / Scaramuzza)",
-        "domain": "İHA Çevik Uçuş & Otonom Manevra",
-        "color": "#ec4899",
-        "desc": "Yüksek G kuvvetli hava muharebesi ve it dalaşında görsel sensörlerden doğrudan agresif uçuş komutları üreten derin öğrenme mimarisi.",
-        "prompt": "Deep Drone Acrobatics makalesindeki sim-to-real transfer ve agresif yörünge izleme mantığını açıkla."
+        "id": "1903.04780",
+        "title": "Fast-Planner: A Robust and Efficient Trajectory Planner for Quadrotors",
+        "authors": "Zhou et al. (HKUST)",
+        "domain": "İHA 3D Kinematik Yörünge Planlama",
+        "color": "#06b6d4",
+        "desc": "Kinodinamik A* ve B-spline optimizasyonu ile engelli ortamlarda milisaniyeler içinde akıcı ve güvenli 3D uçuş rotası üreten algoritma.",
+        "prompt": "Fast-Planner algoritması kinodinamik A* arama ve B-spline eğri türevleriyle quadrotor kısıtlarına uygun yörüngeyi nasıl oluşturur?"
     }
 ]
 
@@ -101,7 +101,7 @@ def update_catalog():
 
 def main():
     print("=" * 65)
-    print("🚀 İHA & TERMAL KAMERA & UÇ YAPAY ZEKA MAKALELERİNİ İNDİRME VE İNDEKSLENME")
+    print("🚀 İHA İT DALAŞI, YOLOV9, GECE GÖRÜŞ VE 3D PLANLAMA MAKALELERİNİ İNDİRME")
     print("=" * 65)
 
     update_catalog()
@@ -116,7 +116,7 @@ def main():
         else:
             print(f"  ⚠️ Hata: {res.get('error')}")
 
-    print("\n✅ Tüm işlemler tamamlandı.")
+    print("\n✅ Tüm yeni makaleler başarıyla hafızaya mühürlendi.")
 
 
 if __name__ == "__main__":

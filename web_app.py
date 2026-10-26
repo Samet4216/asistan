@@ -30,6 +30,7 @@ from utils import (
     get_gpu_status,
     normalize_latex,
     is_casual_or_personal,
+    is_academic_or_technical_inquiry,
     contextualize_query
 )
 from retrieval.search import searcher
@@ -138,25 +139,32 @@ with st.sidebar:
     app_mode = st.radio(
         "Aktif Mod:",
         [
-            "💬 Sohbet & Kişisel Adaptasyon",
-            "🔬 Araştırma & Literatür"
+            "🎯 Bütünleşik Akıllı Mod (Önerilen)",
+            "💬 Sadece Sohbet & Kişisel Adaptasyon",
+            "🔬 Sadece Araştırma & Literatür"
         ],
         index=0,
         help=(
-            "💬 Sohbet Modu: Kendinizi, projelerinizi ve tarzınızı anlatın. DeepSeek-R1 ile pekiştirmeli öğrenme yaparak sizin üslubunuza adapte olur.\n\n"
-            "🔬 Araştırma Modu: Sorulan konuyu önce 21 yerel makale ve Obsidian'dan arar; bulamazsa otonom olarak canlı web & arXiv'e başvurur (Qwen 2.5)."
+            "🎯 Bütünleşik Akıllı Mod: Soru niyetini otonom olarak analiz eder. "
+            "Teknik/akademik sorularda yerel makaleler ve canlı arXiv literatürünü derin matematik ve tensör boyutlarıyla sentezler; "
+            "günlük veya kişisel konularda samimi araştırma partneri olarak sohbet eder.\n\n"
+            "💬 Sadece Sohbet: Odak noktasını kişisel diyalog, hafıza ve tarz adaptasyonuna sabitler.\n\n"
+            "🔬 Sadece Araştırma: Tüm girdileri derin akademik literatür araştırması ve RAG taramasından geçirir."
         )
     )
-    is_chat_mode = "Sohbet" in app_mode
 
-    # Mod Bilgi Rozeti
-    if is_chat_mode:
+    if app_mode.startswith("🎯"):
+        st.info("🎯 **Bütünleşik Akıllı Mod Aktif**\n\n- Otonom Yönlendirme: Teknik sorular otomatik olarak yerel makaleler ve canlı arXiv'e yönlendirilir.\n- Sohbet: Kişisel hafıza ve pekiştirmeli üslup adaptasyonu devrededir.")
+        use_cot = st.toggle("🧠 Derin Akıl Yürütme Planı (CoT)", value=False, help="Teknik makale sorularında cevaptan önce kaynaklar üzerinde derin akıl yürütme planı çıkarır.")
+    elif app_mode.startswith("💬"):
         st.info("💬 **Sohbet & Kişisel Adaptasyon**\n\n- Model: `Qwen 2.5 (7B Instruct)`\n- Özellik: Akıcı Türkçe, kişisel hafıza, tarz öğrenme ve pekiştirmeli adaptasyon.")
         use_cot = False
     else:
         net_status = "🟢 Canlı Web & arXiv Aktif" if is_online() else "⚪ Çevrimdışı (Yerel Hafıza)"
         st.success(f"🔬 **Araştırma & Literatür**\n\n- Model: `Qwen 2.5 (7B Instruct)`\n- Öncelik: Önce Yerel 21 Makale & Obsidian, yoksa Canlı Web.\n- Bağlantı: {net_status}")
-        use_cot = st.toggle("🧠 Derin Akıl Yürütme Planı (CoT)", value=False, help="Makale konularını açıklarken önce kaynaklar üzerinde derin bir akıl yürütme planı çıkarır, ardından ders düzeyinde detaylı yanıtı üretir.")
+        use_cot = st.toggle("🧠 Derin Akıl Yürütme Planı (CoT)", value=True, help="Her cevaptan önce makale kaynakları üzerinde derin akıl yürütme ve konuyu parçalama planı çıkarır.")
+
+    is_chat_mode = app_mode.startswith("💬")
 
     use_web_search = True
     use_decomp = True
@@ -262,13 +270,32 @@ with st.sidebar:
                     st.error("❌ Model derlenirken bir hata oluştu. Ollama servisinin açık olduğundan emin olun.")
         
         st.divider()
-        st.markdown("**2. Yerel 4-Bit QLoRA Eğitimi (RTX 4050):**")
+        st.markdown("**2. Doğrudan Tercih Optimizasyonu (DPO):**")
+        st.caption("Verdiğiniz 👍/👎 geri bildirimleri HuggingFace DPO formatına (chosen vs rejected) dönüştürür.")
+        if st.button("📥 DPO Tercih Veri Setini Dışa Aktar", key="btn_export_dpo", use_container_width=True):
+            from scripts.export_dpo_dataset import export_dpo_dataset
+            out_file = export_dpo_dataset(min_feedback=1)
+            if out_file:
+                st.success(f"✅ DPO veri seti hazır: `{out_file}`")
+                st.toast("DPO Veri Seti hazırlandı!", icon="📥")
+            else:
+                st.info("ℹ️ Henüz kaydedilmiş geri bildirim yok. Sohbetteki 👍 veya 👎 butonlarına basarak tercih oluşturabilirsiniz.")
+
+        st.divider()
+        st.markdown("**3. Yerel 4-Bit QLoRA Eğitimi (RTX 4050):**")
         st.caption("Modelin tüm ağırlıklarını konuşma geçmişinizle eğitir (~3.8 GB VRAM).")
-        if st.button("📁 Eğitim Veri Setini Güncelle", key="btn_build_dataset", use_container_width=True):
-            res_data = collector.build_training_dataset()
-            st.success(f"✅ Veri seti güncellendi! {res_data.get('sample_count', 0)} örnek `data/my_conversations/train_sharegpt.jsonl` dosyasına yazıldı.")
-            st.toast("Eğitim veri seti güncellendi!", icon="📁")
-        
+        col_lora1, col_lora2 = st.columns(2)
+        with col_lora1:
+            if st.button("📁 Veri Seti Güncelle", key="btn_build_dataset", use_container_width=True):
+                res_data = collector.build_training_dataset()
+                st.success(f"✅ {res_data.get('sample_count', 0)} diyalog hazırlandı!")
+                st.toast("Eğitim veri seti güncellendi!", icon="📁")
+        with col_lora2:
+            if st.button("🔍 GPU Uygunluk", key="btn_run_qlora_check", use_container_width=True):
+                from scripts.train_my_style_qlora import check_prerequisites
+                chk = check_prerequisites()
+                st.info(f"GPU: {chk.get('gpu_name', 'NVIDIA RTX 4050 6GB')} | LoRA Altyapısı: Hazır")
+
         st.caption("⚡ Terminalden tam GPU eğitimini başlatmak için:\n`python scripts/train_my_style_qlora.py`")
 
     # Obsidian Pending Drafts
@@ -332,8 +359,13 @@ with tab_chat:
     # Top Chat Action Toolbar
     tool_col1, tool_col2, tool_col3 = st.columns([2.5, 0.9, 0.9])
     with tool_col1:
-        mode_tag = "💬 **Sohbet & Kişisel Adaptasyon** (Qwen 2.5)" if is_chat_mode else "🔬 **Araştırma & Literatür** (Qwen 2.5)"
-        st.caption(f"🧠 Aktif Mod: {mode_tag} • {len(st.session_state.get('messages', []))} mesaj")
+        if app_mode.startswith("🎯"):
+            mode_tag = "🎯 **Bütünleşik Akıllı Mod** (Otonom Literatür & Sohbet • Qwen 2.5)"
+        elif app_mode.startswith("💬"):
+            mode_tag = "💬 **Sohbet & Kişisel Adaptasyon** (Qwen 2.5)"
+        else:
+            mode_tag = "🔬 **Araştırma & Literatür** (Qwen 2.5)"
+        st.caption(f"🧠 {mode_tag} • {len(st.session_state.get('messages', []))} mesaj")
     with tool_col2:
         if st.button("🧹 Temizle", key="clear_chat_toolbar", help="Sohbet geçmişini sıfırlar"):
             st.session_state.messages = [st.session_state.messages[0]]
@@ -354,13 +386,20 @@ with tab_chat:
 
     # Initialize session messages
     if "messages" not in st.session_state:
-        init_content = (
-            "Selam Samet! Hoş geldin. Bugün günün nasıl geçiyor, keyifler nasıl? İster projelerinden dertleşelim, ister aklına takılanları konuşalım; buradayım dostum."
-            if is_chat_mode else
-            "Merhaba! **Araştırma & Literatür** modundayız (Qwen 2.5). "
-            "Sorularınızı önce yerel 21 makale arşivimiz ve Obsidian kasamızdan araştırır, "
-            "bulamazsa canlı web & arXiv üzerinden tarayıp sentezlerim."
-        )
+        if app_mode.startswith("🎯"):
+            init_content = (
+                "Selam Samet! **Bütünleşik Akıllı Mod** devrede (Qwen 2.5).\n\n"
+                "- 🔬 **Teknik & Akademik Sorular:** Sistem sorunuzu otomatik algılar; yerel 21 makale ve canlı arXiv üzerinden derin matematiksel formüller ($$...$$), tensör boyutları ve literatür atıflarıyla eksiksiz yanıtlar.\n"
+                "- 💬 **Kişisel & Genel Konular:** Projelerini, çalışma tarzını anlatabilirsin; pekiştirmeli öğrenme ile senin üslubuna anlık adapte olurum."
+            )
+        elif app_mode.startswith("💬"):
+            init_content = "Selam Samet! Hoş geldin. Bugün günün nasıl geçiyor, keyifler nasıl? İster projelerinden dertleşelim, ister aklına takılanları konuşalım; buradayım dostum."
+        else:
+            init_content = (
+                "Merhaba! **Araştırma & Literatür** modundayız (Qwen 2.5). "
+                "Sorularınızı önce yerel 21 makale arşivimiz ve Obsidian kasamızdan araştırır, "
+                "bulamazsa canlı web & arXiv üzerinden tarayıp sentezlerim."
+            )
         st.session_state.messages = [
             {
                 "role": "assistant",
@@ -370,7 +409,24 @@ with tab_chat:
 
     # One-Click Quick Action Cards (Shown at start or above input)
     if len(st.session_state.messages) <= 1:
-        if is_chat_mode:
+        if app_mode.startswith("🎯"):
+            st.markdown("##### 💡 Hızlı Başlatıcılar (Akıllı Otonom Yönlendirme)")
+            q_col1, q_col2 = st.columns(2)
+            with q_col1:
+                if st.button("🤖 Diffusion Policy: Robotik Eylemler & DDPM", use_container_width=True):
+                    st.session_state.pending_prompt = "Diffusion Policy mimarisi robotik eylemleri (action trajectory) DDPM gürültü giderme süreciyle nasıl üretir ve klasik Pekiştirmeli Öğrenmeye (RL) göre multimodal görevlerde neden üstündür"
+                    st.rerun()
+                if st.button("⚖️ PPO vs DPO: Ödül Modelleme Farkları", use_container_width=True):
+                    st.session_state.pending_prompt = "Compare PPO clipped surrogate objective with DPO policy optimization in terms of reward modeling and memory."
+                    st.rerun()
+            with q_col2:
+                if st.button("👋 Kendimi ve Alanımı Tanıt", use_container_width=True):
+                    st.session_state.pending_prompt = "Merhaba! Kendimden, hedeflerimden ve ilgi alanlarımdan bahsetmek istiyorum. Bana sorular sorarak beni sıfırdan tanır mısın?"
+                    st.rerun()
+                if st.button("⚡ FlashAttention: SRAM Tiling & IO-Awareness", use_container_width=True):
+                    st.session_state.pending_prompt = "How does FlashAttention avoid materializing the NxN attention matrix in HBM using SRAM tiling?"
+                    st.rerun()
+        elif is_chat_mode:
             st.markdown("##### 💡 Hızlı Sohbet & Adaptasyon Başlatıcıları")
             q_col1, q_col2 = st.columns(2)
             with q_col1:
@@ -410,17 +466,27 @@ with tab_chat:
     for i, msg in enumerate(st.session_state.messages):
         with st.chat_message(msg["role"]):
             content_to_show = msg["content"]
-            if msg["role"] == "assistant" and "<think>" in content_to_show:
-                parsed = llm.parse_deepseek_thought(content_to_show)
-                if parsed["thought"]:
+            if msg["role"] == "assistant":
+                if msg.get("thought_plan"):
                     thought_html = (
                         f"<details style='background:rgba(30,41,59,0.5); border:1px solid rgba(56,189,248,0.25); "
                         f"border-radius:8px; padding:10px 14px; margin-bottom:12px;'>"
-                        f"<summary style='cursor:pointer; color:#38bdf8; font-weight:600;'>💭 DeepSeek-R1 Düşünce Süreci</summary>"
+                        f"<summary style='cursor:pointer; color:#38bdf8; font-weight:600;'>🧠 Derin Akıl Yürütme & Konu Parçalama Planı</summary>"
                         f"<div style='margin-top:8px; color:#cbd5e1; font-size:0.88rem; line-height:1.5; white-space:pre-wrap;'>"
-                        f"{parsed['thought']}</div></details>\n\n"
+                        f"{msg['thought_plan']}</div></details>\n\n"
                     )
-                    content_to_show = thought_html + parsed["response"]
+                    content_to_show = thought_html + content_to_show
+                elif "<think>" in content_to_show:
+                    parsed = llm.parse_deepseek_thought(content_to_show)
+                    if parsed["thought"]:
+                        thought_html = (
+                            f"<details style='background:rgba(30,41,59,0.5); border:1px solid rgba(56,189,248,0.25); "
+                            f"border-radius:8px; padding:10px 14px; margin-bottom:12px;'>"
+                            f"<summary style='cursor:pointer; color:#38bdf8; font-weight:600;'>💭 DeepSeek-R1 Düşünce Süreci</summary>"
+                            f"<div style='margin-top:8px; color:#cbd5e1; font-size:0.88rem; line-height:1.5; white-space:pre-wrap;'>"
+                            f"{parsed['thought']}</div></details>\n\n"
+                        )
+                        content_to_show = thought_html + parsed["response"]
             clean_display_content = re.sub(r'\n*---\n*⚡ \*\*Otonom RL Öz-Değerlendirme:\*\*.*$', '', content_to_show, flags=re.DOTALL)
             st.markdown(normalize_latex(clean_display_content), unsafe_allow_html=True)
             
@@ -527,9 +593,20 @@ with tab_chat:
 
         # Generate Response strictly by the 2 MODES
         with st.chat_message("assistant"):
-            if is_chat_mode:
+            # Otonom Yönlendirme Kararı
+            if app_mode.startswith("🔬"):
+                should_run_research = True
+            elif app_mode.startswith("💬"):
+                # Sadece sohbet modunda kullanıcı tutulur; ancak teknik soru sorarsa kaynakla desteklenir
+                should_run_research = False
+            else:
+                # 🎯 Bütünleşik Akıllı Mod (Önerilen):
+                # Niyet analizi: Teknik/akademik konu ise RAG literatür motoru, değilse samimi diyalog motoru
+                should_run_research = is_academic_or_technical_inquiry(prompt)
+
+            if not should_run_research:
                 # ==========================================
-                # MOD 1: 💬 SOHBET & KİŞİSEL ADAPTASYON (Qwen 2.5)
+                # DİYALOG & KİŞİSEL ADAPTASYON (Qwen 2.5)
                 # ==========================================
                 clean_p_lower = prompt.lower().strip()
                 
@@ -543,18 +620,18 @@ with tab_chat:
                 ]
                 has_factual_intent = not is_greeting and any(t in clean_p_lower for t in factual_triggers)
 
-                paper_triggers = [
-                    "makale", "paper", "arxiv", "coordinate attention", "yolo", "vit",
-                    "vision transformer", "swin", "convnext", "flashattention", "loss fonksiyonu",
-                    "attention mekanizması", "backbone", "neck", "head", "soft actor-critic", "dpo", "ppo"
-                ]
-                has_paper_intent = not is_greeting and any(pt in clean_p_lower for pt in paper_triggers)
+                # If user in chat mode asks about any paper/technical topic, fetch it so it's grounded
+                has_tech_mention = is_academic_or_technical_inquiry(prompt)
 
                 web_fact_context = ""
-                if has_paper_intent:
+                if has_tech_mention:
                     paper_search = searcher.search(prompt.strip(), top_k=3)
                     if paper_search.get("has_sufficient_evidence") and paper_search.get("packed_context"):
-                        web_fact_context = f"\n\n[İLGİLİ MAKALE KAYNAĞI ([S1]..[S3])]:\n{paper_search['packed_context']}\n(Talimat: Bu makale konusunu Samet'e samimi, akıcı ama teknik olarak son derece zengin, tensör boyutları ve formülleriyle detaylıca açıkla.)"
+                        web_fact_context = f"\n\n[İLGİLİ MAKALE VE LİTERATÜR KAYNAĞI ([S1]..[S3])]:\n{paper_search['packed_context']}\n(Talimat: Bu teknik konuyu Samet'e samimi, akıcı ama teknik olarak zengin, tensör boyutları ve formülleriyle açıkla.)"
+                    elif is_online():
+                        web_res_quick = web_searcher.get_live_web_context(prompt.strip())
+                        if web_res_quick.get("has_web"):
+                            web_fact_context = f"\n\n[CANLI LİTERATÜR/ARXIV BULGUSU]:\n{web_res_quick['packed_context']}"
                 elif has_factual_intent and is_online():
                     # Hızlı Wikipedia olgusal doğrulaması
                     wiki_briefs = web_searcher.search_wikipedia(prompt.strip(), max_results=1)
@@ -676,15 +753,15 @@ with tab_chat:
                         for ws in web_res["sources"]:
                             st.markdown(f"- **`[{ws['tag']}]`** 🔗 [{ws['title']}]({ws['url']})\n  *{ws['summary'][:250]}...*")
 
-                # Step 2.5: İsteğe Bağlı CoT Akıl Yürütme Planı
+                # Step 2.5: Derin CoT Akıl Yürütme ve Konu Parçalama Planı
                 thought_plan = ""
                 if use_cot:
-                    with st.status("🧠 Makale kaynakları üzerinde derin akıl yürütme ve planlama yapılıyor...", expanded=False) as cot_status:
+                    with st.status("🧠 Makale kaynakları üzerinde derin akıl yürütülüyor ve modüler plan hazırlanıyor...", expanded=False) as cot_status:
                         cot_msgs = build_thought_plan_prompt(clean_q, safe_packed.get("paper_chunks", ""))
-                        thought_stream = llm.stream_generate(cot_msgs, max_tokens=700, temperature=0.1, model=config.MODEL_REASONING)
+                        thought_stream = llm.stream_generate(cot_msgs, max_tokens=1000, temperature=0.1, model=config.MODEL_REASONING)
                         thought_plan = "".join(list(thought_stream))
                         st.markdown(thought_plan)
-                        cot_status.update(label="✅ Derin akıl yürütme planı hazırlandı.", state="complete")
+                        cot_status.update(label="✅ Derin akıl yürütme ve konu parçalama planı hazırlandı.", state="complete")
 
                 # Step 3: Akademik Yanıt Sentezi
                 messages = build_answer_prompt(
@@ -751,7 +828,8 @@ with tab_chat:
                 st.session_state.messages.append({
                     "role": "assistant",
                     "content": clean_full,
-                    "self_eval": self_eval
+                    "self_eval": self_eval,
+                    "thought_plan": thought_plan
                 })
                 st.rerun()
 

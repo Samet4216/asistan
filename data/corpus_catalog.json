@@ -385,5 +385,140 @@
     "color": "#ec4899",
     "desc": "Yüksek G kuvvetli hava muharebesi ve it dalaşında görsel sensörlerden doğrudan agresif uçuş komutları üreten derin öğrenme mimarisi.",
     "prompt": "Deep Drone Acrobatics makalesindeki sim-to-real transfer ve agresif yörünge izleme mantığını açıkla."
+  },
+  {
+    "id": "2303.04137",
+    "title": "Diffusion Policy: Visuomotor Policy Learning via Action Diffusion",
+    "authors": "Chi et al. (Columbia / Toyota Research)",
+    "domain": "Robot Eylemleri İçin Difüzyon Modelleri",
+    "color": "#f43f5e",
+    "desc": "Robotik manipülasyon ve motor kontrolünü görüntü üretimindeki difüzyon matematiğiyle gürültüden arındırma (denoising) süreci olarak çözen en modern robotik kontrol mimarisi.",
+    "prompt": "Diffusion Policy kuramında eylem uzayının (action space) difüzyon süreciyle modellenmesini ve çok modlu (multimodal) robot kontrolündeki matematiksel avantajlarını açıkla."
+  },
+  {
+    "id": "2106.04538",
+    "title": "High-Speed Autonomous Quadrotor Navigation with Event Cameras",
+    "authors": "Falanga et al. (Univ. of Zurich - Scaramuzza Lab)",
+    "domain": "Nöromorfik Görme & Aşırı Hızlı İHA Uçuşu",
+    "color": "#8b5cf6",
+    "desc": "Kare kare çekim yerine piksel bazında mikrosaniyelik parlaklık değişimlerini algılayan olay kameraları (Event Cameras) ile sıfır hareket bulanıklığında agresif İHA navigasyonu ve kaçınma.",
+    "prompt": "Olay kameralarının (Event Cameras) asenkron olay akışının (event stream) matematiksel modelini ve yüksek hızlı İHA manevralarında hareket bulanıklığını (motion blur) nasıl yok ettiğini açıkla."
+  },
+  {
+    "id": "2104.02704",
+    "title": "GradSim: Differentiable Simulation for System Identification and Robot Control",
+    "authors": "Murthy et al. (NVIDIA)",
+    "domain": "Diferansiyellenebilir Fizik & Sistem Tanımlama",
+    "color": "#10b981",
+    "desc": "Fizik motorunu doğrudan türevlenebilir bir sinir ağı katmanı gibi kullanarak sürtünme katsayısı, atalet momenti gibi parametreleri geriye yayılım (backprop) ile saniyeler içinde çözen mimari.",
+    "prompt": "GradSim diferansiyellenebilir fizik motorunun geriye yayılım gradyanlarıyla robotik sistem tanımlama (system identification) ve kontrol optimizasyonunu nasıl gerçekleştirdiğini açıkla."
+  },
+  {
+    "id": "2312.02126",
+    "title": "SplaTAM: Splat, Track & Map 3D Gaussians for Dense RGB-D SLAM",
+    "authors": "Keetha et al. (CMU)",
+    "domain": "3B Gaussian Splatting & Fotogerçekçi SLAM",
+    "color": "#f59e0b",
+    "desc": "Nokta bulutu ve mesh haritalar yerine uzayı türevlenebilir 3B Gauss elipsleriyle modelleyerek 100+ FPS hızında yoğun fotogerçekçi SLAM ve robotik haritalama yapan yeni nesil mimari.",
+    "prompt": "SplaTAM mimarisinde 3B Gaussian Splatting temsili ile kamera poz takibi (tracking) ve haritalama (mapping) optimizasyonunun kapalı form denklemlerini açıkla."
+  },
+  {
+    "id": "2203.14360",
+    "title": "Observation-Centric SORT (OC-SORT): Robust Object Tracking for Fast Maneuvers",
+    "authors": "Cao et al.",
+    "domain": "İHA İt Dalaşı & Viraj Takibi",
+    "color": "#f97316",
+    "desc": "Hedef ani manevra veya viraj yaptığında Kalman filtresinin yön sapmasını gözlem merkezli düzelten ve kilidin kopmasını engelleyen algoritma.",
+    "prompt": "OC-SORT mimarisi klasik SORT ve ByteTrack modellerine göre ani dönüşlerde ve hedef kaybolmalarında kilitlenmeyi nasıl korur?"
+  },
+  {
+    "id": "2112.00995",
+    "title": "SwinTrack: Visual Tracking with Swin Transformer",
+    "authors": "Lin et al.",
+    "domain": "Hava Hedef Takip & Kilitlenme",
+    "color": "#10b981",
+    "desc": "Swin Transformer'ın pencereli dikkat mimarisini kullanarak yakın ve uzak ölçeklerdeki hava hedeflerini kararlı takip eden yapı.",
+    "prompt": "SwinTrack mimarisinin hedef ve arama alanını birleştiren hiyerarşik dikkat mekanizmasını açıkla."
+  },
+  {
+    "id": "2402.13616",
+    "title": "YOLOv9: Learning What You Want to Learn Using Programmable Gradient Information (PGI)",
+    "authors": "Wang, Bochkovskiy & Liao",
+    "domain": "YOLO Mimarisi & PGI Teorisi",
+    "color": "#ef4444",
+    "desc": "Derin ağlarda küçük hedeflere ait bilginin kaybolmasını engelleyen PGI (Programlanabilir Gradyan Bilgisi) ve GELAN mimarisi.",
+    "prompt": "YOLOv9 mimarisindeki Programmable Gradient Information (PGI) ve tersinir fonksiyonlar derin katmanlarda bilgi kaybını nasıl önler?"
+  },
+  {
+    "id": "2309.11331",
+    "title": "Gold-YOLO: Efficient Object Detector via Gather-and-Distribute Mechanism",
+    "authors": "Wang et al.",
+    "domain": "Hedef Tespiti & FPN İyileştirme",
+    "color": "#eab308",
+    "desc": "Klasik FPN/PAN yapılarının yerine geçerek hedef özelliklerini tüm ölçeklere minimum gecikmeyle yayan Topla ve Dağıt (GD) mekanizması.",
+    "prompt": "Gold-YOLO mimarisindeki Gather-and-Distribute (GD) mekanizması FPN yapılarına göre küçük hedeflerin tespitinde nasıl avantaj sağlar?"
+  },
+  {
+    "id": "2001.06826",
+    "title": "Zero-DCE: Zero-Reference Deep Curve Estimation for Low-Light Vision",
+    "authors": "Guo et al.",
+    "domain": "Gece & Sis Görüntü İyileştirme",
+    "color": "#a855f7",
+    "desc": "Referans görüntü olmadan 300+ FPS hızda gece ve sisli kamera görüntülerini anında aydınlatan ve netleştiren hafif sinir ağı.",
+    "prompt": "Zero-DCE mimarisi dinamik eğri kestirimi (deep curve estimation) ve referanssız kayıp fonksiyonlarıyla gece görüntüsünü nasıl iyileştirir?"
+  },
+  {
+    "id": "1903.04780",
+    "title": "Fast-Planner: A Robust and Efficient Trajectory Planner for Quadrotors",
+    "authors": "Zhou et al. (HKUST)",
+    "domain": "İHA 3D Kinematik Yörünge Planlama",
+    "color": "#06b6d4",
+    "desc": "Kinodinamik A* ve B-spline optimizasyonu ile engelli ortamlarda milisaniyeler içinde akıcı ve güvenli 3D uçuş rotası üreten algoritma.",
+    "prompt": "Fast-Planner algoritması kinodinamik A* arama ve B-spline eğri türevleriyle quadrotor kısıtlarına uygun yörüngeyi nasıl oluşturur?"
+  },
+  {
+    "id": "2203.04050",
+    "title": "BEVFormer: Learning Bird's-Eye-View Representation from Multi-Camera Images",
+    "authors": "Li et al.",
+    "domain": "Otonom Araçlar & 360° BEV Algılama",
+    "color": "#0ea5e9",
+    "desc": "Çoklu araç kameralarından gelen görüntüleri uzamsal ve zamansal dikkat (spatiotemporal attention) ile 3B kuşbakışı (Bird's Eye View) koordinat düzlemine dönüştüren otonom sürüş mimarisi.",
+    "prompt": "BEVFormer mimarisinde uzamsal çapraz dikkat (spatial cross-attention) ve zamansal öz-dikkat (temporal self-attention) ile çoklu kameradan 3B kuşbakışı harita nasıl çıkarılır?"
+  },
+  {
+    "id": "1907.02522",
+    "title": "Deep Learning for Machinery Fault Diagnostics: A Review & Benchmark",
+    "authors": "Zhao et al.",
+    "domain": "Endüstriyel Kestirimci Bakım & Titreşim Analizi",
+    "color": "#f97316",
+    "desc": "Fabrika motorları, rulmanlar ve redüktörlerin ivmeölçer titreşim verilerini 1D-CNN ve Fourier dönüşümüyle (FFT) işleyerek arızaları önceden kestiren endüstriyel arıza teşhis mimarisi.",
+    "prompt": "Endüstriyel kestirimci bakımda titreşim ve akım zaman serilerinden rulman/dişli arızalarının 1D-CNN ve dalgacık dönüşümü (wavelet) ile tespit mantığını açıkla."
+  },
+  {
+    "id": "2007.13028",
+    "title": "Deep Learning-based Hand Gesture Recognition using Surface Electromyography (sEMG)",
+    "authors": "Cote-Allard et al.",
+    "domain": "Biyomekatronik & Kas Sinyalli Protez Kontrolü",
+    "color": "#14b8a6",
+    "desc": "Koldaki kas elektrik sinyallerini (sEMG) derin evrişimli ağlarla sınıflandırarak biyonik protez ellerin ve dış iskeletlerin (exoskeleton) niyet kestirimiyle sezgisel kontrolü.",
+    "prompt": "Biyomekatronikte yüzeyel elektromiyografi (sEMG) sinyallerinin zaman-frekans analizi ve derin öğrenmeyle protez el hareket niyetine dönüştürülmesi adımlarını açıkla."
+  },
+  {
+    "id": "2304.14811",
+    "title": "Transformer-based Remaining Useful Life (RUL) Prediction for Lithium-Ion Batteries",
+    "authors": "Wang et al.",
+    "domain": "Batarya Yönetim Sistemleri (BMS) & Kalan Ömür",
+    "color": "#eab308",
+    "desc": "Elektrikli araç ve İHA bataryalarının voltaj, akım ve sıcaklık döngülerinden bataryanın kalan ömrünü (RUL) ve yıpranma durumunu (SoH) kestiren transformatör mimarisi.",
+    "prompt": "Lityum-İyon batarya yönetim sistemlerinde (BMS) kapasite düşüş eğrisi ve şarj döngülerinden Kalan Faydalı Ömür (RUL) kestiriminin matematiksel modelini açıkla."
+  },
+  {
+    "id": "2310.03744",
+    "title": "LLaVA-1.5: Improved Baselines with Visual Instruction Tuning",
+    "authors": "Liu et al.",
+    "domain": "Çok Modlu Görsel-Dil Modelleri (VLM)",
+    "color": "#a855f7",
+    "desc": "CLIP vizyon kodlayıcısı ile dil modellerini MLP projeksiyon katmanıyla bağlayarak devre şemalarını, teknik çizimleri ve fotoğrafları analiz edebilen çok modlu yapay zeka mimarisi.",
+    "prompt": "LLaVA-1.5 mimarisinde CLIP ViT görsel özelliklerinin doğrusal/MLP projeksiyon ile büyük dil modelinin (LLM) kelime gömme uzayına (token embedding space) nasıl hizalandığını açıkla."
   }
 ]

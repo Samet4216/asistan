@@ -77,6 +77,61 @@ def normalize_latex(text: str) -> str:
     return "".join(processed)
 
 
+def is_academic_or_technical_inquiry(text: str) -> bool:
+    """
+    Intelligently identifies if the user's prompt is an academic, theoretical,
+    mathematical, architecture-oriented, or technical research question that
+    warrants deep literature RAG (ChromaDB + arXiv + textbook masterclass synthesis).
+    """
+    p = text.strip().lower()
+
+    # Technical AI / Robotics / Math entities & keywords
+    technical_entities = [
+        "diffusion", "ddpm", "ddim", "score-based", "flow matching", "langevin",
+        "robotik", "robotics", "action trajectory", "visuomotor", "manipulation", "end-effector",
+        "reinforcement learning", "pekiştirmeli öğrenme", "pekiştirmeli", "ppo", "dpo", "kto", "orpo", "grpo",
+        "q-learning", "actor-critic", "sac", "td3", "policy gradient", "bellman", "markov", "mdp",
+        "transformer", "attention", "self-attention", "cross-attention", "flashattention", "coordinate attention",
+        "mha", "mqa", "gqa", "roformer", "rope", "alibi",
+        "yolo", "yolov8", "yolov11", "backbone", "neck", "head", "c2f", "c3k2", "fpn", "pan", "bifpn", "anchor", "nms", "ciou",
+        "vit", "vision transformer", "swin", "convnext", "resnet", "vgg", "mobilenet", "efficientnet", "deit",
+        "vae", "gan", "autoencoder", "latent space", "clip", "sam", "segmentation", "detection", "segmentasyon",
+        "loss fonksiyonu", "kayıp fonksiyonu", "surrogate objective", "cross-entropy", "contrastive", "triplet",
+        "tensör", "tensor", "gradient", "gradyan", "backprop", "türev", "integral", "ispat", "matris", "matrix",
+        "sram", "hbm", "cuda", "tiling", "flops", "bandwidth", "vram", "quantization", "qlora", "lora", "peft", "4-bit", "fp16", "bf16",
+        "makale", "paper", "arxiv", "literatür", "derin öğrenme", "deep learning", "yapay zeka", "ai mimarisi", "mimarisi", "mimari",
+        "multimodal", "token", "embedding", "rag", "retrieval", "vektör veritabanı", "chromadb", "llm",
+        "overfitting", "regularization", "dropout", "batchnorm", "layernorm", "rmsnorm", "optimizer", "adamw", "sgd"
+    ]
+
+    # Match entities with word boundary or clean substring for multi-word phrases
+    has_tech_entity = False
+    for ent in technical_entities:
+        if " " in ent or "-" in ent:
+            if ent in p:
+                has_tech_entity = True
+                break
+        else:
+            if re.search(r'\b' + re.escape(ent) + r'\b', p):
+                has_tech_entity = True
+                break
+
+    # Architectural, mechanistic, and comparative analytical query patterns
+    analytical_triggers = [
+        "nasıl üretir", "nasıl çalışır", "neden üstündür", "çalışma prensibi", "çalışma mantığı",
+        "karşılaştır", "farkı nedir", "farkları nelerdir", "avantajı", "dezavantajı",
+        "matematiksel formülü", "formülünü açıkla", "denklemi", "tensör boyutları", "boyut analizi",
+        "ispatı", "türetimi", "algoritması"
+    ]
+    has_analytical_trigger = any(trig in p for trig in analytical_triggers)
+
+    # If it contains clear technical concepts or analytical requests
+    if has_tech_entity or has_analytical_trigger:
+        return True
+
+    return False
+
+
 def is_casual_or_personal(text: str) -> bool:
     """Detects whether prompt is a greeting, casual chat, idea sharing, or personal profile declaration."""
     p = text.strip().lower()
@@ -147,11 +202,17 @@ def contextualize_query(current_query: str, history: List[Dict[str, str]]) -> st
         "aralarındaki fark", "yukarıdaki", "bahsettiğin", "bu formül", "bu kod",
         "the former", "the latter", "difference between them"
     ]
+    continuation_triggers = [
+        "devam", "devam et", "devam edelim", "sonraki", "sıradaki", "sonraki parça",
+        "sıradaki parça", "evet devam", "evet", "geçelim", "sonrakine geç",
+        "2. parça", "3. parça", "ikinci parça", "üçüncü parça", "continue", "next", "go on"
+    ]
 
     is_starter = any(lower_q.startswith(s) for s in followup_starters)
     is_referential = any(re.search(r'\b' + re.escape(w) + r'\b', lower_q) for w in referential_keywords)
+    is_continuation = lower_q in continuation_triggers or any(lower_q.startswith(ct) for ct in continuation_triggers)
 
-    if is_starter or is_referential:
+    if is_starter or is_referential or is_continuation:
         last_user_query = ""
         for msg in reversed(history):
             if msg.get("role") == "user":
@@ -163,6 +224,8 @@ def contextualize_query(current_query: str, history: List[Dict[str, str]]) -> st
             for pfx in ["explain", "how does", "why do", "what is", "what are", "anlat", "açıkla"]:
                 clean_topic = re.sub(r"^" + re.escape(pfx) + r"\s+", "", clean_topic, flags=re.I)
             clean_topic = clean_topic[:50].strip()
+            if is_continuation:
+                return f"{clean_topic} : sıradaki parça ve derinlemesine devamı ({current_query})"
             return f"{clean_topic} : {current_query}"
 
     return current_query
