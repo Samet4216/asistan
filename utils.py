@@ -93,8 +93,21 @@ def is_academic_or_technical_inquiry(text: str) -> bool:
     Intelligently identifies if the user's prompt is an academic, theoretical,
     mathematical, architecture-oriented, or technical research question that
     warrants deep literature RAG (ChromaDB + arXiv + textbook masterclass synthesis).
+    Strictly exempts casual chat, sports (futbol), magazine/gossip, entertainment, and daily banter.
     """
     p = text.strip().lower()
+
+    # Explicit casual / sports / entertainment exemption
+    casual_bypass = [
+        "futbol", "maç", "fener", "galatasaray", "beşiktaş", "trabzon", "süper lig",
+        "şampiyon", "gol", "transfer", "magazin", "ünlü", "dedikodu", "oyuncu", "şarkıcı",
+        "dizi", "film", "sinema", "müzik", "şarkı", "aşk", "sevgili", "hava durumu",
+        "merhaba", "selam", "günaydın", "nasılsın", "naber", "kimsin", "sağol", "eyvallah",
+        "cano", "kanka", "dostum", "hocam", "reis", "ne yapıyorsun", "nasıl gidiyor", "sence"
+    ]
+    # If the query is clearly about football, entertainment or casual chat, never route to academic RAG
+    if any(re.search(r'\b' + re.escape(cb) + r'\b', p) for cb in casual_bypass) and not any(te in p for te in ["transformer", "tensör", "tensor", "gradient", "loss", "backprop", "relu", "robotik"]):
+        return False
 
     # Technical AI / Robotics / Math entities & keywords
     technical_entities = [
@@ -111,7 +124,7 @@ def is_academic_or_technical_inquiry(text: str) -> bool:
         "loss fonksiyonu", "kayıp fonksiyonu", "surrogate objective", "cross-entropy", "contrastive", "triplet",
         "tensör", "tensor", "gradient", "gradyan", "backprop", "türev", "integral", "ispat", "matris", "matrix",
         "sram", "hbm", "cuda", "tiling", "flops", "bandwidth", "vram", "quantization", "qlora", "lora", "peft", "4-bit", "fp16", "bf16",
-        "makale", "paper", "arxiv", "literatür", "derin öğrenme", "deep learning", "yapay zeka", "ai mimarisi", "mimarisi", "mimari",
+        "makale", "paper", "arxiv", "literatür", "derin öğrenme", "deep learning", "yapay zeka", "ai mimarisi", "mimarisi",
         "multimodal", "token", "embedding", "rag", "retrieval", "vektör veritabanı", "chromadb", "llm",
         "overfitting", "regularization", "dropout", "batchnorm", "layernorm", "rmsnorm", "optimizer", "adamw", "sgd",
         # Neural Network Layers, Activations & Training Dynamics
@@ -125,12 +138,16 @@ def is_academic_or_technical_inquiry(text: str) -> bool:
         "lift", "drag", "taşıma kuvveti", "sürükleme kuvveti", "itki", "thrust", "kanat", "airfoil", "kanat profili",
         "iha", "siha", "uav", "drone", "mach", "ses hızı", "aviyonik", "avionics", "pitot", "altimetre", "gyro", "jiroskop",
         "akışkanlar mekaniği", "navier-stokes", "cfd", "türbülans", "bernoulli", "roket", "itki sistemi", "itme kuvveti",
+        # Mechatronics, Sensors, Embedded & Logic Circuits
+        "denavit-hartenberg", "homojen dönüşüm", "jacobian", "euler-lagrange", "state-space", "kök yer eğrisi", "root-locus",
+        "bode diyagramı", "nyquist", "aktüatör", "bldc", "enkoder", "imu", "op-amp", "fırçasız motor",
+        "kalman filtresi", "z-dönüşümü", "fourier", "lti sistem", "cortex-m4", "nvic", "dma", "can bus", "can-fd", "spi", "i2c", "uart",
+        "k-map", "karnaugh", "boole", "flip-flop", "multiplexer", "fsm", "bjt", "mosfet", "shockley",
         # Physics, Math & Fundamental Sciences
         "kuantum", "quantum", "fizik", "physics", "termodinamik", "thermodynamics", "matematik", "mathematics",
         "istatistik", "olasılık", "diferansiyel", "biyoloji", "kimya", "astronomi", "elektromanyetik"
     ]
 
-    # Match entities with word boundary or clean substring for multi-word phrases
     has_tech_entity = False
     for ent in technical_entities:
         if " " in ent or "-" in ent:
@@ -142,32 +159,39 @@ def is_academic_or_technical_inquiry(text: str) -> bool:
                 has_tech_entity = True
                 break
 
-    # Architectural, mechanistic, and comparative analytical query patterns
-    analytical_triggers = [
-        "nasıl üretir", "nasıl çalışır", "neden üstündür", "çalışma prensibi", "çalışma mantığı",
-        "karşılaştır", "farkı nedir", "farkları nelerdir", "avantajı", "dezavantajı",
+    # Strictly technical/academic triggers (only triggers if explicit technical request)
+    strictly_academic_triggers = [
         "matematiksel formülü", "formülünü açıkla", "denklemi", "tensör boyutları", "boyut analizi",
-        "ispatı", "türetimi", "algoritması", "literatürde", "makalede", "akademik", "bilimsel",
-        "teorik olarak", "deney", "ablation", "benchmark"
+        "ispatı", "türetimi", "algoritması", "literatürde", "makalede", "akademik makale",
+        "teorik olarak açıkla", "ablation çalışması", "benchmark sonuçları"
     ]
-    has_analytical_trigger = any(trig in p for trig in analytical_triggers)
+    has_strictly_academic = any(trig in p for trig in strictly_academic_triggers)
 
-    # Quoted replies referencing previous technical discussion are always technical inquiries
-    if p.startswith(">") or "\n>" in p:
+    # Quoted replies referencing previous technical discussion
+    if (p.startswith(">") or "\n>" in p) and has_tech_entity:
         return True
 
-    # If it contains clear technical concepts or analytical requests
-    if has_tech_entity or has_analytical_trigger:
+    # Genuine technical inquiry: must contain a technical entity or strict academic request
+    if has_tech_entity or has_strictly_academic:
         return True
 
     return False
 
 
 def is_casual_or_personal(text: str) -> bool:
-    """Detects brief casual greetings, pleasantries, or conversational banter."""
+    """Detects casual chat, sports, pop culture, entertainment, greetings, or daily banter."""
     if not text:
         return True
     t = text.strip().lower()
+    casual_topics = [
+        "futbol", "maç", "fener", "galatasaray", "beşiktaş", "trabzon", "süper lig",
+        "şampiyon", "gol", "transfer", "magazin", "ünlü", "dedikodu", "oyuncu", "şarkıcı",
+        "dizi", "film", "sinema", "müzik", "şarkı", "aşk", "sevgili", "hava durumu",
+        "merhaba", "selam", "günaydın", "nasılsın", "naber", "kimsin", "sağol", "eyvallah",
+        "cano", "kanka", "dostum", "hocam", "reis", "ne yapıyorsun", "nasıl gidiyor"
+    ]
+    if any(topic in t for topic in casual_topics):
+        return True
     casual_words = {
         "merhaba", "selam", "selamlar", "günaydın", "iyi akşamlar", "teşekkürler",
         "teşekkür ederim", "sağol", "eyvallah", "tamamdır", "anladım", "harika",
@@ -175,7 +199,7 @@ def is_casual_or_personal(text: str) -> bool:
         "hello", "thanks", "thank you", "ok", "peki", "evet", "hayır"
     }
     tokens = [w.strip(".,!?:;\"'") for w in t.split()]
-    return len(tokens) <= 3 and any(tok in casual_words for tok in tokens)
+    return len(tokens) <= 4 and any(tok in casual_words for tok in tokens)
 
 
 def contextualize_query(current_query: str, history: List[Dict[str, str]]) -> str:

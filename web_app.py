@@ -24,12 +24,15 @@ import streamlit.components.v1 as components
 import config
 import llm
 import budget
+import importlib
 import utils
+importlib.reload(utils)
 from utils import (
     get_gpu_status,
     normalize_latex,
     is_academic_or_technical_inquiry,
     contextualize_query,
+    is_casual_or_personal,
     extract_next_section
 )
 
@@ -541,14 +544,12 @@ else:
                 augmented_query = contextualize_query(clean_q, st.session_state.messages[:-1])
                 is_technical = is_academic_or_technical_inquiry(clean_q) or is_academic_or_technical_inquiry(augmented_query)
 
-                # Context Continuity: If the previous discussion was technical/academic and user continues, stay in academic mode
+                # Context Continuity: Only stay in technical mode if genuinely continuing an academic topic
                 if not is_technical and len(st.session_state.messages) > 1:
                     last_asst_msg = next((m for m in reversed(st.session_state.messages[:-1]) if m["role"] == "assistant"), None)
-                    if last_asst_msg:
-                        asst_content = last_asst_msg.get("content", "")
-                        if any(marker in asst_content for marker in ["$$", "Tensör", "Tensor", "Bölüm", "Parça", "[S", "ReLU", "Layer", "Gradient", "Loss", "Initialization", "Neuron"]):
-                            if not utils.is_casual_or_personal(clean_q):
-                                is_technical = True
+                    if last_asst_msg and not is_casual_or_personal(clean_q):
+                        if augmented_query != clean_q or is_academic_or_technical_inquiry(clean_q):
+                            is_technical = True
 
                 retrieved_sources = []
                 if is_technical:
