@@ -164,12 +164,12 @@ with st.sidebar:
         vram_pct = int((vram_used / vram_total) * 100)
         
         st.markdown(f"""
-        <div style="background:rgba(15,23,42,0.5); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:10px 12px; margin-bottom:8px;">
+        <div style="background:rgba(18,24,38,0.5); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:10px 12px; margin-bottom:8px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <span style="font-size:0.8rem; font-weight:600; color:#f8fafc;">⚡ {gpu['name']}</span>
+                <span style="font-size:0.8rem; font-weight:600; color:#f1f5f9;">⚡ {gpu['name']}</span>
                 <span style="font-size:0.75rem; color:#94a3b8;">{gpu['temp']} °C</span>
             </div>
-            <div style="width:100%; height:5px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden; margin:5px 0;">
+            <div style="width:100%; height:4px; background:rgba(255,255,255,0.06); border-radius:4px; overflow:hidden; margin:6px 0;">
                 <div style="width:{vram_pct}%; height:100%; background:#38bdf8; border-radius:4px;"></div>
             </div>
             <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:#64748b;">
@@ -287,16 +287,16 @@ if st.session_state.current_view.startswith("📚"):
             with grid_cols[col_idx]:
                 domain_color = p.get('color', '#38bdf8')
                 st.markdown(f"""
-                <div style="background:rgba(15,23,42,0.6); border:1px solid rgba(255,255,255,0.06); border-left:3px solid {domain_color}; border-radius:10px; padding:14px; margin-bottom:10px; min-height:160px; display:flex; flex-direction:column; justify-content:space-between;">
+                <div style="background:rgba(18,24,38,0.5); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:14px; margin-bottom:10px; min-height:160px; display:flex; flex-direction:column; justify-content:space-between;">
                     <div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                            <span style="font-size:10px; font-weight:600; text-transform:uppercase; color:{domain_color}; letter-spacing:0.5px;">{p.get('domain', 'AI')}</span>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <span style="font-size:10px; font-weight:600; text-transform:uppercase; color:{domain_color}; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.07); padding:2px 8px; border-radius:999px; letter-spacing:0.4px;">{p.get('domain', 'AI')}</span>
                             <span style="font-size:11px; color:#64748b; font-family:'Fira Code',monospace;">arXiv:{p.get('id', '')}</span>
                         </div>
-                        <div style="font-size:0.92rem; font-weight:600; color:#f8fafc; margin-bottom:4px; line-height:1.3;">
+                        <div style="font-size:0.92rem; font-weight:600; color:#f1f5f9; margin-bottom:5px; line-height:1.35;">
                             {p.get('title', '')}
                         </div>
-                        <div style="font-size:0.78rem; color:#94a3b8; line-height:1.4;">
+                        <div style="font-size:0.78rem; color:#94a3b8; line-height:1.45;">
                             {p.get('desc', '')}
                         </div>
                     </div>
