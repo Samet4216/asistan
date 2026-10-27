@@ -252,10 +252,46 @@ div[data-testid="stPopoverBody"] {
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6) !important;
 }
 
-/* --- Clean Up Streamlit Chrome / Clutter --- */
+/* --- Clean Up Streamlit Chrome / Clutter (Keep sidebar reopen toggle accessible!) --- */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
-header {visibility: hidden;}
+header {
+    background: transparent !important;
+    height: 2.75rem !important;
+}
+header [data-testid="stToolbar"] {
+    visibility: hidden !important;
+}
+
+/* Ensure the sidebar reopen button (chevron / collapse control) is always prominently visible */
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="collapsedControl"],
+[data-testid="stSidebarOpenButton"],
+button[data-testid="baseButton-headerNoPadding"],
+[data-testid="stHeader"] button {
+    visibility: visible !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: var(--text-primary) !important;
+    background: rgba(18, 24, 38, 0.85) !important;
+    border: 1px solid var(--border-hover) !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    z-index: 999999 !important;
+    transition: all 0.2s ease !important;
+}
+
+[data-testid="stSidebarCollapsedControl"]:hover,
+[data-testid="collapsedControl"]:hover,
+[data-testid="stSidebarOpenButton"]:hover,
+[data-testid="stHeader"] button:hover {
+    background: rgba(56, 189, 248, 0.2) !important;
+    border-color: var(--accent-primary) !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.25) !important;
+}
+
 [data-testid="stDecoration"] {display: none;}
 [data-testid="stStatusWidget"] {border: none !important; background: transparent !important;}
 hr {
