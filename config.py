@@ -22,6 +22,10 @@ MODEL_CHAT = "qwen2.5:7b-instruct-q4_K_M"
 MODEL_REASONING = "qwen2.5:7b-instruct-q4_K_M"
 NUM_CTX = 8192
 TEMPERATURE = 0.2
+REPEAT_PENALTY = 1.15
+REPEAT_LAST_N = 128
+TOP_K = 40
+TOP_P = 0.9
 KEEP_ALIVE = "10m"
 IDLE_UNLOAD_TIMEOUT_SECONDS = 600  # 10 dakika boşta kalınca VRAM otomatik boşaltılır (idle timer)
 

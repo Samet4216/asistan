@@ -5,6 +5,7 @@ and explicit VRAM unloading.
 """
 
 import json
+import re
 import requests
 import time
 import threading
@@ -101,16 +102,21 @@ class LLMClient:
             self.set_model(target_model)
 
         self._touch_active()
+        options = {
+            "num_ctx": config.NUM_CTX,
+            "temperature": temperature if temperature is not None else config.TEMPERATURE,
+            "num_predict": max_tokens,
+            "repeat_penalty": getattr(config, "REPEAT_PENALTY", 1.15),
+            "repeat_last_n": getattr(config, "REPEAT_LAST_N", 128),
+            "top_k": getattr(config, "TOP_K", 40),
+            "top_p": getattr(config, "TOP_P", 0.9)
+        }
         payload = {
             "model": self.model,
             "messages": messages,
             "stream": False,
             "keep_alive": config.KEEP_ALIVE,
-            "options": {
-                "num_ctx": config.NUM_CTX,
-                "temperature": temperature if temperature is not None else config.TEMPERATURE,
-                "num_predict": max_tokens
-            }
+            "options": options
         }
 
         if schema:
@@ -138,22 +144,27 @@ class LLMClient:
         temperature: float = None,
         model: Optional[str] = None
     ):
-        """Streams generation token by token from Ollama /api/chat."""
+        """Streams generation token by token from Ollama /api/chat with an active anti-repetition circuit breaker."""
         target_model = model or self.model
         if target_model != self.model:
             self.set_model(target_model)
 
         self._touch_active()
+        options = {
+            "num_ctx": config.NUM_CTX,
+            "temperature": temperature if temperature is not None else config.TEMPERATURE,
+            "num_predict": max_tokens,
+            "repeat_penalty": getattr(config, "REPEAT_PENALTY", 1.15),
+            "repeat_last_n": getattr(config, "REPEAT_LAST_N", 128),
+            "top_k": getattr(config, "TOP_K", 40),
+            "top_p": getattr(config, "TOP_P", 0.9)
+        }
         payload = {
             "model": self.model,
             "messages": messages,
             "stream": True,
             "keep_alive": config.KEEP_ALIVE,
-            "options": {
-                "num_ctx": config.NUM_CTX,
-                "temperature": temperature if temperature is not None else config.TEMPERATURE,
-                "num_predict": max_tokens
-            }
+            "options": options
         }
         try:
             response = requests.post(
@@ -164,11 +175,19 @@ class LLMClient:
                 timeout=120
             )
             response.raise_for_status()
+            accumulated_buffer = ""
             for line in response.iter_lines():
                 if line:
                     data = json.loads(line.decode("utf-8"))
                     content = data.get("message", {}).get("content", "")
                     if content:
+                        accumulated_buffer += content
+                        # Circuit-breaker: detect repetitive sentence loop (e.g. same sentence repeated 3 times)
+                        if any(p in content for p in (".", "!", "\n", "?", ";")):
+                            raw_sentences = [s.strip() for s in re.split(r'[\.\n\?!]+', accumulated_buffer) if len(s.strip()) > 25]
+                            if len(raw_sentences) >= 3 and raw_sentences[-1] == raw_sentences[-2] == raw_sentences[-3]:
+                                print(f"[!] [Repetition Guard] Infinite generation loop aborted: '{raw_sentences[-1][:50]}...'")
+                                break
                         yield content
             self._touch_active()
         except Exception as e:

@@ -315,8 +315,10 @@ def inject_citation_anchors(content: str, sources: List[Dict[str, Any]] = None) 
         # Avoid double injecting if 🔗 is already present
         if "🔗" in title:
             return match.group(0)
+        # Strip trailing [S1] or [W1] tag from heading if present so it matches clean style
+        title_clean = re.sub(r'\s*\[(?:S|W)\d+\]\s*$', '', title).strip()
         anchor_html = f' <a href="?inspect_chunk={default_id}" class="cite-anchor-link" data-inspect-chunk="{default_id}" target="_self" title="Bu konunun alıntılandığı makale sayfasını ve fosforlu alıntıyı sağ panelde gör">🔗</a>'
-        return f"{level} {title}{anchor_html}"
+        return f"{level} {title_clean}{anchor_html}"
 
     content = re.sub(r'^(#{1,4})\s+(.+)$', replace_heading, content, flags=re.MULTILINE)
 
