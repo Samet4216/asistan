@@ -68,10 +68,14 @@ class Reranker:
 
         for i, cand in enumerate(candidates):
             score = float(scores[i])
-            # Boost verified ground-truth teacher corrections
+            # Boost verified ground-truth teacher corrections and specialized BTÜ course compendiums
             meta = cand.get("metadata", {})
-            if meta.get("arxiv_id") == "teacher_verified" or "[DOĞRULANMIŞ REFERANS]" in cand.get("content", ""):
+            arxiv_id = str(meta.get("arxiv_id", ""))
+            cid = str(cand.get("id", ""))
+            if arxiv_id == "teacher_verified" or "[DOĞRULANMIŞ REFERANS]" in cand.get("content", ""):
                 score += 4.0
+            elif cid.startswith("BTU-MEK-") or "BTU-MEK-" in arxiv_id:
+                score += 2.5
             cand["rerank_score"] = score
 
         # Sort descending by rerank score

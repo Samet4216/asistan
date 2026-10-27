@@ -29,9 +29,63 @@ DECOMPOSITION_SCHEMA = {
 }
 
 
+ACRONYM_MAP = {
+    "mux": "multiplexer MUX",
+    "demux": "demultiplexer DEMUX",
+    "alu": "arithmetic logic unit ALU",
+    "adc": "analog to digital converter ADC",
+    "dac": "digital to analog converter DAC",
+    "pwm": "pulse width modulation PWM",
+    "gpio": "general purpose input output GPIO",
+    "k-map": "karnaugh map k-map",
+    "kmap": "karnaugh map k-map",
+    "ff": "flip flop flip-flop",
+    "fsm": "finite state machine FSM",
+    "pid": "proportional integral derivative PID controller",
+    "bldc": "brushless dc motor BLDC",
+    "imu": "inertial measurement unit IMU",
+    "esc": "electronic speed controller ESC",
+    "rl": "reinforcement learning RL",
+    "ppo": "proximal policy optimization PPO",
+    "dqn": "deep q network DQN",
+    "ddpg": "deep deterministic policy gradient DDPG",
+    "td3": "twin delayed deep deterministic policy gradient TD3",
+    "sac": "soft actor critic SAC",
+    "grpo": "group relative policy optimization GRPO",
+    "sahi": "slicing aided hyper inference SAHI",
+    "slam": "simultaneous localization and mapping SLAM",
+    "yolo": "you only look once YOLO object detection",
+}
+
+TURKISH_QUESTION_TEMPLATES = {
+    "nedir": "What is",
+    "nasil calisir": "How does",
+    "nasıl çalışır": "How does",
+    "neden": "Why",
+    "farki": "difference between",
+    "farkı": "difference between",
+    "avantajlari": "advantages of",
+    "avantajları": "advantages of",
+    "dezavantajlari": "disadvantages of",
+    "dezavantajları": "disadvantages of",
+}
+
+
 class QueryTransformer:
     def __init__(self):
         self.decomposition_schema = DECOMPOSITION_SCHEMA
+
+    def expand_acronyms(self, query: str) -> str:
+        """Expands technical acronyms in query to improve lexical and semantic match."""
+        tokens = re.findall(r'[\w\-]+', query)
+        expanded = []
+        for t in tokens:
+            t_low = t.lower()
+            if t_low in ACRONYM_MAP:
+                expanded.append(f"{t} ({ACRONYM_MAP[t_low]})")
+            else:
+                expanded.append(t)
+        return " ".join(expanded)
 
     def should_decompose(self, query: str) -> bool:
         """
@@ -122,37 +176,47 @@ class QueryTransformer:
         """
         The embedder (bge-base-en) and reranker (ms-marco) are English-only and the papers
         are English, so Turkish questions retrieve poorly. Translate non-English questions
-        into a concise English search query. Returns the original query if it is already
-        English or translation fails.
+        into a concise English search query. Returns the original query or acronym-expanded query
+        if it is already English or translation fails.
         """
+        clean_q = query.strip()
         try:
             import lang_guard
-            is_tr, _ = lang_guard.detect_turkish(query)
+            is_tr, _ = lang_guard.detect_turkish(clean_q)
         except Exception:
-            is_tr = bool(re.search(r"[çğıöşüÇĞİÖŞÜ]", query))
+            is_tr = bool(re.search(r"[çğıöşüÇĞİÖŞÜ]", clean_q)) or any(w in clean_q.lower() for w in ["nedir", "nasıl", "nasil", "ne", "fark"])
         if not is_tr:
-            return query
+            return self.expand_acronyms(clean_q)
 
         prompt_messages = [
             {
                 "role": "system",
                 "content": (
                     "Translate the user's Turkish question into ONE complete, natural English question "
-                    "for searching a Deep Learning paper database (starts with How, Why, What, etc.). "
-                    "Keep technical terms, model names, symbols, and acronyms intact (e.g. PPO, DPO, FlashAttention, HBM, SRAM, ViT). "
+                    "for searching an engineering, mechatronics, and AI paper database (starts with How, Why, What, etc.). "
+                    "Keep technical terms, model names, symbols, and acronyms intact (e.g. MUX, DEMUX, PPO, DPO, FlashAttention, HBM, SRAM, ViT). "
                     "Output ONLY the English question, no quotes, no explanation."
                 )
             },
-            {"role": "user", "content": query[:600]}
+            {"role": "user", "content": clean_q[:600]}
         ]
         try:
             out = llm.generate(prompt_messages, max_tokens=80, temperature=0.0)
             out = (out or "").strip().strip('"').splitlines()[0].strip() if out else ""
             if out and not out.startswith("[LLM ERROR]") and len(out) > 5:
-                return out
+                return self.expand_acronyms(out)
         except Exception as e:
             print(f"[!] Query translation fallback: {e}")
-        return query
+
+        # Smart Rule-Based Offline Translation Fallback
+        q_low = clean_q.lower()
+        for tr_pattern, en_prefix in TURKISH_QUESTION_TEMPLATES.items():
+            if tr_pattern in q_low:
+                concept = re.sub(rf"\b{re.escape(tr_pattern)}\b", "", clean_q, flags=re.IGNORECASE).strip(" ?.,")
+                expanded_concept = self.expand_acronyms(concept)
+                return f"{en_prefix} {expanded_concept}?"
+
+        return self.expand_acronyms(clean_q)
 
 
 # Global instance

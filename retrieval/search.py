@@ -6,6 +6,7 @@ and token-budgeted context packaging.
 """
 
 import sys
+import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 from rank_bm25 import BM25Okapi
@@ -49,7 +50,7 @@ class HybridSearcher:
         all_metas = all_data.get("metadatas", [])
         bm25 = None
         if all_docs:
-            tokenized_corpus = [doc.lower().split() for doc in all_docs]
+            tokenized_corpus = [re.findall(r'[\w\-]+', doc.lower()) for doc in all_docs]
             bm25 = BM25Okapi(tokenized_corpus)
 
         entry = {
@@ -152,9 +153,12 @@ class HybridSearcher:
                 all_metas = bm25_entry["metas"]
 
                 if bm25 is not None and all_docs:
-                    # Tokenize both the sub_query and user's original query tokens
+                    # Tokenize both the sub_query, user's original query tokens, and expanded acronyms
                     # ensuring both English papers and Turkish compendiums match accurately.
-                    tokenized_query = list(set(sq.lower().split() + query.lower().split()))
+                    q_tokens = re.findall(r'[\w\-]+', sq.lower()) + re.findall(r'[\w\-]+', query.lower())
+                    expanded_text = self.query_transformer.expand_acronyms(query)
+                    q_tokens += re.findall(r'[\w\-]+', expanded_text.lower())
+                    tokenized_query = list(set(q_tokens))
                     bm25_scores = bm25.get_scores(tokenized_query)
 
                     bm25_ranked_indices = sorted(range(len(bm25_scores)), key=lambda i: bm25_scores[i], reverse=True)[:n_fetch]
@@ -176,9 +180,11 @@ class HybridSearcher:
                 # 3. Accumulate Reciprocal Rank Fusion (RRF) Scores across sub-queries
                 for cid, c in col_candidates.items():
                     rrf_contrib = (1.0 / (60.0 + c["vector_rank"])) + (1.0 / (60.0 + c["bm25_rank"]))
-                    # Boost verified teacher ground-truth chunks
+                    # Boost verified teacher ground-truth and domain textbooks
                     if cid.startswith("teacher_") or c.get("metadata", {}).get("arxiv_id") == "teacher_verified":
                         rrf_contrib += 0.05
+                    elif cid.startswith("BTU-MEK-"):
+                        rrf_contrib += 0.03
                     key = f"{col_name}:{cid}"
                     if key in master_candidates:
                         master_candidates[key]["rrf_score"] += rrf_contrib
@@ -186,10 +192,15 @@ class HybridSearcher:
                         c["rrf_score"] = rrf_contrib
                         master_candidates[key] = c
 
-        # Rank all accumulated candidates
+        # Rank candidates ensuring paper_chunks (main academic corpus) has guaranteed top representation
         all_candidates = list(master_candidates.values())
-        all_candidates.sort(key=lambda x: x["rrf_score"], reverse=True)
-        top_candidates = all_candidates[:60]
+        chunks_candidates = [c for c in all_candidates if c.get("collection") == "paper_chunks"]
+        other_candidates = [c for c in all_candidates if c.get("collection") != "paper_chunks"]
+        chunks_candidates.sort(key=lambda x: x["rrf_score"], reverse=True)
+        other_candidates.sort(key=lambda x: x["rrf_score"], reverse=True)
+
+        top_candidates = chunks_candidates[:45] + other_candidates[:15]
+        top_candidates.sort(key=lambda x: x["rrf_score"], reverse=True)
 
         # 4. Cross-Encoder Reranking (using translated English search_query + original query for dual scoring)
         reranked, has_sufficient_evidence = self.reranker.rerank(search_query, top_candidates, top_n=top_k, original_query=query)
@@ -200,7 +211,9 @@ class HybridSearcher:
             tag = f"S{idx + 1}"
             c["source_tag"] = tag
             meta = c.get("metadata", {})
-            cleaned_title = self.clean_title(meta.get("title", c.get("id", "Academic Paper")))
+            raw_title = meta.get("title") or c.get("id") or "Academic Paper"
+            cleaned_title = self.clean_title(raw_title)
+            c["title"] = cleaned_title
             meta["title"] = cleaned_title
             sec = meta.get("section_name", "N/A")
             packed_blocks.append(
