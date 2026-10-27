@@ -157,7 +157,9 @@ def build_answer_prompt(
             "nasıl çalışır", "işleyişi", "detaylandır", "incele", "mimari", "yapısı",
             "formülü", "matematiği", "hesabı", "tarafı", "tüm detayları", "baştan sona",
             "kapsamlı", "ders", "masterclass", "tutorial", "architecture", "explain in detail",
-            "comprehensive", "karşılaştır", "explain", "detail", "mechanism", "formula"
+            "comprehensive", "karşılaştır", "explain", "detail", "mechanism", "formula",
+            "öğret", "bütün bilgileri", "tüm bilgileri", "çok detaylı", "advantage", "advanced",
+            "level", "dead neuron", "dying neuron", "initialization", "activation", "weights"
         ]
         is_topic_explanation = any(kw in q_lower for kw in topic_explain_keywords)
         is_specific_inquiry = any(w in q_lower for w in ["kaç", "değeri", "kim", "hangi", "what is the value", "who is", "which"])
@@ -184,19 +186,20 @@ def build_answer_prompt(
             )
         elif is_topic_explanation:
             instructions = (
-                "AKADEMİK DİNAMİK PARÇALAMA VE ETKİLEŞİMLİ DERİN ANLATIM PROTOKOLÜ (DYNAMIC SECTIONING MASTERCLASS):\n"
+                "AKADEMİK DİNAMİK PARÇALAMA VE EKSİKSİZ MASTERCLASS ÖĞRETİM PROTOKOLÜ (ULTRA-DEEP MASTERCLASS):\n"
                 "Aşağıda sağlanan akademik kanıtları ([S1]..[S5]) temel alarak konuyu açıkla.\n\n"
-                "TEMEL PRENSİP: Tek bir cevapta yüzeysel özet geçmek KESİNLİKLE YASAKTIR.\n"
-                "Konunun karmaşıklığına göre toplam bölüm sayısını N (2 ile 6 parça arası) KENDİN BELİRLE.\n"
-                "Aktif bölümü en derin matematiksel formüller ($$...$$), tensör boyutları ([B, C, H, W]) ve ders kitabı titizliğiyle açıkla.\n\n"
+                "KULLANICI KESİN EMRİ: 'Yanıtlar tek cümle şeklinde ve yüzeysel olamaz; ilgili makale ve bölümdeki BÜTÜN bilgileri çok çok detaylıca öğret.'\n"
+                "- TEK CÜMLELİK MADDELER VEYA YÜZEYSEL TANIMLAR KESİNLİKLE YASAKTIR!\n"
+                "- Konunun karmaşıklığına göre toplam bölüm sayısını N (2 ile 6 parça arası) belirle.\n"
+                "- Aktif bölümü en derin matematiksel formüller ($$...$$), sembol tanımları, tensör boyutları ([B, C, H, W] veya [B, L, D]) ve ders kitabı titizliğiyle açıkla.\n\n"
                 "1. 🗺️ KISA YOL HARİTASI (İLK TURDA EN BAŞTA):\n"
                 "   Konuyu kendi belirlediğin kaç bölüme ayırdığını ve başlıklarını 1-2 cümleyle en başta tanıt:\n"
                 "   Örn: '🗺️ **Yol Haritası (Toplam 4 Bölüm):** 1/4: ..., 2/4: ..., 3/4: ..., 4/4: ...'\n\n"
                 "2. 🔬 AKTİF BÖLÜMÜN DERİNLEMESİNE AÇIKLANMASI (ANA GÖVDE):\n"
                 "   - Aktif bölümü (örn. Bölüm 1/N veya kullanıcı devam dediyse Bölüm 2/N) asla aceleye getirmeden, en ince ayrıntısına kadar pedagojik ve zengin şekilde açıkla.\n"
-                "   - ZORUNLU LATEX FORMÜLLERİ: En az 1-2 adet blok LaTeX formülü ($$...$$) veya satır içi matematik ($X \\in \\mathbb{R}^{B \\times C \\times H \\times W}$) yaz ve her sembolü açıkla.\n"
+                "   - ZORUNLU LATEX FORMÜLLERİ: Her mekanizma için en az 1-2 adet blok LaTeX formülü ($$...$$) veya satır içi matematik yaz ve her sembolü detaylıca tanımla.\n"
                 "   - ZORUNLU KAYNAK ATIFI VE ALINTI: Kanıt metninden en az bir kaynak etiketi ([S1]..[S5]) kullan ve tırnak içinde (\"...\") doğrudan İngilizce alıntı yap.\n"
-                "   - Tensör boyutları ([B, C, H, W]) ve katman akışını adım adım aktar.\n\n"
+                "   - Tensör boyutları ([B, C, H, W]), katman akışını ve gradyan dinamiğini (türev davranışı) adım adım aktar.\n\n"
                 "3. 🎯 STANDART GEÇİŞ KONTROL NOKTASI (SADECE CEVABIN EN ALTINA / SONUNA EKLENİR, ASLA BAŞA YAZMA!):\n"
                 "   - Bu bölüm bittiğinde yanıtın en sonuna ŞU BİREBİR STANDART FORMATTA kontrol noktası koy:\n"
                 "   ---\n"
@@ -207,7 +210,7 @@ def build_answer_prompt(
                 "- Türkçe konuş, terimleri ve alıntıları orijinal İngilizce tut.\n"
                 "- Her teknik iddiada mutlaka [S1]..[S5] etiketlerini kullan.\n"
                 "- Matematiksel ifadeleri mutlaka KaTeX formatında ($ ... $ veya $$ ... $$) yaz.\n"
-                "- Kullanıcı açıkça 'kod yaz' demedikçe kod verme; mimariyi, formülleri ve tensör boyutlarını detaylı açıkla.\n"
+                "- Asla tek cümlelik kestirme tanımlar yapma; her kavramın mantığını ve arkasındaki matematiği tam bir profesör gibi açıkla.\n"
                 "- Kontrol sorusunu / geçiş noktasını KESİNLİKLE yanıtın en altına yerleştir.\n"
                 "- Eğer son bölüme (N/N) ulaşıldıysa, '🎯 Tüm bölümler (N/N) tamamlandı' diyerek konuyu nihai sentez ile kapat."
             )
@@ -278,55 +281,6 @@ CORE OPERATIONAL RULES:
     messages.append({"role": "user", "content": user_message})
     return messages
 
-
-def build_self_correction_prompt(
-    query: str,
-    flawed_response: str,
-    critique: str,
-    packaged_context: str = "",
-    graph_context: str = "",
-    history: list = None
-) -> list:
-    """Stage 2.5: Constructs prompt for intelligent self-correction based on user criticism or penalty."""
-    style_text = get_profile_style(query=query)
-    system_text = f"""Sen dünya standartlarında kıdemli bir Yapay Zeka & Derin Öğrenme Araştırma Partnerisin.
-Şu anda 'Öz-Düzeltme ve Yeniden İyileştirme' modundasın.
-
-GÖREVİN:
-Bir önceki yanıtını incelemek, kullanıcının belirttiği eleştiriyi veya eksikliği analiz etmek ve
-önceki cevabın tüm hatalarını/eksiklerini gideren, matematiksel formülleri ($$...$$), tensör boyutlarını [B, C, H, W]
-ve literatür atıflarını eksiksiz içeren radikal olarak daha üstün bir ders kitabı masterclass yanıtı üretmektir.
-
-KURALLAR:
-1. Önce 1 cümle ile eksikliğin nerede olduğunu dürüstçe teşhis et (örn: 'Önceki yanıtta formül türetimi ve tensör akışı yüzeysel bırakılmıştı; şimdi adım adım detaylandırıyorum:').
-2. Konuyu tam bir matematiksel kesinlikle, blok formüller ($$...$$), sembol tanımları ve [S1] alıntılarıyla baştan inşa et.
-3. Asla kaçamak veya genel geçer özet yapma; doğrudan teknik çekirdeğe in.
-4. En sonda tam 3 adet proaktif devam sorusu ekle.
-
-{style_text}
-"""
-    evidence_parts = []
-    if graph_context:
-        evidence_parts.append(f"### [SİNAPTİK BİLGİ GRAFİĞİ BAĞLANTILARI (GraphRAG)]:\n{graph_context}")
-    if packaged_context:
-        evidence_parts.append(f"### [DOĞRULANMIŞ LİTERATÜR KANITI]:\n{packaged_context}")
-
-    full_evidence = "\n\n".join(evidence_parts) if evidence_parts else "Yerel makale kanıtları mevcut."
-
-    user_text = (
-        f"[KULLANICININ ORİJİNAL SORUSU]:\n{query}\n\n"
-        f"[ELEŞTİRİLEN / EKSİK BULUNAN ÖNCEKİ YANIT]:\n{flawed_response}\n\n"
-        f"[KULLANICI ELEŞTİRİSİ / DÜZELTİLECEK NOKTA]:\n{critique}\n\n"
-        f"[MEVCUT AKADEMİK KANITLAR]:\n{full_evidence}\n\n"
-        "Şimdi yukarıdaki kurallara tam uyarak düzeltilmiş, eksiksiz ve derinlemesine yanıtını üret:"
-    )
-
-    msgs = [{"role": "system", "content": system_text}]
-    if history:
-        for m in history[-2:]:
-            msgs.append({"role": m["role"], "content": m["content"][:400]})
-    msgs.append({"role": "user", "content": user_text})
-    return msgs
 
 
 def build_casual_response_prompt(query: str, history: list = None, immediate_critique: str = "") -> list:

@@ -114,6 +114,12 @@ def is_academic_or_technical_inquiry(text: str) -> bool:
         "makale", "paper", "arxiv", "literatür", "derin öğrenme", "deep learning", "yapay zeka", "ai mimarisi", "mimarisi", "mimari",
         "multimodal", "token", "embedding", "rag", "retrieval", "vektör veritabanı", "chromadb", "llm",
         "overfitting", "regularization", "dropout", "batchnorm", "layernorm", "rmsnorm", "optimizer", "adamw", "sgd",
+        # Neural Network Layers, Activations & Training Dynamics
+        "neuron", "nöron", "dead neuron", "dying neuron", "activation function", "aktivasyon fonksiyonu",
+        "relu", "leaky relu", "prelu", "gelu", "silu", "swish", "sigmoid", "tanh",
+        "initialization", "random initialization", "weight initialization", "xavier", "glorot", "kaiming", "he initialization",
+        "bias weight", "bias", "weights", "neural network", "yapay sinir ağı", "ann", "cnn", "rnn", "lstm",
+        "vanishing gradient", "exploding gradient", "gradient clipping", "learning rate", "backpropagation",
         # Aerospace, Aviation, Flight Mechanics & UAV
         "havacılık", "aerodinamik", "aerodynamics", "uçuş dinamiği", "flight dynamics", "hücum açısı", "angle of attack",
         "lift", "drag", "taşıma kuvveti", "sürükleme kuvveti", "itki", "thrust", "kanat", "airfoil", "kanat profili",
@@ -146,52 +152,15 @@ def is_academic_or_technical_inquiry(text: str) -> bool:
     ]
     has_analytical_trigger = any(trig in p for trig in analytical_triggers)
 
+    # Quoted replies referencing previous technical discussion are always technical inquiries
+    if p.startswith(">") or "\n>" in p:
+        return True
+
     # If it contains clear technical concepts or analytical requests
     if has_tech_entity or has_analytical_trigger:
         return True
 
     return False
-
-
-def is_casual_or_personal(text: str) -> bool:
-    """Detects whether prompt is a greeting, casual chat, idea sharing, or personal profile declaration."""
-    p = text.strip().lower()
-    conversational_starters = [
-        "whats up", "what's up", "sup", "hello", "hi", "hey", "how are you",
-        "how's it going", "good morning", "good evening", "who are you",
-        "kanka", "kankam", "hocam", "dostum", "reis", "selam", "merhaba",
-        "naber", "nasılsın", "günaydın", "iyi akşamlar", "iyi günler",
-        "kolay gelsin", "merhabalar", "selamlar", "selamün aleyküm", "bak şimdi",
-        "sen kimsin", "kimsin sen", "beni tanıyor musun", "adın ne", "ne yapıyorsun",
-        "ne haber", "ne var ne yok"
-    ]
-    personal_cues = [
-        "benim adım", "adım ", "aklında tut", "hafızana kaydet",
-        "beni hatırla", "projem", "çalışmaya başladım", "çalışıyorum",
-        "düşünüyorum", "planlıyorum", "yapmak istiyorum", "öğrenciyim", "okuyorum",
-        "fikrim var", "bir model eğiteceğim", "model eğitmeyi", "başlayacağım",
-        "yapacağım", "benim hakkımda", "hakkımda ne biliyorsun", "beni tanıyor musun",
-        "geçmişim", "okulum", "bölümüm", "tezim", "ben ", "benim "
-    ]
-    if any(p == g or p.startswith(g) or g in p.split()[:3] for g in conversational_starters):
-        return True
-    if any(cue in p for cue in personal_cues) and len(p.split()) < 40:
-        return True
-    return False
-
-
-def is_challenge_request(text: str) -> bool:
-    """Detects whether prompt is requesting a Devil's Advocate or hypothesis stress-test."""
-    p = text.strip().lower()
-    if p.startswith("/challenge") or p.startswith("/test-hypo"):
-        return True
-    triggers = [
-        "hipotezimi test et", "hipotezimi sına", "bu fikrimi çürüt",
-        "fikrimi eleştir", "fikrimi sına", "şeytanın avukatı",
-        "devil's advocate", "failure mode analizi", "hipotezi test et",
-        "hipotezimi değerlendir", "fikrimi değerlendir"
-    ]
-    return any(trig in p for trig in triggers)
 
 
 def contextualize_query(current_query: str, history: List[Dict[str, str]]) -> str:
@@ -227,7 +196,9 @@ def contextualize_query(current_query: str, history: List[Dict[str, str]]) -> st
         "devam", "devam et", "devam edelim", "sonraki", "sıradaki", "sonraki parça",
         "sıradaki parça", "evet devam", "evet", "geçelim", "sonrakine geç", "sıradaki bölüme geç",
         "sıradaki adım", "sonraki bölüm", "bölüm", "2. parça", "3. parça", "ikinci parça", "üçüncü parça",
-        "continue", "next", "go on"
+        "continue", "next", "go on", "go advantage", "advantage level", "advanced", "advanced level",
+        "ileri seviye", "ileri seviyeye geç", "daha detaylı", "detaylı anlat", "çok detaylı", "bütün bilgileri",
+        "daha fazla detay", "ayrıntılı açıkla", "derinleştir"
     ]
 
     is_starter = any(lower_q.startswith(s) for s in followup_starters)
@@ -254,28 +225,109 @@ def contextualize_query(current_query: str, history: List[Dict[str, str]]) -> st
 
 
 def extract_next_section(text: str) -> str:
-    """
-    Asistan yanıtındaki bölüm kontrol noktasından sıradaki bölüm başlığını otonom olarak ayıklar.
-    Örn: '➡️ **Sıradaki Adım: Bölüm 2/5 (PGI Mimarisi ve Tensör Akışı)**' -> 'Bölüm 2/5: PGI Mimarisi ve Tensör Akışı'
-    """
+    """Parses '➡️ Sıradaki Adım: Bölüm X/N (Başlık)' or similar transitions from assistant response."""
     if not text:
         return ""
-    
-    patterns = [
-        r'(?:Sıradaki|Sonraki)\s*(?:Adım|Bölüm|Parça)[^:\n]*[:\-]\s*([^\n\r*]+)',
-        r'(?:devam edelim mi|geçelim mi)[^(\n]*\((?:\*\*)?([^)\*]+)(?:\*\*)?\)',
-        r'Bölüm\s*(\d+/\d+[^:\n]*:[^\n\r*]+)',
-        r'🎯\s*(?:Bölüm|Parça)\s*\d+/\d+\s*tamamlandı[^\n]*\n+[^:\n]*:\s*([^\n\r*]+)'
-    ]
-    for p in patterns:
-        m = re.search(p, text, re.IGNORECASE)
-        if m:
-            clean = m.group(1).strip().strip('*').strip()
-            # trailing punctuations
-            clean = re.sub(r'[\?\.!:]+$', '', clean).strip()
-            if clean.count('(') > clean.count(')'):
-                clean += ')'
-            # If length is reasonable
-            if 3 < len(clean) < 80:
-                return clean
-    return ""
+    m = re.search(r'➡️\s*(?:Sıradaki\s*Adım|Sonraki\s*Adım)?[:\s]*(Bölüm\s*\d+/\d+[^\n]+)', text, flags=re.I)
+    if m:
+        return m.group(1).strip()
+    m2 = re.search(r'(Bölüm\s*\d+/\d+[^:\n]+)', text, flags=re.I)
+    return m2.group(1).strip() if m2 else ""
+
+
+def highlight_fosforlu(chunk_text: str, assistant_text: str = "", query: str = "") -> str:
+    """
+    Highlights cited passages and key evidence in paper chunk text with authentic fluorescent yellow marker.
+    1. Extracts verbatim quotes from assistant response (text in "..." or '...') that match in chunk_text.
+    2. If no exact quote matches, finds sentences in chunk_text with highest query/concept overlap.
+    3. Wraps matched text in glowing <mark class="fosfor-highlighter">...</mark>.
+    """
+    if not chunk_text:
+        return ""
+
+    processed_text = chunk_text
+    highlight_applied = False
+
+    # 1. Look for explicit verbatim quotes from assistant_text
+    if assistant_text:
+        # Match quotes between double quotes or single quotes
+        raw_quotes = re.findall(r'["“]([^"”]{10,})["”]', assistant_text)
+        # Sort by length descending to match longest phrases first
+        raw_quotes = sorted(set(raw_quotes), key=lambda x: len(x), reverse=True)
+
+        for q in raw_quotes:
+            q_clean = q.strip()
+            if len(q_clean) >= 10 and q_clean in processed_text:
+                pattern = re.escape(q_clean)
+                replacement = f'<mark class="fosfor-highlighter">{q_clean}</mark>'
+                processed_text = re.sub(pattern, replacement, processed_text, count=1)
+                highlight_applied = True
+
+    # 2. If no verbatim quote matched or as secondary highlighting, highlight key evidence sentences
+    if not highlight_applied:
+        # Split chunk into sentences while preserving delimiters
+        sentences = re.split(r'(?<=[.!?])\s+', chunk_text)
+        search_terms = set()
+        if query:
+            # Extract meaningful words (>= 4 chars)
+            words = re.findall(r'\b[A-Za-z0-9_ğüşıöçĞÜŞİÖÇ\-]{4,}\b', query.lower())
+            search_terms.update(words)
+
+        scored_sentences = []
+        for s in sentences:
+            s_clean = s.strip()
+            if len(s_clean) < 25:
+                continue
+            s_lower = s_clean.lower()
+            overlap_score = sum(1 for term in search_terms if term in s_lower)
+            if overlap_score > 0:
+                scored_sentences.append((overlap_score, len(s_clean), s_clean))
+
+        if scored_sentences:
+            scored_sentences.sort(key=lambda x: (x[0], x[1]), reverse=True)
+            # Pick top 1-2 most relevant sentences
+            for _, _, target_s in scored_sentences[:2]:
+                if target_s in processed_text:
+                    pattern = re.escape(target_s)
+                    replacement = f'<mark class="fosfor-highlighter">{target_s}</mark>'
+                    processed_text = re.sub(pattern, replacement, processed_text, count=1)
+                    highlight_applied = True
+
+    return processed_text
+
+
+def inject_citation_anchors(content: str, sources: List[Dict[str, Any]] = None) -> str:
+    """
+    Injects interactive 🔗 citation anchor links next to headings and citation tags [S1], [S2]
+    so users can click them to inspect the cited paper page and fluorescent quote in the right panel.
+    """
+    if not content:
+        return ""
+
+    sources = sources or []
+    default_tag = sources[0].get("source_tag", "S1") if sources else "S1"
+    default_id = sources[0].get("id", default_tag) if sources else "S1"
+
+    # 1. Turn markdown headings (### Heading) into clickable headings with 🔗
+    def replace_heading(match):
+        level = match.group(1)
+        title = match.group(2).strip()
+        # Avoid double injecting if 🔗 is already present
+        if "🔗" in title:
+            return match.group(0)
+        anchor_html = f' <a href="?inspect_chunk={default_id}" class="cite-anchor-link" data-inspect-chunk="{default_id}" target="_self" title="Bu konunun alıntılandığı makale sayfasını ve fosforlu alıntıyı sağ panelde gör">🔗</a>'
+        return f"{level} {title}{anchor_html}"
+
+    content = re.sub(r'^(#{1,4})\s+(.+)$', replace_heading, content, flags=re.MULTILINE)
+
+    # 2. Turn inline citation tags [S1], [S2], [W1] into interactive clickable pills
+    for idx, s in enumerate(sources):
+        tag = s.get("source_tag", f"S{idx+1}")
+        cid = s.get("id", tag)
+        tag_pattern = rf'\[{tag}\]'
+        pill_html = f'<a href="?inspect_chunk={cid}" class="cite-pill-link" data-inspect-chunk="{cid}" target="_self" title="Kaynak [{tag}] sayfasını sağ panelde fosforlu alıntıyla aç">[{tag} 🔗]</a>'
+        content = re.sub(tag_pattern, pill_html, content)
+
+    return content
+
+

@@ -6,7 +6,7 @@ Filters out low-confidence chunks below threshold to prevent model hallucination
 
 import sys
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from sentence_transformers import CrossEncoder
 
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
@@ -37,13 +37,14 @@ class Reranker:
         self,
         query: str,
         candidates: List[Dict[str, Any]],
-        top_n: int = 5
+        top_n: int = 5,
+        original_query: Optional[str] = None
     ) -> Tuple[List[Dict[str, Any]], bool]:
         """
         Reranks a list of candidate chunk dictionaries.
-        Each candidate must have a 'content' key.
-        Returns:
-            (reranked_candidates, has_sufficient_evidence)
+        Supports dual-language scoring (English search query + Turkish original query)
+        to prevent language penalties on Turkish notes or textbooks.
+        Applies ground-truth priority and diverse chunk coverage.
         """
         if not candidates:
             return [], False
@@ -55,23 +56,56 @@ class Reranker:
         pairs = [[query, c.get("content", "")] for c in candidates]
         scores = self.model.predict(pairs)
 
+        # If original query differs (e.g. Turkish question vs English search query),
+        # take the maximum score to ensure non-English passages are fairly scored.
+        if original_query and original_query.strip().lower() != query.strip().lower():
+            try:
+                pairs_orig = [[original_query, c.get("content", "")] for c in candidates]
+                scores_orig = self.model.predict(pairs_orig)
+                scores = [max(float(s1), float(s2)) for s1, s2 in zip(scores, scores_orig)]
+            except Exception:
+                pass
+
         for i, cand in enumerate(candidates):
-            cand["rerank_score"] = float(scores[i])
+            score = float(scores[i])
+            # Boost verified ground-truth teacher corrections
+            meta = cand.get("metadata", {})
+            if meta.get("arxiv_id") == "teacher_verified" or "[DOĞRULANMIŞ REFERANS]" in cand.get("content", ""):
+                score += 4.0
+            cand["rerank_score"] = score
 
         # Sort descending by rerank score
         ranked = sorted(candidates, key=lambda x: x["rerank_score"], reverse=True)
-        top_candidates = ranked[:top_n]
 
         # Filter candidates meeting minimum relevance threshold
-        # For MS MARCO cross-encoders, logits > -2.0 indicate genuine semantic relevance.
-        # Negative extremes (-10 to -12) indicate completely unrelated content.
-        valid_candidates = [c for c in top_candidates if c["rerank_score"] >= -2.0]
-        has_sufficient_evidence = len(valid_candidates) > 0
-
-        if not has_sufficient_evidence:
+        # For MS MARCO cross-encoders, logits >= -2.0 indicate genuine semantic relevance.
+        valid_candidates = [c for c in ranked if c["rerank_score"] >= -2.0]
+        if not valid_candidates:
             return [], False
 
-        return valid_candidates, True
+        # Source diversity: Limit chunks from the exact same paper and section to max 2
+        # to ensure the prompt receives multi-perspective evidence rather than redundant repeats.
+        diverse_top: List[Dict[str, Any]] = []
+        section_counts: Dict[str, int] = {}
+
+        for c in valid_candidates:
+            meta = c.get("metadata", {})
+            paper_id = meta.get("arxiv_id", c.get("id", "doc")).split("_")[0]
+            sec_name = meta.get("section_name", "general")
+            key = f"{paper_id}:{sec_name}"
+
+            count = section_counts.get(key, 0)
+            if count < 2 or len(valid_candidates) <= top_n:
+                diverse_top.append(c)
+                section_counts[key] = count + 1
+            if len(diverse_top) >= top_n:
+                break
+
+        # Fallback if diversity filtering left too few results
+        if len(diverse_top) < min(top_n, len(valid_candidates)):
+            diverse_top = valid_candidates[:top_n]
+
+        return diverse_top, True
 
 
 # Global reranker instance

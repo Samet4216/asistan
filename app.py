@@ -74,7 +74,6 @@ def print_help():
     table.add_row("/approve <id>", "Approve a draft into permanent Obsidian Vault & ChromaDB")
     table.add_row("/reject <id>", "Discard a draft from Vault/Drafts/")
     table.add_row("/tr", "Translate last answer into academic Turkish (preserves math)")
-    table.add_row("/eval", "Run 10-question retrieval & recall benchmark")
     table.add_row("/dryrun <path>", "Dry-run PyTorch module on CPU: check shapes, backward pass, & FLOPs")
     table.add_row("/challenge <hypo>", "Devil's Advocate mode: stress-test hypotheses against failure modes & GPU limits")
     table.add_row("/explain <topic>", "Deep-dive tutorial mode: comprehensive pedagogical lecture (math, tensor flow & code)")
@@ -229,12 +228,6 @@ def run_repl():
             with console.status("[cyan]Translating technical response to Turkish...[/cyan]"):
                 tr_text = lang_guard.translate_to_turkish(last_answer)
             console.print(Panel(Markdown(tr_text), title="🇹🇷 Academic Turkish Translation", border_style="blue", box=box.ROUNDED))
-
-        elif cmd == "/eval":
-            console.print("[cyan][*] Running evaluation benchmark...[/cyan]")
-            from eval.run_eval import run_eval
-            res = run_eval()
-            console.print(f"[green]✓ Evaluation completed! Recall@5: {res.get('recall@5')*100:.1f}%, MRR: {res.get('mrr'):.3f}[/green]")
 
         elif cmd == "/dryrun":
             parts = user_input.split(maxsplit=1)

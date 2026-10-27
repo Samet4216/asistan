@@ -110,7 +110,7 @@ class HybridSearcher:
                 if count == 0:
                     continue
 
-                n_fetch = min(20, count)
+                n_fetch = min(35, count)
 
                 # 1. Dense Vector Query
                 where_filter = None
@@ -144,7 +144,7 @@ class HybridSearcher:
                         "bm25_rank": 999
                     }
 
-                # 2. Sparse BM25 Query (Cached)
+                # 2. Sparse BM25 Query (Cached & Bilingual Match)
                 bm25_entry = self._get_bm25_index(col_name, col, count)
                 bm25 = bm25_entry["bm25"]
                 all_ids = bm25_entry["ids"]
@@ -152,7 +152,9 @@ class HybridSearcher:
                 all_metas = bm25_entry["metas"]
 
                 if bm25 is not None and all_docs:
-                    tokenized_query = sq.lower().split()
+                    # Tokenize both the sub_query and user's original query tokens
+                    # ensuring both English papers and Turkish compendiums match accurately.
+                    tokenized_query = list(set(sq.lower().split() + query.lower().split()))
                     bm25_scores = bm25.get_scores(tokenized_query)
 
                     bm25_ranked_indices = sorted(range(len(bm25_scores)), key=lambda i: bm25_scores[i], reverse=True)[:n_fetch]
@@ -174,6 +176,9 @@ class HybridSearcher:
                 # 3. Accumulate Reciprocal Rank Fusion (RRF) Scores across sub-queries
                 for cid, c in col_candidates.items():
                     rrf_contrib = (1.0 / (60.0 + c["vector_rank"])) + (1.0 / (60.0 + c["bm25_rank"]))
+                    # Boost verified teacher ground-truth chunks
+                    if cid.startswith("teacher_") or c.get("metadata", {}).get("arxiv_id") == "teacher_verified":
+                        rrf_contrib += 0.05
                     key = f"{col_name}:{cid}"
                     if key in master_candidates:
                         master_candidates[key]["rrf_score"] += rrf_contrib
@@ -184,10 +189,10 @@ class HybridSearcher:
         # Rank all accumulated candidates
         all_candidates = list(master_candidates.values())
         all_candidates.sort(key=lambda x: x["rrf_score"], reverse=True)
-        top_candidates = all_candidates[:50]
+        top_candidates = all_candidates[:60]
 
-        # 4. Cross-Encoder Reranking (using translated English search_query)
-        reranked, has_sufficient_evidence = self.reranker.rerank(search_query, top_candidates, top_n=top_k)
+        # 4. Cross-Encoder Reranking (using translated English search_query + original query for dual scoring)
+        reranked, has_sufficient_evidence = self.reranker.rerank(search_query, top_candidates, top_n=top_k, original_query=query)
 
         # 5. Numbered Source Packaging [S1]..[Sk] and Clean Titles
         packed_blocks = []

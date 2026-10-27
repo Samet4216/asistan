@@ -21,42 +21,19 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import streamlit as st
 import streamlit.components.v1 as components
-import psutil
 import config
 import llm
 import budget
-import importlib
 import utils
 importlib.reload(utils)
 from utils import (
     get_gpu_status,
     normalize_latex,
     is_academic_or_technical_inquiry,
-    contextualize_query
+    contextualize_query,
+    highlight_fosforlu,
+    inject_citation_anchors
 )
-
-try:
-    from utils import extract_next_section
-except (ImportError, AttributeError):
-    def extract_next_section(text: str) -> str:
-        if not text:
-            return ""
-        patterns = [
-            r'(?:Sıradaki|Sonraki)\s*(?:Adım|Bölüm|Parça)[^:\n]*[:\-]\s*([^\n\r*]+)',
-            r'(?:devam edelim mi|geçelim mi)[^(\n]*\((?:\*\*)?([^)\*]+)(?:\*\*)?\)',
-            r'Bölüm\s*(\d+/\d+[^:\n]*:[^\n\r*]+)',
-            r'🎯\s*(?:Bölüm|Parça)\s*\d+/\d+\s*tamamlandı[^\n]*\n+[^:\n]*:\s*([^\n\r*]+)'
-        ]
-        for p in patterns:
-            m = re.search(p, text, re.IGNORECASE)
-            if m:
-                clean = m.group(1).strip().strip('*').strip()
-                clean = re.sub(r'[\?\.!:]+$', '', clean).strip()
-                if clean.count('(') > clean.count(')'):
-                    clean += ')'
-                if 3 < len(clean) < 80:
-                    return clean
-        return ""
 
 from retrieval.search import searcher
 from retrieval.web_search import web_searcher, is_online
@@ -75,8 +52,7 @@ importlib.reload(rl_mod)
 
 from answer.prompts import (
     build_answer_prompt,
-    build_casual_response_prompt,
-    build_general_expert_prompt
+    build_casual_response_prompt
 )
 from memory.approval import approval_manager
 from memory.user_profile import profile_manager
@@ -485,12 +461,20 @@ else:
         # Generate Assistant Response
         with st.chat_message("assistant"):
             clean_q = prompt_to_process.strip()
-            is_technical = is_academic_or_technical_inquiry(clean_q)
+            augmented_query = contextualize_query(clean_q, st.session_state.messages[:-1])
+            is_technical = is_academic_or_technical_inquiry(clean_q) or is_academic_or_technical_inquiry(augmented_query)
+
+            # Context Continuity: If the previous discussion was technical/academic and user continues, stay in academic mode
+            if not is_technical and len(st.session_state.messages) > 1:
+                last_asst_msg = next((m for m in reversed(st.session_state.messages[:-1]) if m["role"] == "assistant"), None)
+                if last_asst_msg:
+                    asst_content = last_asst_msg.get("content", "")
+                    if any(marker in asst_content for marker in ["$$", "Tensör", "Tensor", "Bölüm", "Parça", "[S", "ReLU", "Layer", "Gradient", "Loss", "Initialization", "Neuron"]):
+                        if not utils.is_casual_or_personal(clean_q):
+                            is_technical = True
 
             retrieved_sources = []
             if is_technical:
-                augmented_query = contextualize_query(clean_q, st.session_state.messages[:-1])
-                
                 with st.spinner("💭 Yanıt hazırlanıyor..."):
                     search_res = searcher.search(
                         augmented_query,

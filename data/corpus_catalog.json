@@ -1,5 +1,77 @@
 [
   {
+    "id": "BTU-MEK-ELEKTRONIK-DEVRELER",
+    "title": "Analog Elektronik, Yarıiletken Fiziği ve Devre Teorisi",
+    "authors": "Robert L. Boylestad, Louis Nashelsky & Adel S. Sedra, Kenneth C. Smith",
+    "domain": "BTÜ Mekatronik / Elektronik Devreleri",
+    "color": "#0ea5e9",
+    "desc": "BTÜ Elektronik Devreleri dersi ana kaynakları: Diyot fiziği (Shockley denklemi, doğrultucular, Zener), BJT transistörler (Kutuplama, küçük sinyal hibrid-pi modeli, yükselteçler), MOSFET fiziği (Karakteristik denklemler, CMOS anahtarlama) ve Op-Amp analog devreleri (Schmitt trigger, aktif filtreler).",
+    "prompt": "BTÜ Elektronik dersi kapsamında BJT transistörün küçük sinyal hibrid-pi modelini ve MOSFET doyum bölgesi akım denklemini türeterek çalışma bölgelerini açıkla."
+  },
+  {
+    "id": "BTU-MEK-MANTIK-DEVRELERI",
+    "title": "Sayısal Mantık Devreleri ve Sayısal Sistem Tasarımı",
+    "authors": "M. Morris Mano & Michael D. Ciletti, Thomas L. Floyd",
+    "domain": "BTÜ Mekatronik / Mantık Devreleri",
+    "color": "#e11d48",
+    "desc": "BTÜ Mantık Devreleri dersi ana kaynakları: Boolean cebri, Karnaugh haritaları (K-Map indirgemeleri), Kombinezonsal mantık (Toplayıcılar, MUX/DEMUX, Kodlayıcılar), Ardışıl devreler (Flip-Floplar, Sayıcılar) ve Sonlu Durum Makineleri (FSM Mealy & Moore).",
+    "prompt": "BTÜ Mantık Devreleri dersi kapsamında Karnaugh Haritası (K-Map) ile mantıksal indirgeme kurallarını ve Mealy/Moore sonlu durum makineleri (FSM) arasındaki temel farkları açıkla."
+  },
+  {
+    "id": "BTU-MEK-ROS2",
+    "title": "Robot İşletim Sistemi (ROS2 Humble) ve Otonom Mobil Robotlar",
+    "authors": "Steven Macenski, Tully Foote & Open Robotics",
+    "domain": "BTÜ Mekatronik / Robotik Yazılım & ROS2",
+    "color": "#06b6d4",
+    "desc": "BTÜ Robotik Yazılım dersi ana kaynakları: DDS haberleşme omurgası, ROS2 Nodes/Topics/Actions, URDF/Xacro robot modelleme, TF2 koordinat dönüşümleri ve Nav2 otonom navigasyon yığını.",
+    "prompt": "ROS2 mimarisinde TF2 koordinat dönüşüm kütüphanesi, URDF robot modeli ve Nav2 Costmap entegrasyonu otonom sürüşte nasıl birlikte çalışır?"
+  },
+  {
+    "id": "BTU-MEK-GOMULU-STM32",
+    "title": "Gömülü Sistemler, ARM Cortex-M ve CAN Bus Mimarisi",
+    "authors": "Joseph Yiu & STMicroelectronics",
+    "domain": "BTÜ Mekatronik / Gömülü Sistemler",
+    "color": "#ec4899",
+    "desc": "BTÜ Gömülü Sistemler dersi ana kaynakları: ARM Cortex-M4 çekirdeği, NVIC kesme kontrolcüsü, DMA bellek aktarımı, Timer PWM, SPI/I2C/UART ve CAN 2.0B / CAN-FD endüstriyel haberleşmesi.",
+    "prompt": "STM32 mikrodenetleyicilerde CAN Bus 2.0B bit arbitrasyonunu, diferansiyel sinyalleşmeyi ve NVIC kesme önceliklendirmesini teknik olarak açıkla."
+  },
+  {
+    "id": "BTU-MEK-SINYAL-DSP",
+    "title": "Sinyaller, Sistemler ve Sayısal Sinyal İşleme (DSP)",
+    "authors": "Alan V. Oppenheim & Alan S. Willsky",
+    "domain": "BTÜ Mekatronik / Sinyal & DSP",
+    "color": "#8b5cf6",
+    "desc": "BTÜ Sinyaller & DSP dersi ana kaynakları: LTI sistem konvolüsyonu, Fourier ve Z-dönüşümü, Nyquist örnekleme teoremi, FIR/IIR sayısal filtreler ve robotik sensörler için 1D Kalman Filtresi.",
+    "prompt": "Ayrık zamanlı Kalman filtresinin kestirim (predict) ve güncelleme (update) matris denklemlerini bir robotik odometri örneğiyle adım adım göster."
+  },
+  {
+    "id": "BTU-MEK-SENSOR-AKTUATOR",
+    "title": "Mekatronik Sensörler, Aktüatörler ve Sinyal Şartlandırma",
+    "authors": "David G. Alciatore & Michael B. Histand",
+    "domain": "BTÜ Mekatronik / Sensör & Aktüatör",
+    "color": "#f59e0b",
+    "desc": "BTÜ Sensör & Aktüatör dersi ana kaynakları: Artımsal/mutlak enkoderler, IMU sensör füzyonu, BLDC motor 6-adımlı komütasyonu, H-Köprüsü PWM sürüşü ve Op-Amp sinyal şartlandırma.",
+    "prompt": "Fırçasız DC (BLDC) motorlarda Hall sensörleri ile 6 adımlı komütasyon mantığını ve H-köprüsü PWM anahtarlama mimarisini açıkla."
+  },
+  {
+    "id": "BTU-MEK-KONTROL",
+    "title": "Modern Otomatik Kontrol Sistemleri ve Durum-Uzay Analizi",
+    "authors": "Katsuhiko Ogata & Gene F. Franklin",
+    "domain": "BTÜ Mekatronik / Kontrol Teorisi",
+    "color": "#10b981",
+    "desc": "BTÜ Kontrol dersi ana kaynakları: Transfer fonksiyonları, Durum-Uzay modelleme, Kök-Yer Eğrisi, Bode/Nyquist frekans analizi, PID tasarımı ve Durum Geri Beslemesi (State Feedback / Luenberger Observer).",
+    "prompt": "BTÜ Kontrol dersi kapsamında Durum-Uzay (State-Space) kutup yerleştirme tasarımı ve Kalman Rank ile kontrol edilebilirlik şartını matematiksel olarak açıkla."
+  },
+  {
+    "id": "BTU-MEK-ROBOTIK",
+    "title": "Modern Robotik: Kinematik, Dinamik ve Yörünge Kontrolü",
+    "authors": "John J. Craig & Kevin M. Lynch, Frank C. Park",
+    "domain": "BTÜ Mekatronik / Robotik",
+    "color": "#3b82f6",
+    "desc": "BTÜ Robotik dersi ana kaynakları: Denavit-Hartenberg (DH) parametreleri, homojen dönüşümler, ileri/ters kinematik, Jacobian tekillikleri ve Euler-Lagrange dinamik denklemleri.",
+    "prompt": "BTÜ Mekatronik Robotik dersindeki Denavit-Hartenberg (DH) kural adımlarını, homojen dönüşüm matrisini ve Jacobian tekillik analizi denklemlerini detaylandır."
+  },
+  {
     "id": "1706.03762",
     "title": "Attention Is All You Need",
     "authors": "Vaswani et al. (Google Brain)",
