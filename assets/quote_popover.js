@@ -91,23 +91,6 @@ function setupQuoteButton() {
 
         btn.style.display = "none";
     });
-
-    // Intercept clicks on citation anchor links (🔗) to open right inspection panel
-    parentDoc.addEventListener("click", (e) => {
-        const anchor = e.target.closest("a.cite-anchor-link, a.cite-pill-link, [data-inspect-chunk]");
-        if (anchor) {
-            e.preventDefault();
-            e.stopPropagation();
-            const chunkId = anchor.getAttribute("data-inspect-chunk") || 
-                            (anchor.getAttribute("href") || "").replace("?inspect_chunk=", "");
-            if (chunkId) {
-                const url = new URL(window.parent.location.href);
-                url.searchParams.set("inspect_chunk", chunkId);
-                window.parent.history.pushState({}, "", url.toString());
-                window.parent.location.reload();
-            }
-        }
-    });
 }
 
 setTimeout(setupQuoteButton, 500);

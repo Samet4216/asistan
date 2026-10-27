@@ -163,6 +163,21 @@ def is_academic_or_technical_inquiry(text: str) -> bool:
     return False
 
 
+def is_casual_or_personal(text: str) -> bool:
+    """Detects brief casual greetings, pleasantries, or conversational banter."""
+    if not text:
+        return True
+    t = text.strip().lower()
+    casual_words = {
+        "merhaba", "selam", "selamlar", "günaydın", "iyi akşamlar", "teşekkürler",
+        "teşekkür ederim", "sağol", "eyvallah", "tamamdır", "anladım", "harika",
+        "süper", "güzel", "nasılsın", "naber", "kimsin", "görüşürüz", "bye", "hi",
+        "hello", "thanks", "thank you", "ok", "peki", "evet", "hayır"
+    }
+    tokens = [w.strip(".,!?:;\"'") for w in t.split()]
+    return len(tokens) <= 3 and any(tok in casual_words for tok in tokens)
+
+
 def contextualize_query(current_query: str, history: List[Dict[str, str]]) -> str:
     """
     Augments genuine follow-up questions or quoted replies with conversation context.
@@ -300,13 +315,19 @@ def inject_citation_anchors(content: str, sources: List[Dict[str, Any]] = None) 
     """
     Injects interactive 🔗 citation anchor links next to headings and citation tags [S1], [S2]
     so users can click them to inspect the cited paper page and fluorescent quote in the right panel.
+    If no sources exist, leaves content unmodified (no 🔗 icons).
     """
     if not content:
         return ""
 
-    sources = sources or []
-    default_tag = sources[0].get("source_tag", "S1") if sources else "S1"
-    default_id = sources[0].get("id", default_tag) if sources else "S1"
+    # KAYNAK YOKSA ASLA 🔗 İKONU VEYA ALINTI ETİKETİ KOYMA!
+    if not sources or len(sources) == 0:
+        return content
+
+    default_tag = sources[0].get("source_tag", "S1")
+    default_id = sources[0].get("id", default_tag)
+    if not default_id or default_id in ("None", "", "S1") and not any(s.get("id") for s in sources):
+        return content
 
     # 1. Turn markdown headings (### Heading) into clickable headings with 🔗
     def replace_heading(match):

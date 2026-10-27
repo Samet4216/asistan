@@ -25,31 +25,17 @@ import config
 import llm
 import budget
 import utils
-importlib.reload(utils)
 from utils import (
     get_gpu_status,
     normalize_latex,
     is_academic_or_technical_inquiry,
     contextualize_query,
-    highlight_fosforlu,
-    inject_citation_anchors,
     extract_next_section
 )
 
 from retrieval.search import searcher
 from retrieval.web_search import web_searcher, is_online
 from retrieval.graph_rag import graph_rag_engine
-import answer.prompts as prompts_mod
-import memory.user_profile as up_mod
-import memory.teacher_correction as tc_mod
-import memory.conversation_collector as cc_mod
-import memory.rl_feedback as rl_mod
-
-importlib.reload(prompts_mod)
-importlib.reload(up_mod)
-importlib.reload(tc_mod)
-importlib.reload(cc_mod)
-importlib.reload(rl_mod)
 
 from answer.prompts import (
     build_answer_prompt,
@@ -67,15 +53,10 @@ from ingest.local_file_ingest import ingest_uploaded_file
 
 
 def safe_sync_self_training():
-    """Safely executes self-training sync even under Streamlit hot-reload cache."""
+    """Safely executes self-training sync."""
     try:
         if hasattr(collector, "sync_self_training"):
             return collector.sync_self_training()
-        else:
-            import memory.conversation_collector as _cc
-            importlib.reload(_cc)
-            if hasattr(_cc.collector, "sync_self_training"):
-                return _cc.collector.sync_self_training()
     except Exception as e:
         print(f"[!] Warning during self-training sync: {e}")
     return {}
@@ -113,6 +94,12 @@ with st.sidebar:
     if st.button("➕ Yeni Sohbet", use_container_width=True, type="primary"):
         st.session_state.messages = []
         st.session_state.pending_prompt = None
+        st.session_state.inspect_chunk_id = None
+        if "inspect_chunk" in st.query_params:
+            try:
+                del st.query_params["inspect_chunk"]
+            except Exception:
+                st.query_params["inspect_chunk"] = ""
         st.session_state.current_view = "💬 Sohbet"
         st.rerun()
 
@@ -290,11 +277,46 @@ if st.session_state.current_view.startswith("📚"):
 # VIEW 2: SOHBET & ASİSTAN (Pure Centered Chat OR Split-View Right Panel)
 # ==============================================================================
 else:
-    param_chunk = st.query_params.get("inspect_chunk", None)
-    if param_chunk in (None, "", '""', "None"):
-        param_chunk = None
-    active_inspect_id = param_chunk or st.session_state.get("inspect_chunk_id", None)
-    is_split_view = bool(active_inspect_id)
+    # Sohbet boşsa veya yeni sohbet açılmışsa sağ paneli kapalı tut
+    if not st.session_state.get("messages"):
+        if "inspect_chunk" in st.query_params:
+            try:
+                del st.query_params["inspect_chunk"]
+            except Exception:
+                st.query_params["inspect_chunk"] = ""
+        st.session_state.inspect_chunk_id = None
+        active_inspect_id = None
+        is_split_view = False
+    else:
+        param_chunk = st.query_params.get("inspect_chunk", None)
+        if param_chunk in (None, "", '""', "None"):
+            param_chunk = None
+        candidate_inspect_id = param_chunk or st.session_state.get("inspect_chunk_id", None)
+
+        # Yalnızca geçerli sohbette bulunan kaynaklar için paneli aç
+        has_matching_source = False
+        if candidate_inspect_id:
+            for m in st.session_state.messages:
+                if m.get("role") == "assistant" and m.get("sources"):
+                    for s in m["sources"]:
+                        if s.get("id") == candidate_inspect_id or s.get("source_tag") == candidate_inspect_id:
+                            has_matching_source = True
+                            break
+                    if has_matching_source:
+                        break
+
+        if candidate_inspect_id and has_matching_source:
+            active_inspect_id = candidate_inspect_id
+            is_split_view = True
+        else:
+            active_inspect_id = None
+            is_split_view = False
+            st.session_state.inspect_chunk_id = None
+            if "inspect_chunk" in st.query_params:
+                try:
+                    del st.query_params["inspect_chunk"]
+                except Exception:
+                    st.query_params["inspect_chunk"] = ""
 
     if is_split_view:
         st.markdown("<style>.main .block-container { max-width: 96% !important; min-width: 960px !important; padding-top: 1.2rem !important; }</style>", unsafe_allow_html=True)
@@ -369,37 +391,46 @@ else:
         for idx, msg in enumerate(st.session_state.messages):
             with st.chat_message(msg["role"]):
                 content = msg["content"]
-                if msg["role"] == "assistant":
-                    anchored_content = inject_citation_anchors(content, msg.get("sources", []))
+                if msg["role"] == "assistant" and msg.get("sources"):
+                    anchored_content = inject_citation_anchors(content, msg["sources"])
                     st.markdown(normalize_latex(anchored_content), unsafe_allow_html=True)
                 else:
                     st.markdown(normalize_latex(content), unsafe_allow_html=True)
 
-                # If sources were recorded for this assistant message, show interactive inspector buttons & bibliography
+                # Kanıt sunuluyorsa veya kitaptan alıntı yapılmışsa kaynakçayı göster, yoksa tamamen gizle
                 if msg["role"] == "assistant" and msg.get("sources"):
-                    valid_sources = msg["sources"][:4]
-                    num_btn = len(valid_sources)
-                    if num_btn > 0:
-                        btn_cols = st.columns([1 for _ in range(num_btn)] + [max(1, 5 - num_btn)])
-                        for s_i, s in enumerate(valid_sources):
+                    is_refusal = "⚠️ **Bu konu hakkında yerel makale arşivimizde" in content
+                    valid_sources = [
+                        s for s in msg["sources"] 
+                        if s.get("content") and s.get("rerank_score", 0.0) >= -1.0
+                    ]
+                    has_citation = bool(re.search(r'\[(?:S\d+|W\d+|DOĞRULANMIŞ)\]', content))
+
+                    # Hızlı kaynak inceleme butonları
+                    if valid_sources and has_citation and not is_refusal:
+                        num_b = min(len(valid_sources), 3)
+                        b_cols = st.columns([1 for _ in range(num_b)] + [max(1, 5 - num_b)])
+                        for s_i, s in enumerate(valid_sources[:num_b]):
                             s_tag = s.get("source_tag", f"S{s_i+1}")
                             s_cid = s.get("id", s_tag)
-                            s_meta = s.get("metadata", {})
-                            s_title = s_meta.get("title", "Makale")
-                            with btn_cols[s_i]:
-                                if st.button(f"📄 {s_tag} İncele", key=f"btn_src_{idx}_{s_i}", help=f"'{s_title}' alıntılanan sayfasını ve fosforlu satırları sağ panelde aç"):
+                            with b_cols[s_i]:
+                                if st.button(f"📄 {s_tag} İncele", key=f"btn_quick_src_{idx}_{s_i}", help="Sayfayı ve fosforlu alıntıyı sağ panelde aç"):
                                     st.session_state.inspect_chunk_id = s_cid
                                     st.query_params["inspect_chunk"] = s_cid
                                     st.rerun()
 
-                    with st.expander(f"📚 Kaynakça ({len(msg['sources'])} Referans)", expanded=False):
-                        for s in msg["sources"]:
-                            meta = s.get("metadata", {})
-                            title = meta.get("title", "Makale")
-                            tag = s.get("source_tag", "Kaynak")
-                            score = s.get("rerank_score", 0.0)
-                            cid = s.get("id", tag)
-                            st.markdown(f"- **`[{tag}]`** 📄 [{title}](?inspect_chunk={cid}) *(Skor: {score:.2f})*")
+                    if valid_sources and has_citation and not is_refusal:
+                        with st.expander(f"📚 Doğrulanmış Kaynakça & Kitap Alıntıları ({len(valid_sources)} Referans)", expanded=False):
+                            for s in valid_sources:
+                                meta = s.get("metadata", {})
+                                title = meta.get("title", s.get("id", "Makale / Ders Kitabı"))
+                                sec = meta.get("section_name", "İlgili Bölüm / Sayfa")
+                                tag = s.get("source_tag", "Kaynak")
+                                excerpt = s.get("content", "").strip()
+                                st.markdown(f"- **`[{tag}]`** 📄 **{title}** *(Bölüm: {sec})*")
+                                if excerpt:
+                                    clean_excerpt = excerpt.split("\n\n")[-1] if len(excerpt) > 300 else excerpt
+                                    st.caption(f"> {clean_excerpt[:280]}...")
 
                 # Multi-stage single-click progression button
                 if msg["role"] == "assistant":
@@ -627,37 +658,6 @@ else:
                         if s.get("id") == active_inspect_id or s.get("source_tag") == active_inspect_id:
                             found_source = s
 
-            # Fallback direct lookup into ChromaDB if opened via URL param or tag
-            if not found_source:
-                try:
-                    from ingest.indexer import Indexer
-                    idxr = Indexer()
-                    res_col = idxr.collections["paper_chunks"].get(ids=[active_inspect_id])
-                    if res_col and res_col.get("documents") and len(res_col["documents"]) > 0:
-                        meta_item = res_col["metadatas"][0] if res_col.get("metadatas") else {}
-                        found_source = {
-                            "id": active_inspect_id,
-                            "content": res_col["documents"][0],
-                            "metadata": meta_item,
-                            "source_tag": "S1",
-                            "rerank_score": 1.0
-                        }
-                    else:
-                        q_res = idxr.collections["paper_chunks"].get(
-                            where={"arxiv_id": active_inspect_id},
-                            limit=1
-                        )
-                        if q_res and q_res.get("documents") and len(q_res["documents"]) > 0:
-                            meta_item = q_res["metadatas"][0] if q_res.get("metadatas") else {}
-                            found_source = {
-                                "id": q_res["ids"][0],
-                                "content": q_res["documents"][0],
-                                "metadata": meta_item,
-                                "source_tag": "S1",
-                                "rerank_score": 1.0
-                            }
-                except Exception:
-                    pass
 
             # Inspector Panel Top Navigation Bar
             hdr_c1, hdr_c2 = st.columns([4, 1.2])
@@ -749,4 +749,10 @@ else:
                     st.rerun()
 
             else:
-                st.warning(f"'{active_inspect_id}' kimlikli makale sayfası veya alıntı bulunamadı. Lütfen sohbetteki bir alıntı butonuna tıklayın.")
+                st.session_state.inspect_chunk_id = None
+                if "inspect_chunk" in st.query_params:
+                    try:
+                        del st.query_params["inspect_chunk"]
+                    except Exception:
+                        st.query_params["inspect_chunk"] = ""
+                st.rerun()
