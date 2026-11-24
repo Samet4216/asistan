@@ -1,0 +1,35 @@
+training:
+  experiment_name: "dl_cv_specialist_lora"
+  output_dir: "checkpoints/dl_cv_lora"
+  
+  # Hardware limits for RTX 4050 6GB Laptop GPU
+  max_vram_gb: 5.0                # Strict allocable ceiling to avoid Windows WDDM paging
+  mixed_precision: "fp16"         # FP16 acceleration
+  gradient_checkpointing: true    # Saves ~40% activation memory
+  
+  # LoRA Hyperparameters (PEFT)
+  lora:
+    r: 8                          # Rank (small rank keeps adapter under 50MB and prevents overfitting)
+    lora_alpha: 16                # Alpha scaling factor (alpha = 2 * r)
+    lora_dropout: 0.05
+    bias: "none"
+    task_type: "CAUSAL_LM"
+    target_modules:
+      - "q_proj"
+      - "v_proj"
+
+  # Optimizer & Scheduler
+  optimizer:
+    name: "adamw"
+    learning_rate: 2.0e-4
+    weight_decay: 0.01
+    warmup_ratio: 0.05
+    lr_scheduler_type: "cosine"
+
+  # Training steps & batches
+  batch_size: 1                   # Batch size 1 mandatory on 6GB VRAM
+  gradient_accumulation_steps: 8  # Effective batch size = 8
+  max_seq_length: 512             # Keeps KV and activations within ~2GB VRAM
+  epochs: 3
+  save_steps: 50
+  logging_steps: 5
