@@ -9,8 +9,8 @@
 | **Phase 4** | **Feedback & Controlled Memory** | 🟢 **DONE** | User critique logging, quality-gated verification before dataset creation, train/val/test segregation without data leakage, provenance manifest. 31/31 pytest tests passing. |
 | **Phase 5** | **Specialist LoRA: DL / CV** | 🟢 **DONE** | Standardized 10-item engineering benchmark, automated rubric grading, 6GB VRAM budget verification, PEFT LoRA training engine with verified CUDA smoke test. 38/38 pytest tests passing. |
 | **Phase 6** | **Expansion to Math & Software** | 🟢 **DONE** | Deterministic SymbolicMathEngine (differentiation, integration, matrix eigenvalues, linear systems with LaTeX) and CodeValidator (Python AST parsing & C++ delimiter checking). 46/46 pytest tests passing. |
-| **Phase 7** | **Transformer from Scratch (Research)** | 🟡 **IN PROGRESS** | BPE Tokenizer training, custom PyTorch multi-head causal attention, next-token pretraining smoke test. |
-| **Phase 8** | **Distillation & Edge Models** | ⚪ *QUEUED* | Knowledge distillation from teacher models to small edge models for latency/VRAM optimization. |
+| **Phase 7** | **Transformer from Scratch (Research)** | 🟢 **DONE** | Scratch Causal Transformer (RoPE, SwiGLU, RMSNorm, Weight Tying), autoregressive generation, next-token pretraining engine with tokens/sec & VRAM telemetry. 52/52 pytest tests passing. |
+| **Phase 8** | **Distillation & Edge Models** | 🟡 **IN PROGRESS** | Knowledge distillation from teacher models to small edge models for latency/VRAM optimization. |
 | **Phase 9** | **Preference Optimization & RL** | ⚪ *QUEUED* | DPO implementation, unit-test verified reward signals, PPO/GRPO exploration. |
 | **Phase 10** | **Custom Architectures: Sparse / MoE** | ⚪ *QUEUED* | Top-k routing, load balancing loss, expert collapse analysis, parameter vs compute comparison. |
 
