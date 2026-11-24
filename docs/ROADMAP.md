@@ -12,7 +12,7 @@
 | **Phase 7** | **Transformer from Scratch (Research)** | 🟢 **DONE** | Scratch Causal Transformer (RoPE, SwiGLU, RMSNorm, Weight Tying), autoregressive generation, next-token pretraining engine with tokens/sec & VRAM telemetry. 52/52 pytest tests passing. |
 | **Phase 8** | **Distillation & Edge Models** | 🟢 **DONE** | Hinton KD loss engine ($L_{KD} = \alpha L_{CE} + (1-\alpha) T^2 D_{KL}$), automated teacher output quality/license filter, side-by-side benchmark comparator with latency/VRAM/regression telemetry. 61 tests passing. |
 | **Phase 9** | **Preference Optimization & RL** | 🟢 **DONE** | Verifiable reward engine (AST code execution, SymPy math equivalence), anti-reward hacking detector, Direct Preference Optimization (DPO) trainer with frozen reference model. 69 tests passing. |
-| **Phase 10** | **Custom Architectures: Sparse / MoE** | 🟡 **IN PROGRESS** | Top-k noisy gating router, load-balancing auxiliary loss, expert collapse analysis, dense vs MoE compute benchmark. |
+| **Phase 10** | **Custom Architectures: Sparse / MoE** | 🟢 **DONE** | Top-K noisy gating router, Shazeer auxiliary load-balancing loss, SwiGLU routed & DeepSeek-style shared experts, expert collapse analysis, and dense vs MoE compute benchmark comparator. 76/76 tests passing. |
 
 ---
 

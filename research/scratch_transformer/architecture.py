@@ -150,6 +150,7 @@ class ScratchCausalTransformer(nn.Module):
     def __init__(self, cfg: TransformerConfig):
         super().__init__()
         self.cfg = cfg
+        self.config = cfg
         self.embedding = nn.Embedding(cfg.vocab_size, cfg.hidden_dim)
         self.layers = nn.ModuleList([TransformerBlock(cfg) for _ in range(cfg.num_layers)])
         self.final_norm = RMSNorm(cfg.hidden_dim)
