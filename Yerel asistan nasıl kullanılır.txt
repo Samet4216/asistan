@@ -1,0 +1,10 @@
+evrensel-beyin.md yi çalışacağın ide ye yapıştır ve yapacağın işlemleri yap sonra
+
+oturumu kapat de ve yaptığın değişiklikler kaydedilsin obsedian hafızasında
+
+
+==============================================================================
+
+uçuşta kullanılacak tek mavproxy komutu budur:
+
+mavproxy.exe --master=tcp:127.0.0.1:5762 --out=tcp:127.0.0.1:14550 --out=udp:127.0.0.1:14650

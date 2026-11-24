@@ -1,0 +1,12 @@
+hardware:
+  gpu_name: "NVIDIA GeForce RTX 4050 Laptop GPU"
+  total_vram_gb: 6.0
+  max_allocable_vram_gb: 5.0
+  total_ram_gb: 16.0
+  max_system_ram_usage_gb: 13.0
+  cuda_device_id: 0
+  mixed_precision: "fp16"
+  gradient_checkpointing_default: true
+  gradient_accumulation_steps_default: 8
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 2

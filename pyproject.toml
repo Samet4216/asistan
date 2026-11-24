@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "personal-ai-assistant"
+version = "0.1.0"
+description = "Personal expert engineering AI assistant and neural network research laboratory."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Samet" }
+]
+dependencies = [
+    "pyyaml>=6.0",
+    "requests>=2.31.0",
+    "rich>=13.0.0",
+    "pydantic>=2.0.0",
+    "sentence-transformers>=3.0.0",
+    "chromadb>=0.5.0",
+    "rank-bm25>=0.2.2",
+    "pymupdf>=1.23.0",
+    "pymupdf4llm>=0.0.1",
+    "psutil>=5.9.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0"
+]
+research = [
+    "transformers>=4.40.0",
+    "peft>=0.10.0",
+    "datasets>=2.18.0",
+    "tokenizers>=0.19.0",
+    "accelerate>=0.29.0"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"

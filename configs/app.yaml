@@ -1,0 +1,27 @@
+app:
+  name: "Personal Engineering AI Assistant"
+  version: "0.1.0-alpha"
+  language: "tr"
+  log_level: "INFO"
+  log_dir: "logs"
+  data_dir: "data"
+  checkpoints_dir: "checkpoints"
+  experiments_dir: "experiments"
+  
+agents:
+  deep_learning:
+    enabled: true
+    persona: "Senior Neural Networks & Deep Learning Research Scientist"
+    specialties: ["ANN", "CNN", "Transformer", "PyTorch", "Optimization", "Loss Functions"]
+  computer_vision_uav:
+    enabled: true
+    persona: "Computer Vision & Autonomous UAV Flight Systems Engineer"
+    specialties: ["YOLO", "SAHI", "Object Tracking", "Edge Deployment", "Flight Dynamics", "Trajectory Planning"]
+  mathematics_engineering:
+    enabled: true
+    persona: "Applied Mathematics & Control Systems Engineer"
+    specialties: ["Linear Algebra", "Calculus", "Differential Equations", "Kalman Filters", "PID Control", "Numerical Methods"]
+  software_engineering:
+    enabled: true
+    persona: "Senior Software Architect & Systems Engineer"
+    specialties: ["Python", "C++", "Algorithms", "Debugging", "Clean Architecture", "Unit Testing"]

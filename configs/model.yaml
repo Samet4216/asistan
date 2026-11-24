@@ -1,0 +1,18 @@
+model:
+  backend: "ollama"  # Options: ollama, huggingface, cloud_api
+  ollama_base_url: "http://localhost:11434"
+  default_model: "qwen2.5:7b-instruct-q4_K_M"
+  reasoning_model: "deepseek-r1:7b"
+  embedding_model: "BAAI/bge-base-en-v1.5"
+  embedding_device: "cpu"
+  reranker_model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+  reranker_device: "cpu"
+  num_ctx: 8192
+  temperature: 0.65  # Natural, fluent, unconstrained reasoning
+  top_p: 0.90
+  top_k: 40
+  repeat_penalty: 1.10
+  cloud_api_fallback:
+    enabled: false
+    provider: "gemini"  # or anthropic
+    model_name: "gemini-1.5-flash"

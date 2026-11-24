@@ -596,14 +596,27 @@ else:
                             full_response = st.write_stream(stream)
                             clean_full = normalize_latex(full_response)
                         else:
-                            # SIFIR HALÜSİNASYON / KESİN DÜRÜSTLÜK (ZERO-HALLUCINATION STRICT ABSTENTION)
-                            # Literatürde veya yerel makalelerde doğrulanmış kanıt yoksa ASLA spekülasyon veya uydurma bilgi üretilmez.
-                            clean_full = (
-                                "⚠️ **Bu konu hakkında yerel makale arşivimizde ve taranan literatürde doğrulanmış bir akademik kanıt veya bilgi bulunmamaktadır; bu yüzden bilmiyorum.**\n\n"
-                                "Halüsinasyon, uydurma veya yanıltıcı bilgi üretmemek adına varsayımsal tahminde bulunmuyorum. "
-                                "Eğer bu konuyla ilgili doğru bilgiye sahipseniz, aşağıdaki **'✏️ Doğrusunu Öğret'** butonuna tıklayarak doğrudan gerçeği sisteme öğretebilirsiniz."
-                            )
-                            st.markdown(clean_full)
+                            # Check if the user is asking a strict verification question about a specific paper/experiment
+                            q_lower = clean_q.lower()
+                            verification_kw = ["yapıldı mı", "var mı", "yazıyor mu", "denendi mi", "test edildi mi", "kullanıldı mı", "tabloda", "makalede", "yazarlar", "is there", "did they", "was it"]
+                            is_strict_verify = any(kw in q_lower for kw in verification_kw)
+
+                            if is_strict_verify:
+                                # SIFIR HALÜSİNASYON / KESİN DÜRÜSTLÜK: Belirli bir makalede olmayan deney için dürüstçe bilmiyorum de
+                                clean_full = (
+                                    "⚠️ **Bu konu hakkında yerel makale arşivimizde ve taranan literatürde doğrulanmış bir akademik kanıt veya bilgi bulunmamaktadır; bu yüzden bilmiyorum.**\n\n"
+                                    "Halüsinasyon, uydurma veya yanıltıcı bilgi üretmemek adına varsayımsal tahminde bulunmuyorum. "
+                                    "Eğer bu konuyla ilgili doğru bilgiye sahipseniz, aşağıdaki **'✏️ Doğrusunu Öğret'** butonuna tıklayarak doğrudan gerçeği sisteme öğretebilirsiniz."
+                                )
+                                st.markdown(clean_full)
+                            else:
+                                # GENEL MÜHENDİSLİK & BİLİMSEL BİLGİ (MODELİN KENDİ EĞİTİM BEYNİ):
+                                # Her konuyu tek tek veritabanına kodlamak zorunda değiliz! Model kendi parametrik hafızasından
+                                # kıdemli bir Mekatronik, Robotik ve Yapay Zeka Uzmanı olarak eksiksiz ve derinlemesine yanıt verir.
+                                expert_msgs = build_general_expert_prompt(clean_q, history=st.session_state.messages[:-1])
+                                stream = llm.stream_generate(expert_msgs, max_tokens=2500, temperature=config.TEMPERATURE, model=config.MODEL_ACADEMIC)
+                                full_response = st.write_stream(stream)
+                                clean_full = normalize_latex(full_response)
 
                         # Silent interaction recording
                         self_eval = self_evolving_rl.evaluate_and_evolve(clean_q, clean_full, mode="research")
