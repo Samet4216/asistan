@@ -11,8 +11,8 @@
 | **Phase 6** | **Expansion to Math & Software** | 🟢 **DONE** | Deterministic SymbolicMathEngine (differentiation, integration, matrix eigenvalues, linear systems with LaTeX) and CodeValidator (Python AST parsing & C++ delimiter checking). 46/46 pytest tests passing. |
 | **Phase 7** | **Transformer from Scratch (Research)** | 🟢 **DONE** | Scratch Causal Transformer (RoPE, SwiGLU, RMSNorm, Weight Tying), autoregressive generation, next-token pretraining engine with tokens/sec & VRAM telemetry. 52/52 pytest tests passing. |
 | **Phase 8** | **Distillation & Edge Models** | 🟢 **DONE** | Hinton KD loss engine ($L_{KD} = \alpha L_{CE} + (1-\alpha) T^2 D_{KL}$), automated teacher output quality/license filter, side-by-side benchmark comparator with latency/VRAM/regression telemetry. 61 tests passing. |
-| **Phase 9** | **Preference Optimization & RL** | 🟡 **IN PROGRESS** | Preference data formatting, Direct Preference Optimization (DPO) loss, verifiable task reward functions. |
-| **Phase 10** | **Custom Architectures: Sparse / MoE** | ⚪ *QUEUED* | Top-k routing, load balancing loss, expert collapse analysis, parameter vs compute comparison. |
+| **Phase 9** | **Preference Optimization & RL** | 🟢 **DONE** | Verifiable reward engine (AST code execution, SymPy math equivalence), anti-reward hacking detector, Direct Preference Optimization (DPO) trainer with frozen reference model. 69 tests passing. |
+| **Phase 10** | **Custom Architectures: Sparse / MoE** | 🟡 **IN PROGRESS** | Top-k noisy gating router, load-balancing auxiliary loss, expert collapse analysis, dense vs MoE compute benchmark. |
 
 ---
 
