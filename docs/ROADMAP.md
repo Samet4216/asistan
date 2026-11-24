@@ -4,8 +4,8 @@
 | :--- | :--- | :---: | :--- |
 | **Phase 0** | **Repository & Hardware Discovery** | 🟢 **DONE** | GPU/VRAM measured, CUDA PyTorch bridge verified (4/4 tests passed), docs created, project configs initialized. |
 | **Phase 1** | **Local Minimal CLI Assistant** | 🟢 **DONE** | Unconstrained, natural CLI conversation with local 7B model. Rich terminal formatting, LaTeX math, zero boilerplate templates. 10/10 pytest tests passing. |
-| **Phase 2** | **RAG & Document Intelligence** | 🟡 **IN PROGRESS** | Page-accurate citations (PDF/MD/TXT), ChromaDB semantic search, zero-hallucination honest abstention on missing facts. |
-| **Phase 3** | **Agent & Task Routing System** | ⚪ *QUEUED* | Explicit 4-agent dispatch (`deep_learning`, `cv_uav`, `math_eng`, `software_eng`), logged routing decisions, clarification flow. |
+| **Phase 2** | **RAG & Document Intelligence** | 🟢 **DONE** | Page-accurate citations (PDF/MD/TXT), ChromaDB persistent vector store, SentenceTransformers embeddings, zero-hallucination honest abstention. 19/19 pytest tests passing. |
+| **Phase 3** | **Agent & Task Routing System** | 🟡 **IN PROGRESS** | Explicit 4-agent dispatch (`deep_learning`, `cv_uav`, `math_eng`, `software_eng`), logged routing decisions, clarification flow. |
 | **Phase 4** | **Feedback & Controlled Memory** | ⚪ *QUEUED* | User critique logging, quality-gated verification before dataset creation, train/val/test segregation. |
 | **Phase 5** | **Specialist LoRA: DL / CV** | ⚪ *QUEUED* | Fixed benchmark, baseline measurement, QLoRA training on 6GB VRAM, regression analysis. |
 | **Phase 6** | **Expansion to Math & Software** | ⚪ *QUEUED* | Adapters for C++/Python software engineering and symbolic/numerical math. |

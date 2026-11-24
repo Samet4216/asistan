@@ -1,0 +1,23 @@
+rag:
+  persist_directory: "data/chroma"
+  default_collection: "engineering_vault"
+  
+  # Chunking configuration
+  chunk_size: 600          # Characters (~120-150 tokens) for tight, specific citations
+  chunk_overlap: 100       # Overlap between consecutive chunks
+  separators: ["\n\n", "\n", ". ", "? ", "! ", " "]
+
+  # Embedding model (Sentence Transformers)
+  # Keeping on CPU by default preserves all 6GB VRAM for LLM generation
+  embedding_model: "all-MiniLM-L6-v2"
+  embedding_device: "cpu"
+  embedding_batch_size: 32
+
+  # Retrieval hyperparameters
+  top_k: 4
+  distance_threshold: 0.75  # Cosine distance cutoff (smaller is closer; discard > 0.75)
+  enable_bm25_rerank: false
+
+  # Persona and citation prompt rules
+  citation_format: "[Kaynak: {source_file}, Sayfa: {page_number}]"
+  abstention_message: "Yüklenen kişisel teknik dokümanlarda bu konuyla ilgili doğrudan bir bilgi bulunamadı."
