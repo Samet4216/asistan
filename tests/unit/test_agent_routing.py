@@ -101,3 +101,29 @@ def test_routing_decision_logged_to_file(test_router: TaskRouter):
     assert last_record["query"] == query
     assert last_record["selected_agent"] == "deep_learning"
     assert "timestamp" in last_record
+
+
+def test_route_option_selection(test_router: TaskRouter):
+    """Verify router cleanly parses option selection numbers and choice phrases."""
+    d1 = test_router.route("1.bakış açısı")
+    assert d1.selected_agent == "deep_learning"
+    assert d1.needs_clarification is False
+
+    d2 = test_router.route("2")
+    assert d2.selected_agent == "computer_vision_uav"
+    assert d2.needs_clarification is False
+
+    d3 = test_router.route("3. seçenek")
+    assert d3.selected_agent == "mathematics_engineering"
+    assert d3.needs_clarification is False
+
+    d4 = test_router.route("4")
+    assert d4.selected_agent == "software_engineering"
+    assert d4.needs_clarification is False
+
+
+def test_route_greeting_does_not_require_clarification(test_router: TaskRouter):
+    """Verify general polite greetings are routed without annoying clarification quiz."""
+    d = test_router.route("merhaba")
+    assert d.selected_agent == "deep_learning"
+    assert d.needs_clarification is False

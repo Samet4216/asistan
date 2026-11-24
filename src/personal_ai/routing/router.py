@@ -42,7 +42,44 @@ class TaskRouter:
 
     def route(self, query: str) -> RoutingDecision:
         """Analyzes the user query and selects the best specialist agent."""
-        norm_query = query.lower()
+        norm_query = query.lower().strip()
+
+        # 0. Check for explicit option / clarification response selection
+        stripped = norm_query.rstrip(".").strip()
+        option_match = re.match(r"^([1-4])(?:\.|\.bakış|\s*bakış|\s*seçenek|\))?.*$", stripped)
+        if option_match:
+            choice = option_match.group(1)
+            agent_map = {
+                "1": "deep_learning",
+                "2": "computer_vision_uav",
+                "3": "mathematics_engineering",
+                "4": "software_engineering",
+            }
+            chosen = agent_map[choice]
+            decision = RoutingDecision(
+                query=query,
+                selected_agent=chosen,
+                confidence=1.0,
+                reasoning=f"Kullanıcı netleştirme seçimi olarak {choice}. seçeneği ({chosen}) seçti.",
+                needs_clarification=False,
+                scores={chosen: 1.0},
+            )
+            self._log_decision(decision)
+            return decision
+
+        # 0b. Check for general conversational greetings
+        greetings = {"merhaba", "selam", "selamlar", "günaydın", "iyi günler", "hey", "nasılsın"}
+        if stripped in greetings or any(stripped.startswith(g) for g in greetings if len(stripped) <= len(g) + 3):
+            decision = RoutingDecision(
+                query=query,
+                selected_agent="deep_learning",
+                confidence=0.9,
+                reasoning="Genel selamlama/sohbet girişi; birincil mühendislik asistanı yanıtlıyor.",
+                needs_clarification=False,
+                scores={"deep_learning": 1.0},
+            )
+            self._log_decision(decision)
+            return decision
 
         scores: Dict[str, float] = {}
         matched_keywords: Dict[str, List[str]] = {}

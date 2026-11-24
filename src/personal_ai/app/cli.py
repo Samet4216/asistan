@@ -49,6 +49,7 @@ def main():
     rag_enabled = True
     active_agent_lock: Optional[str] = None  # None means automatic routing
     last_interaction: Optional[Dict[str, Any]] = None
+    pending_clarification_query: Optional[str] = None
 
     agent_aliases = {
         "dl": "deep_learning",
@@ -60,7 +61,7 @@ def main():
     }
 
     console.print(Panel.fit(
-        f"[bold cyan]Personal Engineering AI Assistant & Research Lab[/bold cyan] [dim](Phase 4: Feedback & Memory)[/dim]\n"
+        f"[bold cyan]Personal Engineering AI Assistant & Research Lab[/bold cyan] [dim](Phase 10: Full Multi-Agent & Research)[/dim]\n"
         f"Backend: [green]{client.base_url}[/green] | Model: [yellow]{client.default_model}[/yellow]\n"
         f"Active Specialist: [bold magenta]{active_agent_lock or 'AUTO (TaskRouter Active)'}[/bold magenta]\n"
         f"RAG Knowledge Base: [bold {'green' if rag_enabled else 'red'}]{'ACTIVE' if rag_enabled else 'OFF'}[/bold {'green' if rag_enabled else 'red'}] ({retriever.default_collection})\n"
@@ -227,16 +228,32 @@ def main():
                         console.print(f"[bold red]Geri bildirim ID'si bulunamadı:[/bold red] {fb_id}")
                     continue
 
+            # Check if answering a pending clarification question
+            actual_query = clean_input
+            force_agent_this_turn = active_agent_lock
+
+            if pending_clarification_query:
+                clarif_decision = router.route(clean_input)
+                if clarif_decision.selected_agent:
+                    force_agent_this_turn = clarif_decision.selected_agent
+                    actual_query = pending_clarification_query
+                    agent_name = registry.get_agent(force_agent_this_turn).name
+                    console.print(f"[bold magenta]🤖 Netleştirme uygulandı: {agent_name} görevi devraldı.[/bold magenta]")
+                    pending_clarification_query = None
+                else:
+                    # Treat clean_input as a fresh question
+                    pending_clarification_query = None
+
             # Orchestrate response stream
             response_chunks = []
             is_clarification = False
-            last_agent_id = active_agent_lock or "unknown"
+            last_agent_id = force_agent_this_turn or "unknown"
             last_sources: List[str] = []
 
             events = orchestrator.handle_query_stream(
-                query=clean_input,
+                query=actual_query,
                 conversation_history=conversation_history,
-                force_agent_id=active_agent_lock,
+                force_agent_id=force_agent_this_turn,
                 enable_rag=rag_enabled,
             )
 
@@ -246,6 +263,7 @@ def main():
                     console.print(f"[bold magenta]🤖 {event.content}[/bold magenta]")
                 elif event.event_type == "clarification":
                     is_clarification = True
+                    pending_clarification_query = actual_query
                     console.print(Panel(
                         f"[bold yellow]Sorunuzu daha kesin yanıtlayabilmek için netleştirme gerekiyor:[/bold yellow]\n\n"
                         f"{event.content}",
