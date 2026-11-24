@@ -1,4 +1,4 @@
-"""Interactive Terminal CLI for Personal Engineering AI Assistant (Phase 1 & Phase 2).
+"""Interactive Terminal CLI for Personal Engineering AI Assistant (Phases 1, 2, 3).
 
 Run via:
     python -m personal_ai.app.cli
@@ -11,7 +11,10 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
 
+from personal_ai.agents.specialists import AgentRegistry
 from personal_ai.rag.retriever import DocumentRetriever
+from personal_ai.routing.orchestrator import AgentOrchestrator
+from personal_ai.routing.router import TaskRouter
 from personal_ai.runtime.ollama_client import OllamaClient, OllamaRuntimeError
 
 
@@ -30,14 +33,36 @@ Kullanıcının projelerinde (İHA/SİHA uçuş dinamiği, YOLO/SAHI hedef tespi
 def main():
     console = Console()
     client = OllamaClient()
+    registry = AgentRegistry()
+    router = TaskRouter(registry=registry)
     retriever = DocumentRetriever()
+    orchestrator = AgentOrchestrator(
+        registry=registry,
+        router=router,
+        retriever=retriever,
+        client=client,
+    )
+
     rag_enabled = True
+    active_agent_lock: Optional[str] = None  # None means automatic routing
+
+    # Short aliases for quick switching
+    agent_aliases = {
+        "dl": "deep_learning",
+        "cv": "computer_vision_uav",
+        "uav": "computer_vision_uav",
+        "math": "mathematics_engineering",
+        "sw": "software_engineering",
+        "software": "software_engineering",
+    }
 
     console.print(Panel.fit(
-        f"[bold cyan]Personal Engineering AI Assistant & Research Lab[/bold cyan]\n"
-        f"Backend: [green]{client.base_url}[/green] | Model: [yellow]{client.default_model}[/yellow] | Temp: [magenta]{client.default_temperature}[/magenta]\n"
+        f"[bold cyan]Personal Engineering AI Assistant & Research Lab[/bold cyan] [dim](Phase 3: Multi-Agent)[/dim]\n"
+        f"Backend: [green]{client.base_url}[/green] | Model: [yellow]{client.default_model}[/yellow]\n"
+        f"Active Specialist: [bold magenta]{active_agent_lock or 'AUTO (TaskRouter Active)'}[/bold magenta]\n"
         f"RAG Knowledge Base: [bold {'green' if rag_enabled else 'red'}]{'ACTIVE' if rag_enabled else 'OFF'}[/bold {'green' if rag_enabled else 'red'}] ({retriever.default_collection})\n"
-        f"Commands: [dim]/add <path>, /index <dir>, /rag [on|off], /info, /clear, /exit[/dim]",
+        f"Specialists: [dim]{', '.join(registry.list_agents())}[/dim]\n"
+        f"Commands: [dim]/agent [dl|cv|math|sw|auto], /add <file>, /index <dir>, /rag [on|off], /info, /clear, /exit[/dim]",
         border_style="cyan"
     ))
 
@@ -53,7 +78,8 @@ def main():
 
     while True:
         try:
-            user_input = Prompt.ask("\n[bold green]Sen[/bold green]")
+            mode_prefix = f"[{active_agent_lock}]" if active_agent_lock else "[auto]"
+            user_input = Prompt.ask(f"\n[bold green]Sen {mode_prefix}[/bold green]")
             if not user_input.strip():
                 continue
 
@@ -74,11 +100,32 @@ def main():
                     f"Available Models: {', '.join(models)}\n"
                     f"Context Window: {client.default_num_ctx} tokens\n"
                     f"Temperature: {client.default_temperature}\n"
-                    f"RAG Status: {'ACTIVE' if rag_enabled else 'DISABLED'} (Vault: {retriever.default_collection})\n"
-                    f"Chroma Directory: {retriever.persist_directory}",
+                    f"Specialist Mode: {active_agent_lock or 'Automatic Routing'}\n"
+                    f"Available Agents: {', '.join(registry.list_agents())}\n"
+                    f"RAG Status: {'ACTIVE' if rag_enabled else 'DISABLED'} (Vault: {retriever.default_collection})",
                     title="System Status",
                     border_style="blue"
                 ))
+                continue
+            elif clean_input.lower().startswith("/agent"):
+                parts = clean_input.split(maxsplit=1)
+                if len(parts) > 1:
+                    target = parts[1].strip().lower()
+                    if target in ("auto", "none", "reset"):
+                        active_agent_lock = None
+                        console.print("[green]Ajan yönlendirmesi OTOMATİK moda alındı (TaskRouter devrede).[/green]")
+                    else:
+                        full_id = agent_aliases.get(target, target)
+                        if full_id in registry.list_agents():
+                            active_agent_lock = full_id
+                            agent_obj = registry.get_agent(full_id)
+                            console.print(f"[bold magenta]Uzman kilitlendi:[/bold magenta] {agent_obj.name}")
+                        else:
+                            console.print(f"[bold red]Bilinmeyen ajan:[/bold red] '{target}'. Seçenekler: dl, cv, math, sw, auto")
+                else:
+                    current_name = registry.get_agent(active_agent_lock).name if active_agent_lock else "OTOMATİK"
+                    console.print(f"Mevcut Uzman: [bold magenta]{current_name}[/bold magenta]")
+                    console.print(f"Mevcut Tüm Ajanlar: {', '.join(registry.list_agents())}")
                 continue
             elif clean_input.lower().startswith("/rag"):
                 parts = clean_input.split(maxsplit=1)
@@ -109,35 +156,46 @@ def main():
                     console.print(f"[bold red][Hata][/bold red] Dizin taranamadı: {e}")
                 continue
 
-            # Query retrieval
-            augmented_query = clean_input
-            if rag_enabled:
-                retrieval = retriever.retrieve(clean_input)
-                if retrieval.has_context:
-                    console.print(f"[dim green]🔍 RAG Bağlamı Bulundu ({len(retrieval.chunks)} kaynak): {', '.join(retrieval.sources_summary)}[/dim green]")
-                    augmented_query = retriever.build_rag_prompt(clean_input, retrieval)
-                else:
-                    console.print("[dim yellow]ℹ Yüklenen dokümanlarda doğrudan eşleşme bulunamadı; genel mühendislik bilgisiyle yanıtlanıyor.[/dim yellow]")
-
-            conversation_history.append({"role": "user", "content": augmented_query})
-
-            console.print("\n[bold cyan]Asistan:[/bold cyan]")
+            # Orchestrate response stream
             response_chunks = []
-            
-            # Streaming live tokens
-            for token in client.chat_stream(
-                messages=conversation_history,
-                system_prompt=SYSTEM_ENGINEERING_PERSONA
-            ):
-                sys.stdout.write(token)
-                sys.stdout.flush()
-                response_chunks.append(token)
-            
-            full_response = "".join(response_chunks)
-            sys.stdout.write("\n")
-            # In history, preserve the user's natural query to not pollute next-turn context
-            conversation_history[-1]["content"] = clean_input
-            conversation_history.append({"role": "assistant", "content": full_response})
+            is_clarification = False
+
+            events = orchestrator.handle_query_stream(
+                query=clean_input,
+                conversation_history=conversation_history,
+                force_agent_id=active_agent_lock,
+                enable_rag=rag_enabled,
+            )
+
+            for event in events:
+                if event.event_type == "routing":
+                    console.print(f"[bold magenta]🤖 {event.content}[/bold magenta]")
+                elif event.event_type == "clarification":
+                    is_clarification = True
+                    console.print(Panel(
+                        f"[bold yellow]Sorunuzu daha kesin yanıtlayabilmek için netleştirme gerekiyor:[/bold yellow]\n\n"
+                        f"{event.content}",
+                        title="Netleştirme Talebi",
+                        border_style="yellow"
+                    ))
+                    break
+                elif event.event_type == "context":
+                    if event.metadata.get("sources"):
+                        console.print(f"[dim green]🔍 RAG Bağlamı: {', '.join(event.metadata['sources'])}[/dim green]")
+                    console.print("\n[bold cyan]Asistan:[/bold cyan]")
+                elif event.event_type == "token":
+                    sys.stdout.write(event.content)
+                    sys.stdout.flush()
+                    response_chunks.append(event.content)
+                elif event.event_type == "error":
+                    console.print(f"\n[bold red][Hata][/bold red] {event.content}")
+                elif event.event_type == "done":
+                    sys.stdout.write("\n")
+
+            if not is_clarification and response_chunks:
+                full_reply = "".join(response_chunks)
+                conversation_history.append({"role": "user", "content": clean_input})
+                conversation_history.append({"role": "assistant", "content": full_reply})
 
         except KeyboardInterrupt:
             console.print("\n[dim]Çıkış yapılıyor...[/dim]")
