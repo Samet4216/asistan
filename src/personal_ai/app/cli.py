@@ -1,4 +1,4 @@
-"""Interactive Terminal CLI for Personal Engineering AI Assistant (Phases 1, 2, 3).
+"""Interactive Terminal CLI for Personal Engineering AI Assistant (Phases 1-4).
 
 Run via:
     python -m personal_ai.app.cli
@@ -6,12 +6,14 @@ Run via:
 
 from pathlib import Path
 import sys
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
+from rich.table import Table
 
 from personal_ai.agents.specialists import AgentRegistry
+from personal_ai.memory.feedback_manager import FeedbackManager
 from personal_ai.rag.retriever import DocumentRetriever
 from personal_ai.routing.orchestrator import AgentOrchestrator
 from personal_ai.routing.router import TaskRouter
@@ -36,6 +38,7 @@ def main():
     registry = AgentRegistry()
     router = TaskRouter(registry=registry)
     retriever = DocumentRetriever()
+    feedback_mgr = FeedbackManager()
     orchestrator = AgentOrchestrator(
         registry=registry,
         router=router,
@@ -45,8 +48,8 @@ def main():
 
     rag_enabled = True
     active_agent_lock: Optional[str] = None  # None means automatic routing
+    last_interaction: Optional[Dict[str, Any]] = None
 
-    # Short aliases for quick switching
     agent_aliases = {
         "dl": "deep_learning",
         "cv": "computer_vision_uav",
@@ -57,12 +60,11 @@ def main():
     }
 
     console.print(Panel.fit(
-        f"[bold cyan]Personal Engineering AI Assistant & Research Lab[/bold cyan] [dim](Phase 3: Multi-Agent)[/dim]\n"
+        f"[bold cyan]Personal Engineering AI Assistant & Research Lab[/bold cyan] [dim](Phase 4: Feedback & Memory)[/dim]\n"
         f"Backend: [green]{client.base_url}[/green] | Model: [yellow]{client.default_model}[/yellow]\n"
         f"Active Specialist: [bold magenta]{active_agent_lock or 'AUTO (TaskRouter Active)'}[/bold magenta]\n"
         f"RAG Knowledge Base: [bold {'green' if rag_enabled else 'red'}]{'ACTIVE' if rag_enabled else 'OFF'}[/bold {'green' if rag_enabled else 'red'}] ({retriever.default_collection})\n"
-        f"Specialists: [dim]{', '.join(registry.list_agents())}[/dim]\n"
-        f"Commands: [dim]/agent [dl|cv|math|sw|auto], /add <file>, /index <dir>, /rag [on|off], /info, /clear, /exit[/dim]",
+        f"Commands: [dim]/agent [id|auto], /fb [+1|-1] <not>, /fb list, /add <dosya>, /index <dizin>, /rag [on|off], /clear, /exit[/dim]",
         border_style="cyan"
     ))
 
@@ -99,10 +101,10 @@ def main():
                     f"Model: {client.default_model}\n"
                     f"Available Models: {', '.join(models)}\n"
                     f"Context Window: {client.default_num_ctx} tokens\n"
-                    f"Temperature: {client.default_temperature}\n"
                     f"Specialist Mode: {active_agent_lock or 'Automatic Routing'}\n"
                     f"Available Agents: {', '.join(registry.list_agents())}\n"
-                    f"RAG Status: {'ACTIVE' if rag_enabled else 'DISABLED'} (Vault: {retriever.default_collection})",
+                    f"RAG Status: {'ACTIVE' if rag_enabled else 'DISABLED'} (Vault: {retriever.default_collection})\n"
+                    f"Total Feedback Logged: {len(feedback_mgr.load_all_feedback())}",
                     title="System Status",
                     border_style="blue"
                 ))
@@ -155,10 +157,81 @@ def main():
                 except Exception as e:
                     console.print(f"[bold red][Hata][/bold red] Dizin taranamadı: {e}")
                 continue
+            elif clean_input.lower().startswith("/fb"):
+                parts = clean_input.split(maxsplit=2)
+                subcmd = parts[1].lower() if len(parts) > 1 else "list"
+
+                if subcmd == "list":
+                    all_fb = feedback_mgr.load_all_feedback()[-5:]
+                    if not all_fb:
+                        console.print("[dim]Henüz kaydedilmiş geri bildirim bulunmuyor.[/dim]")
+                    else:
+                        table = Table(title="Son Geri Bildirim Kayıtları")
+                        table.add_column("ID", style="cyan")
+                        table.add_column("Ajan", style="magenta")
+                        table.add_column("Puan", justify="center")
+                        table.add_column("Onay", justify="center")
+                        table.add_column("Soru / Düzeltme")
+                        for fb in all_fb:
+                            score_str = "[green]+1[/green]" if fb.rating > 0 else ("[red]-1[/red]" if fb.rating < 0 else "0")
+                            verif_str = "[green]✔ Onaylı[/green]" if fb.is_verified_for_training else "[dim]Bekliyor[/dim]"
+                            table.add_row(fb.feedback_id, fb.agent_id, score_str, verif_str, fb.correction or fb.query[:40])
+                        console.print(table)
+                    continue
+
+                elif subcmd in ("+1", "1", "up"):
+                    if not last_interaction:
+                        console.print("[yellow]Puan verilecek önceki bir yanıt bulunamadı.[/yellow]")
+                        continue
+                    note = parts[2] if len(parts) > 2 else ""
+                    fb = feedback_mgr.log_interaction(
+                        query=last_interaction["query"],
+                        response=last_interaction["response"],
+                        agent_id=last_interaction["agent_id"],
+                        model_version=client.default_model,
+                        rating=1,
+                        correction=note or None,
+                        sources_used=last_interaction.get("sources", []),
+                    )
+                    console.print(f"[bold green]✔ Olumlu geri bildirim kaydedildi (ID: {fb.feedback_id}).[/bold green]")
+                    continue
+
+                elif subcmd in ("-1", "-1", "down"):
+                    if not last_interaction:
+                        console.print("[yellow]Düzeltme yapılacak önceki bir yanıt bulunamadı.[/yellow]")
+                        continue
+                    correction_text = parts[2] if len(parts) > 2 else Prompt.ask("[yellow]Lütfen doğru yanıtı veya eleştirinizi girin[/yellow]")
+                    fb = feedback_mgr.log_interaction(
+                        query=last_interaction["query"],
+                        response=last_interaction["response"],
+                        agent_id=last_interaction["agent_id"],
+                        model_version=client.default_model,
+                        rating=-1,
+                        correction=correction_text,
+                        sources_used=last_interaction.get("sources", []),
+                    )
+                    console.print(f"[bold green]✔ Düzeltme kaydı oluşturuldu (ID: {fb.feedback_id}).[/bold green] [dim]Kalite kontrolünden geçmeden eğitime eklenmez.[/dim]")
+                    continue
+
+                elif subcmd == "verify":
+                    if len(parts) < 3:
+                        console.print("[yellow]Kullanım: /fb verify <feedback_id> [train|val|test][/yellow]")
+                        continue
+                    args = parts[2].split()
+                    fb_id = args[0]
+                    split_choice = args[1] if len(args) > 1 else "train"
+                    success = feedback_mgr.verify_entry(fb_id, approved=True, split=split_choice)
+                    if success:
+                        console.print(f"[bold green]✔ Geri bildirim {fb_id} doğrulandı ve '{split_choice}' kümesine atandı.[/bold green]")
+                    else:
+                        console.print(f"[bold red]Geri bildirim ID'si bulunamadı:[/bold red] {fb_id}")
+                    continue
 
             # Orchestrate response stream
             response_chunks = []
             is_clarification = False
+            last_agent_id = active_agent_lock or "unknown"
+            last_sources: List[str] = []
 
             events = orchestrator.handle_query_stream(
                 query=clean_input,
@@ -169,6 +242,7 @@ def main():
 
             for event in events:
                 if event.event_type == "routing":
+                    last_agent_id = event.metadata.get("agent_id", last_agent_id)
                     console.print(f"[bold magenta]🤖 {event.content}[/bold magenta]")
                 elif event.event_type == "clarification":
                     is_clarification = True
@@ -181,7 +255,8 @@ def main():
                     break
                 elif event.event_type == "context":
                     if event.metadata.get("sources"):
-                        console.print(f"[dim green]🔍 RAG Bağlamı: {', '.join(event.metadata['sources'])}[/dim green]")
+                        last_sources = event.metadata["sources"]
+                        console.print(f"[dim green]🔍 RAG Bağlamı: {', '.join(last_sources)}[/dim green]")
                     console.print("\n[bold cyan]Asistan:[/bold cyan]")
                 elif event.event_type == "token":
                     sys.stdout.write(event.content)
@@ -196,6 +271,12 @@ def main():
                 full_reply = "".join(response_chunks)
                 conversation_history.append({"role": "user", "content": clean_input})
                 conversation_history.append({"role": "assistant", "content": full_reply})
+                last_interaction = {
+                    "query": clean_input,
+                    "response": full_reply,
+                    "agent_id": last_agent_id,
+                    "sources": last_sources,
+                }
 
         except KeyboardInterrupt:
             console.print("\n[dim]Çıkış yapılıyor...[/dim]")
